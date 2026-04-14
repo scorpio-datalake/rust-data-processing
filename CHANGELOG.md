@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-04-14
+
+### Fixed
+
+- **docs.rs**: Fix rustdoc intra-doc links that become hard errors under `RUSTDOCFLAGS=-D warnings` (broken `Some(None)`-style links, link to a private helper, redundant explicit targets, and ambiguous `glob` / `reduce` links). Version **0.1.6** documentation failed to build for this reason; republish after this change.
+
 ### Planned
 
 - **JVM / Java / Maven:** first-class bindings (native library + **Maven Central** artifact, cross-platform CI) are **Phase 3** scope, not Phase 2, so Phase 2 can focus on Rust + Python with **smaller releases** and faster cycles. Follow releases and notes here for when Java support lands.
@@ -61,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `profiling`, `validation`, `outliers`, `transform` (TransformSpec), `cdc` boundary types.
 - Optional `db_connectorx` for DB → Arrow → `DataSet` ingestion.
 
+[0.1.7]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.7
 [0.1.5]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.5
 [0.1.4]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.4
 [0.1.3]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.3

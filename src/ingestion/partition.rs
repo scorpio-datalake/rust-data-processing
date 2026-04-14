@@ -157,7 +157,7 @@ pub fn discover_hive_partitioned_files(
 
 /// Expand a filesystem glob pattern and return existing regular files, sorted by path.
 ///
-/// Uses the [`glob`] crate (shell-style patterns). Patterns are platform-specific; prefer explicit
+/// Uses the [`mod@glob`] crate (shell-style patterns). Patterns are platform-specific; prefer explicit
 /// paths in tests when possible.
 pub fn paths_from_glob(pattern: &str) -> IngestionResult<Vec<PathBuf>> {
     let mut out: Vec<PathBuf> = Vec::new();
