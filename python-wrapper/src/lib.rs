@@ -16,8 +16,9 @@ use pyo3::types::{PyDict, PyList};
 use rust_data_processing::execution::ExecutionEngine;
 use rust_data_processing::ingestion::{
     IngestionOptions, discover_hive_partitioned_files as discover_hive_partitioned_files_rs,
-    infer_schema_from_path, ingest_from_db, ingest_from_db_infer, ingest_from_path,
-    ingest_from_path_infer, parse_partition_segment as parse_partition_segment_rs,
+    infer_schema_from_path, ingest_from_db, ingest_from_db_infer, ingest_from_ordered_paths,
+    ingest_from_path, ingest_from_path_infer, parse_partition_segment as parse_partition_segment_rs,
+    paths_from_directory_scan as paths_from_directory_scan_rs,
     paths_from_explicit_list as paths_from_explicit_list_rs, paths_from_glob as paths_from_glob_rs,
 };
 use rust_data_processing::outliers::{
@@ -682,6 +683,39 @@ fn infer_schema_from_path_py(
     schema_to_py_list(py, &s)
 }
 
+/// Ingest an ordered list of files, concatenate rows, apply watermark once; returns `(dataset, metadata_dict)`.
+#[pyfunction(name = "ingest_from_ordered_paths")]
+#[pyo3(signature = (paths, schema, options=None))]
+fn ingest_from_ordered_paths_py(
+    py: Python<'_>,
+    paths: Vec<String>,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<(PyDataSet, PyObject)> {
+    let schema = schema_from_py(schema)?;
+    let opts = merge_ingestion_options(py, options)?;
+    let pbs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let (ds, meta) =
+        ingest_from_ordered_paths(&pbs, &schema, &opts).map_err(ingestion_err_to_py)?;
+    let d = PyDict::new(py);
+    let path_list = PyList::empty(py);
+    for p in &meta.paths {
+        path_list.append(p.to_string_lossy().to_string())?;
+    }
+    d.set_item("paths", path_list)?;
+    d.set_item(
+        "last_path",
+        meta.last_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string()),
+    )?;
+    match &meta.max_watermark_value {
+        Some(v) => d.set_item("max_watermark_value", value_to_py(py, v))?,
+        None => d.set_item("max_watermark_value", py.None())?,
+    }
+    Ok((PyDataSet::from_inner(ds), d.into()))
+}
+
 #[pyfunction(name = "ingest_from_path_infer")]
 #[pyo3(signature = (path, options=None))]
 fn ingest_from_path_infer_py(
@@ -994,6 +1028,22 @@ fn paths_from_glob(py: Python<'_>, pattern: &str) -> PyResult<PyObject> {
     Ok(list.into())
 }
 
+/// List files under `root` (recursive), optional glob on path relative to root; sorted for stable ordering.
+#[pyfunction(name = "paths_from_directory_scan")]
+#[pyo3(signature = (root, relative_pattern=None))]
+fn paths_from_directory_scan_py(
+    py: Python<'_>,
+    root: &str,
+    relative_pattern: Option<&str>,
+) -> PyResult<PyObject> {
+    let paths = paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
+    let list = PyList::empty(py);
+    for p in paths {
+        list.append(p.to_string_lossy().to_string())?;
+    }
+    Ok(list.into())
+}
+
 /// Validate paths exist as files; return them in order with duplicates removed (first wins).
 #[pyfunction]
 fn paths_from_explicit_list(py: Python<'_>, paths: Vec<String>) -> PyResult<PyObject> {
@@ -1028,6 +1078,7 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutionEngine>()?;
 
     m.add_function(wrap_pyfunction!(ingest_from_path_py, m)?)?;
+    m.add_function(wrap_pyfunction!(ingest_from_ordered_paths_py, m)?)?;
     m.add_function(wrap_pyfunction!(infer_schema_from_path_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_path_infer_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_py, m)?)?;
@@ -1050,6 +1101,7 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extension_version, m)?)?;
     m.add_function(wrap_pyfunction!(discover_hive_partitioned_files, m)?)?;
     m.add_function(wrap_pyfunction!(paths_from_glob, m)?)?;
+    m.add_function(wrap_pyfunction!(paths_from_directory_scan_py, m)?)?;
     m.add_function(wrap_pyfunction!(paths_from_explicit_list, m)?)?;
     m.add_function(wrap_pyfunction!(parse_partition_segment, m)?)?;
 

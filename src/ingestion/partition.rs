@@ -28,6 +28,16 @@
 //! - [`paths_from_glob`] expands a filesystem glob (e.g. `data/**/*.parquet`) to existing files.
 //! - [`paths_from_explicit_list`] checks that each path exists and is a file, then returns them in
 //!   order (deduplicated while preserving first occurrence).
+//! - [`paths_from_directory_scan`] walks a directory tree and returns matching files in sorted path
+//!   order (see **Deterministic ordering** below).
+//!
+//! ## Deterministic ordering (incremental batches)
+//!
+//! For repeatable pipelines, these helpers define a stable sequence:
+//!
+//! - [`paths_from_directory_scan`], [`paths_from_glob`], and [`discover_hive_partitioned_files`]
+//!   sort results by [`PathBuf`] (lexicographic / component-wise per the standard library).
+//! - [`paths_from_explicit_list`] preserves caller order (deduplicates while keeping first occurrence).
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -170,6 +180,72 @@ pub fn paths_from_glob(pattern: &str) -> IngestionResult<Vec<PathBuf>> {
         if p.is_file() {
             out.push(p);
         }
+    }
+
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
+/// Recursively list files under `root`, optionally filtered by a glob on the path **relative to
+/// `root`**, then sort for deterministic ordering.
+///
+/// Intended for **incremental directory batches**: pair with
+/// [`ingest_from_ordered_paths`](super::unified::ingest_from_ordered_paths) (or your own ordering)
+/// when you need the same file sequence across machines and runs.
+///
+/// - `root` must exist and be a directory.
+/// - If `relative_pattern` is `None`, every regular file under `root` is included.
+/// - If `Some`, it is a [`glob::Pattern`] matched against each file path relative to `root` (use
+///   forward slashes in the pattern string for portability, e.g. `**/*.csv`).
+pub fn paths_from_directory_scan(
+    root: impl AsRef<Path>,
+    relative_pattern: Option<&str>,
+) -> IngestionResult<Vec<PathBuf>> {
+    let root = root.as_ref();
+    if !root.is_dir() {
+        return Err(IngestionError::SchemaMismatch {
+            message: format!(
+                "directory scan root must be an existing directory: {}",
+                root.display()
+            ),
+        });
+    }
+
+    let pattern = match relative_pattern {
+        None => None,
+        Some(p) => Some(
+            Pattern::new(p).map_err(|e| IngestionError::SchemaMismatch {
+                message: format!("invalid glob pattern '{p}': {e}"),
+            })?,
+        ),
+    };
+
+    let root = root.to_path_buf();
+    let mut out = Vec::new();
+
+    for entry in WalkDir::new(&root).follow_links(false).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        let rel = match path.strip_prefix(&root) {
+            Ok(r) => r.to_path_buf(),
+            Err(_) => continue,
+        };
+
+        if let Some(ref pat) = pattern {
+            if !pat.matches_path_with(&rel, glob::MatchOptions {
+                case_sensitive: true,
+                require_literal_separator: true,
+                require_literal_leading_dot: false,
+            }) {
+                continue;
+            }
+        }
+
+        out.push(path.to_path_buf());
     }
 
     out.sort();

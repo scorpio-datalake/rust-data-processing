@@ -215,6 +215,89 @@ fn expect_bool(v: &Value, row: usize, column: &str) -> IngestionResult<bool> {
     }
 }
 
+/// Maximum value in `column` over **non-null** cells (ordering matches the column [`DataType`]:
+/// `Int64` / `Bool` / `Utf8` use [`Ord`]; `Float64` uses IEEE total order via [`f64::total_cmp`]).
+///
+/// Returns `None` if the column is missing, there are no rows, or every value in that column is
+/// null. Non-finite floats are ignored.
+pub fn max_value_in_column(ds: &DataSet, schema: &Schema, column: &str) -> Option<Value> {
+    let idx = schema.index_of(column)?;
+    let dt = &schema.fields[idx].data_type;
+    let mut best: Option<Value> = None;
+    for row in &ds.rows {
+        let cell = &row[idx];
+        if matches!(cell, Value::Null) {
+            continue;
+        }
+        if matches!(dt, DataType::Float64) {
+            if let Value::Float64(f) = cell {
+                if !f.is_finite() {
+                    continue;
+                }
+            }
+        }
+        best = Some(match &best {
+            None => cell.clone(),
+            Some(cur) => max_of_typed(dt, cur, cell),
+        });
+    }
+    best
+}
+
+fn max_of_typed(dt: &DataType, a: &Value, b: &Value) -> Value {
+    match dt {
+        DataType::Int64 => {
+            let ai = match a {
+                Value::Int64(i) => *i,
+                _ => return b.clone(),
+            };
+            let bi = match b {
+                Value::Int64(i) => *i,
+                _ => return a.clone(),
+            };
+            Value::Int64(ai.max(bi))
+        }
+        DataType::Float64 => {
+            let af = match a {
+                Value::Float64(f) => *f,
+                _ => return b.clone(),
+            };
+            let bf = match b {
+                Value::Float64(f) => *f,
+                _ => return a.clone(),
+            };
+            if !af.is_finite() {
+                return b.clone();
+            }
+            if !bf.is_finite() {
+                return a.clone();
+            }
+            Value::Float64(if af.total_cmp(&bf) == Ordering::Less { bf } else { af })
+        }
+        DataType::Bool => {
+            let ab = match a {
+                Value::Bool(x) => *x,
+                _ => return b.clone(),
+            };
+            let bb = match b {
+                Value::Bool(x) => *x,
+                _ => return a.clone(),
+            };
+            Value::Bool(ab.max(bb))
+        }
+        DataType::Utf8 => match (a, b) {
+            (Value::Utf8(sa), Value::Utf8(sb)) => {
+                if sb.as_str() > sa.as_str() {
+                    b.clone()
+                } else {
+                    a.clone()
+                }
+            }
+            _ => b.clone(),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +334,22 @@ mod tests {
         );
         let out = apply_watermark_filter(ds, &schema, "ts", &Value::Int64(99)).unwrap();
         assert_eq!(out.row_count(), 0);
+    }
+
+    #[test]
+    fn max_value_in_column_int64_skips_null() {
+        let schema = ts_schema();
+        let ds = DataSet::new(
+            schema.clone(),
+            vec![
+                vec![Value::Int64(1), Value::Int64(100)],
+                vec![Value::Int64(2), Value::Null],
+                vec![Value::Int64(3), Value::Int64(50)],
+            ],
+        );
+        assert_eq!(
+            max_value_in_column(&ds, &schema, "ts"),
+            Some(Value::Int64(100))
+        );
     }
 }

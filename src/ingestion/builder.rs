@@ -5,7 +5,9 @@ use crate::types::{DataSet, Schema, Value};
 
 use super::observability::IngestionObserver;
 use super::observability::IngestionSeverity;
-use super::unified::{ExcelSheetSelection, IngestionFormat, IngestionOptions, ingest_from_path};
+use super::unified::{
+    self, ExcelSheetSelection, IngestionFormat, IngestionOptions, OrderedBatchIngestMetadata, ingest_from_path,
+};
 
 /// Builder for [`IngestionOptions`].
 ///
@@ -81,6 +83,16 @@ impl IngestionOptionsBuilder {
     ) -> IngestionResult<DataSet> {
         let opts = self.build();
         ingest_from_path(path, schema, &opts)
+    }
+
+    /// Convenience: ordered multi-file ingest (see [`unified::ingest_from_ordered_paths`]).
+    pub fn ingest_from_ordered_paths(
+        self,
+        paths: &[std::path::PathBuf],
+        schema: &Schema,
+    ) -> IngestionResult<(DataSet, OrderedBatchIngestMetadata)> {
+        let opts = self.build();
+        unified::ingest_from_ordered_paths(paths, schema, &opts)
     }
 }
 
