@@ -42,6 +42,7 @@ Bindings for the [`rust-data-processing`](../README.md) crate. Types stay in **c
 | Function | Returns |
 |----------|---------|
 | `ingest_from_path(path, schema, options=None)` | `DataSet` |
+| `ingest_from_ordered_paths(paths, schema, options=None)` | `(DataSet, metadata dict)` — same `options` as single-file ingest; watermark applies once after concatenating rows; metadata has `paths`, `last_path`, `max_watermark_value` |
 | `infer_schema_from_path(path, options=None)` | schema list |
 | `ingest_from_path_infer(path, options=None)` | `DataSet` |
 | `ingest_with_inferred_schema(path, options=None)` | `(DataSet, schema list)` — convenience; same two-step behavior as Rust. |
@@ -77,6 +78,7 @@ With **`ingest_from_db` / `ingest_from_db_infer`**, the same keys apply when the
 |----------|---------|
 | `discover_hive_partitioned_files(root, file_pattern=None)` | `list[dict]` — each `{"path": str, "segments": [{"key": str, "value": str}, ...]}` |
 | `paths_from_glob(pattern)` | `list[str]` — existing files matching the glob (sorted) |
+| `paths_from_directory_scan(root, relative_pattern=None)` | `list[str]` — recursive directory listing; optional glob on path relative to `root`; sorted for stable ordering |
 | `paths_from_explicit_list(paths)` | `list[str]` — existing files only; deduped, order preserved |
 | `parse_partition_segment(component)` | `dict` `\| None` — `{"key", "value"}` for a `key=value` segment, else `None` |
 

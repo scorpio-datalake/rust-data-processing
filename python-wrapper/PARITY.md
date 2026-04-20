@@ -5,10 +5,11 @@ Status of Python (`rust_data_processing`) vs the main crate (`rust-data-processi
 | Rust module / API | Python surface | Notes |
 |-------------------|----------------|-------|
 | `ingestion::ingest_from_path` | `ingest_from_path` | |
+| `ingestion::ingest_from_ordered_paths` | `ingest_from_ordered_paths` | Returns `(DataSet, dict)` with `paths`, `last_path`, `max_watermark_value` |
 | `ingestion::infer_schema_from_path` | `infer_schema_from_path` | |
 | `ingestion::ingest_from_path_infer` | `ingest_from_path_infer`, `ingest_with_inferred_schema` | |
 | `ingestion::IngestionOptions` + observer | `options` dict: `format`, `excel_sheet_selection`, **`watermark_column`**, **`watermark_exclusive_above`**, **`observer`**, **`alert_at_or_above`** | Observer keys: `on_success`, `on_failure`, `on_alert` |
-| `ingestion::discover_hive_partitioned_files`, `paths_from_glob`, `paths_from_explicit_list`, `parse_partition_segment` | Same names on `rust_data_processing` | `discover_hive_partitioned_files` returns list of dicts |
+| `ingestion::discover_hive_partitioned_files`, `paths_from_glob`, `paths_from_directory_scan`, `paths_from_explicit_list`, `parse_partition_segment` | Same names on `rust_data_processing` | `discover_hive_partitioned_files` returns list of dicts |
 | `ingestion::ingest_from_db` | `ingest_from_db` | Needs `maturin` / `cargo` build with `--features db` on the extension |
 | `ingestion::ingest_from_db_infer` | `ingest_from_db_infer` | Same |
 | `types::DataSet` | `DataSet` | |

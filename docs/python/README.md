@@ -20,7 +20,7 @@ Use this as a **tour of the Python API** (the same page is rendered on [GitHub P
 
 | Topic | Where below |
 | --- | --- |
-| **File ETL** (CSV, JSON, Parquet, Excel) | [Quick start](#quick-start-library-usage), [JSON / Parquet / Excel](#json-parquet-and-excel) |
+| **File ETL** (CSV, JSON, Parquet, Excel) | [Quick start](#quick-start-library-usage), [JSON / Parquet / Excel](#json-parquet-and-excel), [Ordered paths & directory scans](#ordered-paths-and-directory-scans-incremental-batches) |
 | **Databases** (Python driver vs built-in ConnectorX) | [Database sources: two ways](#database-sources-two-ways), [ConnectorX](#direct-db-ingestion-connectorx-feature-gated) |
 | **SQL & lazy `DataFrame`** | [SQL](#sql-queries-polars-backed-phase-1), [DataFrame pipelines](#dataframe-centric-pipelines-polars-backed-phase-1), [Cookbook](#cookbook-phase-1) |
 | **Declarative transforms** | [`TransformSpec`](#end-user-transformation-spec-transformspec-phase-1) |
@@ -86,6 +86,20 @@ ds_parquet = rdp.ingest_from_path("path/to/file.parquet", schema_flat, {"format"
 
 # Excel — optional sheet selection in options (see python-wrapper/README.md)
 ds_excel = rdp.ingest_from_path("path/to/file.xlsx", schema_flat, {"format": "excel"})
+```
+
+### Ordered paths and directory scans (incremental batches)
+
+Use **`paths_from_directory_scan`** for a recursive listing with an optional glob on paths **relative to the root**; results are **sorted** so ordering is repeatable. Combine with **`ingest_from_ordered_paths`**: files are read in list order, rows are concatenated, then the same **watermark** options as single-file ingest apply **once** to the combined rows (not per file). The function returns `(DataSet, metadata)` where `metadata` includes `paths`, `last_path`, and `max_watermark_value` (when `watermark_column` / `watermark_exclusive_above` are set) for checkpointing the next run.
+
+```python
+paths = rdp.paths_from_directory_scan("data/incoming", "**/*.csv")
+ds, meta = rdp.ingest_from_ordered_paths(
+    paths,
+    schema,
+    {"watermark_column": "ts", "watermark_exclusive_above": 100},
+)
+print(meta["last_path"], meta["max_watermark_value"])
 ```
 
 ## DataFrame-centric pipelines (Polars-backed) (Phase 1)

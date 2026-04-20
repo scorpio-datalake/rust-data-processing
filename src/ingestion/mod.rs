@@ -6,6 +6,10 @@
 //! - performs ingestion into an in-memory [`crate::types::DataSet`]
 //! - optionally reports success/failure/alerts to an [`IngestionObserver`]
 //!
+//! For **append-only ordered batches**, use [`ingest_from_ordered_paths`] (concatenate rows, then
+//! apply the watermark filter once). For stable directory listings, see [`paths_from_directory_scan`]
+//! and [`partition`] module docs on deterministic ordering.
+//!
 //! For ergonomic configuration, prefer [`IngestionOptionsBuilder`] over constructing
 //! [`IngestionOptions`] directly.
 //!
@@ -112,12 +116,14 @@ pub use observability::{
 };
 pub use partition::{
     PartitionSegment, PartitionedFile, discover_hive_partitioned_files, hive_segments_for_relative_parent,
-    parse_partition_segment, paths_from_explicit_list, paths_from_glob,
+    parse_partition_segment, paths_from_directory_scan, paths_from_explicit_list, paths_from_glob,
 };
 pub use unified::{
-    ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest,
-    infer_schema_from_path, ingest_from_path, ingest_from_path_infer,
+    ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest, OrderedBatchIngestMetadata,
+    infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path, ingest_from_path_infer,
 };
-pub use watermark::{apply_watermark_after_ingest, apply_watermark_filter, validate_watermark_config};
+pub use watermark::{
+    apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column, validate_watermark_config,
+};
 
 pub use db::{ingest_from_db, ingest_from_db_infer};

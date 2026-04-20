@@ -20,7 +20,7 @@ use super::observability::{
     IngestionContext, IngestionObserver, IngestionSeverity, IngestionStats,
 };
 use super::polars_bridge::{infer_schema_from_dataframe_lossy, polars_error_to_ingestion};
-use super::watermark::{apply_watermark_after_ingest, validate_watermark_config};
+use super::watermark::{apply_watermark_after_ingest, max_value_in_column, validate_watermark_config};
 use super::{csv, excel, json, parquet};
 use polars::prelude::*;
 
@@ -335,6 +335,74 @@ pub fn ingest_from_path(
     }
 
     result
+}
+
+/// Per-file [`IngestionOptions`] with watermark fields cleared so each file is loaded in full; the
+/// caller applies [`apply_watermark_after_ingest`] once over the concatenated batch.
+fn options_without_watermark(options: &IngestionOptions) -> IngestionOptions {
+    let mut o = options.clone();
+    o.watermark_column = None;
+    o.watermark_exclusive_above = None;
+    o
+}
+
+/// Metadata from [`ingest_from_ordered_paths`]: which paths were read, the last path in that
+/// sequence, and (when incremental watermark options are set) the maximum value in the watermark
+/// column **after** the batch filter — useful for checkpointing the next run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderedBatchIngestMetadata {
+    /// Files ingested, in the order given.
+    pub paths: Vec<PathBuf>,
+    /// Last entry in [`Self::paths`] (typical append-only batch cursor).
+    pub last_path: Option<PathBuf>,
+    /// Maximum of the watermark column over non-null cells in the output dataset, when watermark
+    /// options were set; otherwise `None`.
+    pub max_watermark_value: Option<Value>,
+}
+
+/// Ingest many files **in order**, concatenate rows into one [`DataSet`], then apply the watermark
+/// filter **once** (if configured).
+///
+/// Semantics: the high-water filter applies to the **combined** rows, not per file. For each path,
+/// this calls [`ingest_from_path`] with watermark options temporarily cleared so observers see
+/// full per-file loads; the batch watermark runs after concatenation.
+pub fn ingest_from_ordered_paths<P: AsRef<Path>>(
+    paths: &[P],
+    schema: &Schema,
+    options: &IngestionOptions,
+) -> IngestionResult<(DataSet, OrderedBatchIngestMetadata)> {
+    validate_watermark_config(schema, options)?;
+    if paths.is_empty() {
+        return Err(IngestionError::SchemaMismatch {
+            message: "ingest_from_ordered_paths: empty path list".to_string(),
+        });
+    }
+
+    let path_bufs: Vec<PathBuf> = paths.iter().map(|p| p.as_ref().to_path_buf()).collect();
+    let per_file_opts = options_without_watermark(options);
+
+    let mut all_rows: Vec<Vec<Value>> = Vec::new();
+    for p in &path_bufs {
+        let ds = ingest_from_path(p, schema, &per_file_opts)?;
+        all_rows.extend(ds.rows.into_iter());
+    }
+
+    let mut ds = DataSet::new(schema.clone(), all_rows);
+    ds = apply_watermark_after_ingest(ds, schema, options)?;
+
+    let max_watermark_value = match &options.watermark_column {
+        Some(col) => max_value_in_column(&ds, schema, col),
+        None => None,
+    };
+
+    let last_path = path_bufs.last().cloned();
+    let meta = OrderedBatchIngestMetadata {
+        paths: path_bufs,
+        last_path,
+        max_watermark_value,
+    };
+
+    Ok((ds, meta))
 }
 
 /// Infer a [`Schema`] for an input file.
