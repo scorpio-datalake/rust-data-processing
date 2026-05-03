@@ -7,11 +7,11 @@
 
 |                                                | Link                                                                                                                                                                                                                                     |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://vihangdesai2018-png.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see `[docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)`.* |
+| **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://vihangdesai2018-png.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).* |
 | **Rust crate on crates.io**                    | [docs.rs — rust-data-processing](https://docs.rs/rust-data-processing) *(populates after the first successful publish)*                                                                                                                  |
-| **Markdown API guides**                        | `[API.md](API.md)` (Rust); Python: `[python-wrapper/API.md](python-wrapper/API.md)`                                                                                                                                                      |
-| **Rust examples (this repo)**                  | `[docs/rust/README.md](docs/rust/README.md)` — `Cargo.toml`, ingestion, DataFrame/SQL, cookbook, execution, benchmarks                                                                                                                   |
-| **Python examples (this repo)**                | `[docs/python/README.md](docs/python/README.md)` — same topics via `rust_data_processing`                                                                                                                                                |
+| **Markdown API guides**                        | [`API.md`](API.md) (Rust); Python: [`python-wrapper/API.md`](python-wrapper/API.md)                                                                                                                                                      |
+| **Rust examples (this repo)**                  | [`docs/rust/README.md`](docs/rust/README.md) — `Cargo.toml`, ingestion, DataFrame/SQL, cookbook, execution, benchmarks                                                                                                                   |
+| **Python examples (this repo)**                | [`docs/python/README.md`](docs/python/README.md) — same topics via `rust_data_processing`                                                                                                                                                |
 
 
 ## Quick start (Python)
@@ -44,7 +44,7 @@ uv sync --group dev
 uv run maturin develop --release
 ```
 
-**From PyPI** (after you publish a release — see `[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)`):
+**From PyPI** (after you publish a release — see [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)):
 
 ```bash
 pip install rust-data-processing
@@ -52,15 +52,15 @@ pip install rust-data-processing
 
 Use the same `import rust_data_processing as rdp` pattern; point `ingest_from_path` at your own CSV, JSON, or Parquet files and schema.
 
-**Rust:** `[docs/rust/README.md](docs/rust/README.md)` has copy-paste examples for `Cargo.toml`, ingestion, Polars-backed pipelines, SQL, transforms, profiling, validation, execution, and benchmarks. **Python (expanded):** `[docs/python/README.md](docs/python/README.md)`. The conceptual Rust API overview is in `[API.md](API.md)`.
+**Rust:** [`docs/rust/README.md`](docs/rust/README.md) has copy-paste examples for `Cargo.toml`, ingestion, Polars-backed pipelines, SQL, transforms, profiling, validation, execution, and benchmarks. **Python (expanded):** [`docs/python/README.md`](docs/python/README.md). The conceptual Rust API overview is in [`API.md`](API.md).
 
-Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or `./scripts/build_docs.ps1 -All` (Rust + Python → `_site/python/`). Maintainer notes: `[docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)`.
+Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or `./scripts/build_docs.ps1 -All` (Rust + Python → `_site/python/`). Maintainer notes: [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).
 
 ## Reporting bugs
 
 - Open a **[GitHub Issue](https://github.com/vihangdesai2018-png/rust-data-processing/issues)** and use **Bug Report** or **Feature Request** so we get version, OS, and repro steps.
-- **Security:** do not file publicly — read `[SECURITY.md](SECURITY.md)`.
-- How we triage and prioritize: `[docs/ISSUE_TRIAGE.md](docs/ISSUE_TRIAGE.md)`.
+- **Security:** do not file publicly — read [`SECURITY.md`](SECURITY.md).
+- How we triage and prioritize: [`docs/ISSUE_TRIAGE.md`](docs/ISSUE_TRIAGE.md).
 - **Status**: library APIs are in `src/lib.rs`; the binary (`src/main.rs`) is currently just a placeholder.
 - **Developer guide**: see `README_DEV.md` (module map, workflows, conventions)
 - **Benchmark snapshot (pipeline bench)**: on this repo (Windows, Criterion), `filter → map → reduce(sum)`:
@@ -76,7 +76,7 @@ Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or 
 
 ![Library scope overview — Phase 2](docs/images/phase-2-scope-overview.png)
 
-Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local `**Planning/`** folder (gitignored—never committed). Nothing in the repo removes those files; this section is the public README summary only.
+Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Planning/`** folder (gitignored—never committed). Nothing in the repo removes those files; this section is the public README summary only.
 
 - Polars-first delegation for ingestion + DataFrame-centric pipelines
 - Polars-backed SQL support (default-on)
@@ -108,11 +108,11 @@ Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local `**Pl
 
 ## Python bindings
 
-Bindings live under `**python-wrapper/`** (**PyO3** + **maturin** + **uv**). User-facing docs: `**python-wrapper/README.md`**, `**python-wrapper/API.md**`, `**python-wrapper/README_DEV.md**`. The native module calls this crate; Polars stays on the Rust side.
+Bindings live under **`python-wrapper/`** (**PyO3** + **maturin** + **uv**). User-facing docs: **`python-wrapper/README.md`**, **`python-wrapper/API.md`**, **`python-wrapper/README_DEV.md`**. The native module calls this crate; Polars stays on the Rust side.
 
 **JVM / Java:** not shipped yet; a **Maven-resolvable** Java layer over the same Rust core is **planned for Phase 3** so releases can stay focused on Rust and Python first. See **[CHANGELOG.md](CHANGELOG.md)** (Unreleased → Planned).
 
-**Rust** examples (ingestion, DataFrame/SQL, transforms, profiling, execution, benchmarks): `[docs/rust/README.md](docs/rust/README.md)`.
+**Rust** examples (ingestion, DataFrame/SQL, transforms, profiling, execution, benchmarks): [`docs/rust/README.md`](docs/rust/README.md).
 
 ## What data can be consumed? (Epic 1 / Stories 1.1–1.2)
 
@@ -153,9 +153,9 @@ transformations using `rust_data_processing::processing`:
 - `arg_max_row` / `arg_min_row` — first row index where a column is max/min (ties: smallest index)
 - `top_k_by_frequency` — top‑k `(value, count)` pairs for label-style columns
 
-Polars-backed equivalents for whole-frame scalars: `pipeline::DataFrame::reduce`, `feature_wise_mean_std`. **Semantics**: `[docs/REDUCE_AGG_SEMANTICS.md](docs/REDUCE_AGG_SEMANTICS.md)`.
+Polars-backed equivalents for whole-frame scalars: `pipeline::DataFrame::reduce`, `feature_wise_mean_std`. **Semantics**: [`docs/REDUCE_AGG_SEMANTICS.md`](docs/REDUCE_AGG_SEMANTICS.md).
 
-Full **Rust** examples (filter/map/reduce, aggregates, parallel `ExecutionEngine`, Criterion benchmarks, ingestion observers): `[docs/rust/README.md](docs/rust/README.md)` § *Processing pipelines*.
+Full **Rust** examples (filter/map/reduce, aggregates, parallel `ExecutionEngine`, Criterion benchmarks, ingestion observers): [`docs/rust/README.md`](docs/rust/README.md) § *Processing pipelines*.
 
 ## Supported formats
 
@@ -263,15 +263,15 @@ After changing the *User* PATH, **restart your terminal** (or log out/in) so new
 
 ## License
 
-Dual-licensed under your choice of **Apache License 2.0** or **MIT**. See `[LICENSE-APACHE](LICENSE-APACHE)` and `[LICENSE-MIT](LICENSE-MIT)`.
+Dual-licensed under your choice of **Apache License 2.0** or **MIT**. See [`LICENSE-APACHE`](LICENSE-APACHE) and [`LICENSE-MIT`](LICENSE-MIT).
 
 SPDX-License-Identifier: `MIT OR Apache-2.0`
 
 ## Publishing to crates.io
 
-Maintainers: see `[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)` and `[docs/How_TO_deploy.md](docs/How_TO_deploy.md)`. After the first successful `cargo publish`, API docs appear on [docs.rs](https://docs.rs/rust-data-processing) for the published version.
+Maintainers: see [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) and [`docs/How_TO_deploy.md`](docs/How_TO_deploy.md). After the first successful `cargo publish`, API docs appear on [docs.rs](https://docs.rs/rust-data-processing) for the published version.
 
-#Lib Info 
+#Lib Info
 
 Runnable examples + docs: Python examples [https://lnkd.in/emVFbbja](https://lnkd.in/emVFbbja)
 GitHub: [https://lnkd.in/eQ6JkG3A](https://lnkd.in/eQ6JkG3A)

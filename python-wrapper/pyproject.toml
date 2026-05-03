@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "rust-data-processing"
-version = "0.1.5"
+version = "0.1.8"
 description = "Python bindings for rust-data-processing: schema-first CSV/JSON/Parquet/Excel ingestion into an in-memory DataSet."
 readme = "README_PYPI.md"
 requires-python = ">=3.10"
@@ -45,9 +45,10 @@ pythonpath = ["."]
 [tool.maturin]
 module-name = "rust_data_processing._rust_data_processing"
 python-source = "."
-# Same PNGs may exist under repo root `docs/images/` (e.g. `phase-2-scope-overview.png`) and
-# under `python-wrapper/docs/images/`; maturin would pack both into `…/docs/images/` in the
-# sdist and error. Keep the root `docs/images/` copy only.
+# PyPI long description: README_PYPI.md uses raw.githubusercontent.com for images so sdist/wheel
+# does not duplicate repo-root `docs/images/` (maturin + `cargo package` would otherwise pack the same
+# `docs/images/*.png` path twice). The canonical assets live under `docs/images/` at the repository root.
+# Exclude `python-wrapper/docs/images/**` so any local copies are not merged into the same archive paths.
 exclude = ["docs/images/**"]
 # Optional wheel builds with DB: set `features = ["db"]` here or pass `maturin build --features db`.
 # Optional abi3 (stable Python ABI): enable PyO3 `abi3-py310` (or similar) in Cargo.toml and set

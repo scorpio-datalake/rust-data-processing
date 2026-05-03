@@ -1,6 +1,10 @@
 # rust-data-processing
 
+![Phase 1 scope: sources → rust-data-processing → Python / optional AI & ML surfaces](./docs/images/phase-1-scope-overview.png)
+
 **Rust** library: schema-first ingestion (CSV, JSON, Parquet, Excel with Cargo features) into an in-memory [`DataSet`](https://docs.rs/rust-data-processing/latest/rust_data_processing/types/struct.DataSet.html), plus Polars-backed pipelines, optional SQL, profiling, validation, and map/reduce-style processing.
+
+*Infographic: Phase 1 — single-node, library-first flow (ingest → `DataSet`, pipelines, SQL, profile, validate, outliers, transforms, parallel execution, PyO3 bindings, optional chatbot / notebook story).*
 
 **Limits (masking / “PII”):** UTF-8 transforms and validation checks are **mechanical** helpers only; callers supply policy and must not treat outputs as legal guarantees. See `Planning/P2_E6_PRIVACY_POLICY.md` in the repository.
 

@@ -12,19 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase 2 (batch):** `ReduceOp::Median` / `Agg::Median`; UTF-8 privacy `TransformStep`s (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`); validation `Check::Utf8LenCharsBetween`; modules **`export`** (JSONL + deterministic train/test indices), **`privacy`** (UTF-8 diff summaries), **`reports`** (byte-safe truncation); Arrow **`record_batches_to_dataset`** + `LargeUtf8` support; Python bindings `export_dataset_jsonl`, `privacy_summarize_utf8_changes_json`, `reports_truncate_utf8_bytes`.
 - **Docs & examples:** lake read ADR + user guide, SFT format guide, outreach shortlist, ML reduce gap audit, P2-E6 policy + P2-E7 deferral notes, vector export recipe, `examples/{dbt,airflow,tabular_nn,llm_prep}/`, `notebooks/` index + starter notebooks.
 
+## [0.1.8] - 2026-04-14
+
+### Changed
+
+- (summarize this release)
+
 ## [0.1.7] - 2026-04-14
 
 ### Fixed
 
-- **docs.rs**: Fix rustdoc intra-doc links that become hard errors under `RUSTDOCFLAGS=-D warnings` (broken `Some(None)`-style links, link to a private helper, redundant explicit targets, and ambiguous `glob` / `reduce` links). Version **0.1.6** documentation failed to build for this reason; republish after this change.
+- **docs.rs**: Fix rustdoc intra-doc links that become hard errors under `RUSTDOCFLAGS=-D warnings` (broken `Some(None)`-style links, link to a private helper, redundant `DataSet` targets, ambiguous `glob` / `reduce` links). Republish so docs.rs can rebuild (0.1.6 docs build failed).
+- **docs.rs**: add `[package.metadata.docs.rs]` with `cargo-args = ["-j", "1"]` so the documentation build is less likely to run out of memory while compiling Polars and the rest of the dependency graph (see `Cargo.toml` comments).
+- **PyPI / maturin**: Remove duplicate `docs/images/phase-1-scope-overview.png` under `python-wrapper/` and drop `[tool.maturin] include` for PNGs. The sdist merged the repo-root image (from `cargo package`) with the wrapper copy and failed with “was already added … can't add it from … python-wrapper/docs/images/”. The PyPI README now uses a **raw.githubusercontent.com** URL for that image; canonical file stays at **`docs/images/`** in the repo.
 
 ### Planned
 
 - **JVM / Java / Maven:** first-class bindings (native library + **Maven Central** artifact, cross-platform CI) are **Phase 3** scope, not Phase 2, so Phase 2 can focus on Rust + Python with **smaller releases** and faster cycles. Follow releases and notes here for when Java support lands.
 
-### Fixed
+## [0.1.6] - 2026-04-13
 
-- **docs.rs**: add `[package.metadata.docs.rs]` with `cargo-args = ["-j", "1"]` so the documentation build is less likely to run out of memory while compiling Polars and the rest of the dependency graph (see `Cargo.toml` comments).
+### Changed
+
+- (summarize this release)
 
 ## [0.1.5] - 2026-04-02
 
@@ -72,7 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `profiling`, `validation`, `outliers`, `transform` (TransformSpec), `cdc` boundary types.
 - Optional `db_connectorx` for DB → Arrow → `DataSet` ingestion.
 
+[0.1.8]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.8
 [0.1.7]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.7
+[0.1.6]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.6
 [0.1.5]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.5
 [0.1.4]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.4
 [0.1.3]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.3

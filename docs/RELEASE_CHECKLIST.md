@@ -16,6 +16,8 @@ The release script **`scripts/release.py`** (or **`./scripts/release_tag.ps1`**)
 
 PyPI uses **`pyproject.toml`** as the distribution version; the extension crate version should match for maintainability.
 
+**README assets:** Keep the Phase 1 infographic at **`docs/images/phase-1-scope-overview.png`** (repository root). The **PyPI** project description (`python-wrapper/README_PYPI.md`) links that image via **raw.githubusercontent.com** so source distributions do not bundle a second copy under `python-wrapper/` (which broke `maturin` sdist with duplicate paths). The `Planning/` tree is gitignored and is not a publish source for this asset.
+
 ## 2) Changelog + CI
 
 1. Finish the new section in **`CHANGELOG.md`** (replace the stub line if the script added one) ([Keep a Changelog](https://keepachangelog.com/)).
