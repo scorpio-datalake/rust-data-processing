@@ -9,7 +9,7 @@
 | `src/convert.rs` | Shared Python ↔ Rust parsing (`schema`, validation spec, profile/outlier options, …) |
 | `pyproject.toml` | PEP 517 build (`maturin`), project metadata, **uv** `dependency-groups.dev` |
 | `rust_data_processing/__init__.py` | Stable imports + JSON helpers (`profile_dataset`, `transform_apply`, …) |
-| `tests/` | `pytest`: smoke, bindings, SQL / deep / observability / mapping / ingestion parity, benchmarks |
+| `tests/` | `pytest`: smoke, bindings, **`test_phase2.py`** (export / privacy / UTF-8 transforms / `utf8_len` validation / median), SQL / deep / observability / mapping / ingestion parity, benchmarks |
 | `scripts/*.ps1` | Windows: `Run-UnitTests`, `Run-DeepTests`, `Run-BenchmarkTests` |
 
 ## Tooling with uv

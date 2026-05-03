@@ -150,7 +150,7 @@ Each dict has `"type"` and fields depending on type:
 |--------|------------|
 | `count_rows` | `alias` |
 | `count_not_null` | `column`, `alias` |
-| `sum`, `min`, `max`, `mean` | `column`, `alias` |
+| `sum`, `min`, `max`, `mean`, `median` | `column`, `alias` |
 | `variance`, `std_dev` | `column`, `alias`, optional `kind` (`population` / `sample`) |
 | `sum_squares`, `l2_norm` | `column`, `alias` |
 | `count_distinct_non_null` | `column`, `alias` |
@@ -170,7 +170,27 @@ Each dict has `"type"` and fields depending on type:
 
 ### Reduce op names (`processing_reduce`, `DataFrame.reduce`)
 
-`count`, `sum`, `min`, `max`, `mean`, `variance_population`, `variance_sample`, `stddev_population`, `stddev_sample`, `sum_squares`, `l2_norm`, `count_distinct_non_null` (plus common aliases — see Rust docs).
+`count`, `sum`, `min`, `max`, `mean`, `median`, `variance_population`, `variance_sample`, `stddev_population`, `stddev_sample`, `sum_squares`, `l2_norm`, `count_distinct_non_null` (plus common aliases — see Rust docs).
+
+---
+
+## Export, privacy summaries, truncation (Phase 2)
+
+| Function | Role |
+|----------|------|
+| `export_dataset_jsonl(dataset, columns)` | One JSON object per row (UTF-8); `columns` is ordered `list[str]` of schema names. |
+| `export_train_test_row_indices(row_count, test_fraction)` | Returns `(train_indices, test_indices)` as two lists of `int` (deterministic split; see Rust `export::train_test_row_indices`). |
+| `export_filter_rows_max_utf8_chars(dataset, column, max_chars)` | New `DataSet`: drops rows where UTF-8 `column` exceeds `max_chars` Unicode scalars; nulls kept. |
+| `privacy_summarize_utf8_changes_json(before, after, columns)` | JSON string summarizing UTF-8 cell diffs per column name. |
+| `privacy_summarize_utf8_changes_markdown(before, after, columns)` | Markdown bullet list for the same summaries. |
+| `reports_truncate_utf8_bytes(text, max_bytes)` | Truncates UTF-8 safely to a byte budget; adds a short suffix marker. |
+
+**`rust_data_processing` package helpers** (pure Python, same module):
+
+| Helper | Role |
+|--------|------|
+| `export_jsonl_records(dataset, columns)` | `list[dict]` from `export_dataset_jsonl` lines. |
+| `privacy_summarize_utf8_changes(before, after, columns, as_markdown=False)` | Parsed `list[dict]` or Markdown string. |
 
 ---
 
@@ -181,7 +201,7 @@ Each dict has `"type"` and fields depending on type:
 | `transform_apply_json(dataset, spec_json)` | `spec_json` is JSON for Rust `TransformSpec` (serde shape). |
 | `transform_apply(dataset, spec)` | `spec` may be a `str` or a `dict` (serialized to JSON internally). |
 
-Serde uses Rust enum names for steps, e.g. `Select`, `Rename`, `Cast`, `FillNull`, … and `DataType` variants as strings (`Int64`, `Float64`, …).
+Serde uses Rust enum names for steps, e.g. `Select`, `Rename`, `Cast`, `FillNull`, `Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`, … and `DataType` variants as strings (`Int64`, `Float64`, …).
 
 ---
 
@@ -205,7 +225,7 @@ Serde uses Rust enum names for steps, e.g. `Select`, `Rename`, `Cast`, `FillNull
 | `validate_dataset_markdown(dataset, spec)` | Markdown |
 | `validate_dataset(dataset, spec)` | `dict` |
 
-**`spec`**: `dict` with `checks` (list) and optional `max_examples`. Each check has `kind`: `not_null`, `range_f64`, `regex_match`, `in_set`, `unique`, plus fields per kind (`column`, `severity`, …).
+**`spec`**: `dict` with `checks` (list) and optional `max_examples`. Each check has `kind`: `not_null`, `range_f64`, `regex_match`, `in_set`, `unique`, `utf8_len_chars_between` (`min_chars`, `max_chars` as integers), plus fields per kind (`column`, `severity`, …).
 
 ---
 

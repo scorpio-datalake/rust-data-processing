@@ -36,6 +36,9 @@ pub enum ReduceOp {
     L2Norm,
     /// Count of distinct non-null values (returns [`Value::Int64`]).
     CountDistinctNonNull,
+    /// Median of numeric values as [`Value::Float64`], ignoring nulls. Even count: average of the two middle values.
+    /// Non-numeric columns yield [`Value::Null`].
+    Median,
 }
 
 /// Reduce a column using a built-in [`ReduceOp`].
@@ -46,6 +49,8 @@ pub enum ReduceOp {
 ///   `Some(Value::Null)` if there are no non-null numeric values, or if the column type is not
 ///   numeric (for those ops). `CountDistinctNonNull` supports [`DataType::Bool`] and
 ///   [`DataType::Utf8`] as well as numeric types.
+/// - For [`ReduceOp::Median`], non-numeric columns return `Some(Value::Null)`; numeric columns
+///   return [`Value::Float64`] (even-length inputs use the mean of the two middle values).
 pub fn reduce(dataset: &DataSet, column: &str, op: ReduceOp) -> Option<Value> {
     let idx = dataset.schema.index_of(column)?;
 
@@ -67,7 +72,39 @@ pub fn reduce(dataset: &DataSet, column: &str, op: ReduceOp) -> Option<Value> {
             Some(field) => reduce_numeric_float_stats(dataset, idx, field.data_type.clone(), op),
             None => None,
         },
+        ReduceOp::Median => reduce_median(dataset, idx),
     }
+}
+
+fn reduce_median(dataset: &DataSet, idx: usize) -> Option<Value> {
+    let field = dataset.schema.fields.get(idx)?;
+    if !matches!(field.data_type, DataType::Int64 | DataType::Float64) {
+        return Some(Value::Null);
+    }
+    let is_int = matches!(field.data_type, DataType::Int64);
+    let mut xs: Vec<f64> = Vec::new();
+    for row in &dataset.rows {
+        let x = match row.get(idx) {
+            Some(Value::Null) | None => None,
+            Some(Value::Int64(v)) if is_int => Some(*v as f64),
+            Some(Value::Float64(v)) if !is_int => Some(*v),
+            _ => None,
+        };
+        if let Some(x) = x {
+            xs.push(x);
+        }
+    }
+    if xs.is_empty() {
+        return Some(Value::Null);
+    }
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = xs.len();
+    let med = if n % 2 == 1 {
+        xs[n / 2]
+    } else {
+        (xs[n / 2 - 1] + xs[n / 2]) / 2.0
+    };
+    Some(Value::Float64(med))
 }
 
 #[derive(Default)]
@@ -573,5 +610,32 @@ mod tests {
             other => panic!("expected Float64, got {other:?}"),
         };
         assert!((l2 * l2 - ss).abs() < 1e-12);
+    }
+
+    #[test]
+    fn reduce_median_odd_and_even() {
+        let schema = Schema::new(vec![Field::new("x", DataType::Int64)]);
+        let odd = DataSet::new(
+            schema.clone(),
+            vec![
+                vec![Value::Int64(3)],
+                vec![Value::Int64(1)],
+                vec![Value::Int64(2)],
+            ],
+        );
+        assert_eq!(reduce(&odd, "x", ReduceOp::Median), Some(Value::Float64(2.0)));
+        let even = DataSet::new(
+            schema,
+            vec![
+                vec![Value::Int64(10)],
+                vec![Value::Int64(20)],
+                vec![Value::Int64(30)],
+                vec![Value::Int64(40)],
+            ],
+        );
+        assert_eq!(
+            reduce(&even, "x", ReduceOp::Median),
+            Some(Value::Float64(25.0))
+        );
     }
 }

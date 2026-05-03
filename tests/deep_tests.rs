@@ -116,6 +116,7 @@ fn deep_reduce_new_ops_parity_in_memory_vs_polars_on_seattle_weather() {
         assert_reduce_parity(&ds, col, ReduceOp::Sum);
         assert_reduce_parity(&ds, col, ReduceOp::Min);
         assert_reduce_parity(&ds, col, ReduceOp::Max);
+        assert_reduce_parity(&ds, col, ReduceOp::Median);
     }
 
     assert_reduce_parity(&ds, "weather", ReduceOp::CountDistinctNonNull);
@@ -309,6 +310,7 @@ fn deep_reduce_new_ops_parity_on_job_runs_json_fixture() {
         assert_reduce_parity(&ds, col, ReduceOp::Sum);
         assert_reduce_parity(&ds, col, ReduceOp::Min);
         assert_reduce_parity(&ds, col, ReduceOp::Max);
+        assert_reduce_parity(&ds, col, ReduceOp::Median);
         assert_reduce_parity(&ds, col, ReduceOp::SumSquares);
         assert_reduce_parity(&ds, col, ReduceOp::L2Norm);
         assert_reduce_parity(&ds, col, ReduceOp::Variance(VarianceKind::Population));
