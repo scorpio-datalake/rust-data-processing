@@ -17,7 +17,14 @@ Status of Python (`rust_data_processing`) vs the main crate (`rust-data-processi
 | `execution::ExecutionEngine` | `ExecutionEngine` | `on_execution_event` ctor arg → execution metrics / chunk events |
 | `pipeline::DataFrame` | `DataFrame` | |
 | `sql` | `sql_query_dataset`, `SqlContext` | |
-| `transform::TransformSpec` | `transform_apply` / `transform_apply_json` | JSON serde shape |
+| `transform::TransformSpec` | `transform_apply` / `transform_apply_json` | JSON serde shape; includes UTF-8 privacy steps (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`) |
+| `export::dataset_to_jsonl` | `export_dataset_jsonl` | Stable column order |
+| `export::train_test_row_indices` | `export_train_test_row_indices` | |
+| `export::filter_rows_max_utf8_chars` | `export_filter_rows_max_utf8_chars` | |
+| `privacy::{summarize_utf8_column_changes, render_privacy_report_json}` | `privacy_summarize_utf8_changes_json` | |
+| `privacy::render_privacy_report_markdown` | `privacy_summarize_utf8_changes_markdown` | |
+| `reports::truncate_utf8_by_bytes` | `reports_truncate_utf8_bytes` | |
+| (same + Python helpers) | `export_jsonl_records`, `privacy_summarize_utf8_changes` | In `__init__.py` |
 | `profiling` | `profile_dataset*` | |
 | `validation` | `validate_dataset*` | |
 | `outliers` | `detect_outliers*` | |

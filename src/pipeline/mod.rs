@@ -147,6 +147,11 @@ pub enum Agg {
         column: String,
         alias: String,
     },
+    /// Median of numeric values (cast to `Float64` first), nulls ignored.
+    Median {
+        column: String,
+        alias: String,
+    },
 }
 
 /// Casting behavior for [`DataFrame::cast_with_mode`].
@@ -544,6 +549,7 @@ fn polars_reduce_expr(column: &str, op: ReduceOp) -> Expr {
         ReduceOp::SumSquares => c.clone().strict_cast(P::Float64).pow(lit(2.0)).sum(),
         ReduceOp::L2Norm => c.clone().strict_cast(P::Float64).pow(lit(2.0)).sum().sqrt(),
         ReduceOp::CountDistinctNonNull => c.drop_nulls().n_unique(),
+        ReduceOp::Median => c.clone().strict_cast(P::Float64).median(),
     }
 }
 
@@ -601,6 +607,10 @@ fn agg_to_expr(agg: &Agg) -> Expr {
         Agg::CountDistinctNonNull { column, alias } => col(column.as_str())
             .drop_nulls()
             .n_unique()
+            .alias(alias.as_str()),
+        Agg::Median { column, alias } => col(column.as_str())
+            .strict_cast(P::Float64)
+            .median()
             .alias(alias.as_str()),
     }
 }

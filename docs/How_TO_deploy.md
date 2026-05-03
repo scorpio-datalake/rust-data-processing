@@ -2,6 +2,8 @@
 
 This project is a Rust library (**crates.io**) and a Python package (**PyPI**) built with **PyO3 + maturin** from **`python-wrapper/`** (no `setup.py`).
 
+For **orchestration patterns** (dbt Python models, Airflow DAG sketches, exit-code contracts), see the committed examples under **[`examples/dbt/`](../examples/dbt/)** and **[`examples/airflow/`](../examples/airflow/)**.
+
 ---
 
 ## Deploy to crates.io (Rust)

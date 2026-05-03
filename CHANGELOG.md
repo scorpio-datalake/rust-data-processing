@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Phase 2 (batch):** `ReduceOp::Median` / `Agg::Median`; UTF-8 privacy `TransformStep`s (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`); validation `Check::Utf8LenCharsBetween`; modules **`export`** (JSONL + deterministic train/test indices), **`privacy`** (UTF-8 diff summaries), **`reports`** (byte-safe truncation); Arrow **`record_batches_to_dataset`** + `LargeUtf8` support; Python bindings `export_dataset_jsonl`, `privacy_summarize_utf8_changes_json`, `reports_truncate_utf8_bytes`.
+- **Docs & examples:** lake read ADR + user guide, SFT format guide, outreach shortlist, ML reduce gap audit, P2-E6 policy + P2-E7 deferral notes, vector export recipe, `examples/{dbt,airflow,tabular_nn,llm_prep}/`, `notebooks/` index + starter notebooks.
+
 ## [0.1.7] - 2026-04-14
 
 ### Fixed

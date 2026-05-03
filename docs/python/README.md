@@ -10,9 +10,19 @@ Install (from PyPI after release, or from a checkout with `maturin develop` — 
 pip install rust-data-processing
 ```
 
+**Notebooks:** see **[`notebooks/README.md`](../../notebooks/README.md)** in the repository for Jupyter examples.
+
 ```python
 import rust_data_processing as rdp
 ```
+
+### Delta Lake / Apache Iceberg (read path)
+
+The Rust crate’s **default build** does not embed a Delta/Iceberg table engine (see [`Planning/ADR_P2_E2_LAKE_TABLE_READ.md`](../../Planning/ADR_P2_E2_LAKE_TABLE_READ.md)). In Python, use **`deltalake`** or **`pyiceberg`** to scan a table, write **Parquet**, then call **`rdp.ingest_from_path`** on that file — or stay in Python/Polars for the heavy scan. Details: [`docs/LAKE_TABLE_READ.md`](../LAKE_TABLE_READ.md).
+
+### Phase 2 examples (export, privacy, median, validation, …)
+
+Copy-paste snippets live in **[`PHASE2_EXAMPLES.md`](PHASE2_EXAMPLES.md)** (same folder as this README).
 
 ### What this page covers
 
@@ -25,6 +35,8 @@ Use this as a **tour of the Python API** (the same page is rendered on [GitHub P
 | **SQL & lazy `DataFrame`** | [SQL](#sql-queries-polars-backed-phase-1), [DataFrame pipelines](#dataframe-centric-pipelines-polars-backed-phase-1), [Cookbook](#cookbook-phase-1) |
 | **Declarative transforms** | [`TransformSpec`](#end-user-transformation-spec-transformspec-phase-1) |
 | **ML / QA** (profile, validate, outliers) | [ML-oriented flow](#ml--training-dataset-prep-phase-1), [Profiling](#profiling-phase-1), [Validation](#validation-phase-1), [Outliers](#outlier-detection-phase-1) |
+| **Phase 2** (JSONL export, privacy, truncation, UTF-8 transforms, median, Delta handoff) | [Phase 2 examples](PHASE2_EXAMPLES.md), [Delta / Iceberg](#delta-lake--apache-iceberg-read-path) |
+| **SFT / fine-tuning prep** (Alpaca JSONL, HF optional, chat column) | [SFT Python examples](SFT_PYTHON_EXAMPLES.md), [`SFT_DATA_FORMATS.md`](../SFT_DATA_FORMATS.md) |
 | **Row-wise & parallel processing** | [Processing pipelines](#processing-pipelines-epic-1--story-12), [Execution engine](#execution-engine-parallel-pipelines-story-13) |
 | **Ingestion observability** | [Observability](#observability-failurealert-hooks) |
 | **CDC boundary types** | [CDC](#cdc-interface-boundary-phase-1-spike) |

@@ -1,6 +1,14 @@
 # Rust: ignore Cargo output at repo root and under sub-crates (e.g. python-wrapper/).
 target/
+# Alternate root `CARGO_TARGET_DIR` dirs (agent/tooling scratch builds), e.g. target-p2py, target-agent.
+/target-*/
 /_site
+
+# Root copy of the Phase 2 diagram; canonical tracked asset: docs/images/phase-2-scope-overview.png
+/Phase2.png
+
+# Cursor / local agent workspace files (do not commit)
+/.cursor/
 
 # Python
 __pycache__/

@@ -1,6 +1,6 @@
 # rust-data-processing
 
-**Rust** crate and **Python** package for ingesting common file formats (CSV / JSON / Parquet / Excel (feature-gated)) into an in-memory `DataSet`, with schema validation + inference helpers, in-memory + parallel processing primitives, and a Polars-backed DataFrame-centric pipeline API. Phase 1 also targets profiling, validation, and outlier-detection APIs and report formats, while keeping a small engine-agnostic public surface (SQL support is Polars-backed). Use whichever binding fits your stack—the capabilities are the same under the hood.
+**Rust** crate and **Python** package for ingesting common file formats (CSV / JSON / Parquet / Excel (feature-gated)) into an in-memory `DataSet`, with schema validation + inference helpers, in-memory + parallel processing primitives, and a Polars-backed DataFrame-centric pipeline API. **Phase 1** delivered profiling, validation, and outlier-detection APIs and report formats; **Phase 2** extends that surface with export (JSONL, train/test indices), UTF-8 privacy transforms, richer validation, and related Python bindings—still with a small engine-agnostic public core (SQL remains Polars-backed). Use whichever binding fits your stack—the capabilities are the same under the hood.
 
 ## Documentation (read the APIs online)
 
@@ -72,7 +72,9 @@ Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or 
     - 1M rows: ~74.10 ms median (\approx 13.5 million rows/sec)
   - **Reproduce**: `cargo bench --bench pipelines -- --warm-up-time 2 --measurement-time 6 --sample-size 50`
 
-## Phase 1 scope (roadmap)
+## Phase 2 scope (roadmap)
+
+![Library scope overview — Phase 2](docs/images/phase-2-scope-overview.png)
 
 Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local `**Planning/`** folder (gitignored—never committed). Nothing in the repo removes those files; this section is the public README summary only.
 
@@ -179,7 +181,7 @@ Disable default features (including SQL) if you want a smaller dependency surfac
 rust-data-processing = { path = ".", default-features = false }
 ```
 
-## “Pit of success” defaults (Phase 1)
+## “Pit of success” defaults (Phase 1–2)
 
 - **Ingestion defaults**: format is auto-detected by extension; observers are off by default; failures are surfaced as `IngestionError` (no automatic retries).
 - **Execution defaults**: `ExecutionOptions::default()` uses available parallelism, a moderate `chunk_size`, and throttles in-flight chunks.
