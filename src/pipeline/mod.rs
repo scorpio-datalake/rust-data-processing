@@ -155,19 +155,14 @@ pub enum Agg {
 }
 
 /// Casting behavior for [`DataFrame::cast_with_mode`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CastMode {
     /// Casting errors fail the pipeline at `collect()` time.
+    #[default]
     Strict,
     /// Casting errors yield nulls instead of failing.
     Lossy,
-}
-
-impl Default for CastMode {
-    fn default() -> Self {
-        Self::Strict
-    }
 }
 
 /// A DataFrame-centric pipeline compiled into a lazy plan.
@@ -416,7 +411,7 @@ impl DataFrame {
                 message: format!("missing reduce output column '{REDUCE_SCALAR_COL}'"),
             })?
             .as_materialized_series();
-        if s.len() == 0 {
+        if s.is_empty() {
             return Ok(Some(Value::Null));
         }
         let av = s.get(0).map_err(|e| IngestionError::SchemaMismatch {
@@ -446,7 +441,7 @@ impl DataFrame {
             .collect_schema()
             .map_err(|e| polars_error_to_ingestion("failed to collect polars schema", e))?;
         for c in columns {
-            if df_schema.get(*c).is_none() {
+            if df_schema.get(c).is_none() {
                 return Err(IngestionError::SchemaMismatch {
                     message: format!("feature_wise_mean_std: unknown column '{c}'"),
                 });
@@ -484,7 +479,7 @@ impl DataFrame {
         }
 
         let mut out = Vec::with_capacity(columns.len());
-        for i in 0..columns.len() {
+        for (i, _) in columns.iter().enumerate() {
             let mean_s = df
                 .column(&format!("__fwm_{i}_mean"))
                 .map_err(|_| IngestionError::SchemaMismatch {
