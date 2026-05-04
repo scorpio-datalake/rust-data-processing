@@ -99,10 +99,7 @@ pub enum TransformStep {
         delta: f64,
     },
     /// Truncate UTF-8 cells to at most `max_chars` Unicode scalars; nulls unchanged.
-    Utf8Truncate {
-        column: String,
-        max_chars: usize,
-    },
+    Utf8Truncate { column: String, max_chars: usize },
     /// Replace non-null UTF-8 with lowercase hex SHA-256 of the original UTF-8 bytes; nulls unchanged.
     Utf8Sha256Hex { column: String },
     /// If a UTF-8 cell is longer than `keep_left + keep_right`, keep both ends and insert `redaction` between; shorter cells unchanged.
@@ -177,15 +174,14 @@ impl TransformSpec {
                     source,
                     delta,
                 } => df.with_add_f64(name, source, *delta)?,
-                TransformStep::Utf8Truncate {
-                    column,
-                    max_chars,
-                } => Self::apply_utf8_dataset_step(df, |ds| {
-                    utf8_truncate_dataset(ds, column, *max_chars)
-                })?,
-                TransformStep::Utf8Sha256Hex { column } => Self::apply_utf8_dataset_step(df, |ds| {
-                    utf8_sha256_dataset(ds, column)
-                })?,
+                TransformStep::Utf8Truncate { column, max_chars } => {
+                    Self::apply_utf8_dataset_step(df, |ds| {
+                        utf8_truncate_dataset(ds, column, *max_chars)
+                    })?
+                }
+                TransformStep::Utf8Sha256Hex { column } => {
+                    Self::apply_utf8_dataset_step(df, |ds| utf8_sha256_dataset(ds, column))?
+                }
                 TransformStep::Utf8RedactMiddle {
                     column,
                     keep_left,
@@ -211,9 +207,12 @@ impl TransformSpec {
 }
 
 fn utf8_field_index(ds: &DataSet, column: &str) -> IngestionResult<usize> {
-    let idx = ds.schema.index_of(column).ok_or_else(|| IngestionError::SchemaMismatch {
-        message: format!("unknown column '{column}' for UTF-8 transform"),
-    })?;
+    let idx = ds
+        .schema
+        .index_of(column)
+        .ok_or_else(|| IngestionError::SchemaMismatch {
+            message: format!("unknown column '{column}' for UTF-8 transform"),
+        })?;
     if ds.schema.fields[idx].data_type != DataType::Utf8 {
         return Err(IngestionError::SchemaMismatch {
             message: format!("column '{column}' must be Utf8 for this transform"),
@@ -475,7 +474,10 @@ pub mod arrow {
                             }
                         } else {
                             return Err(IngestionError::SchemaMismatch {
-                                message: format!("arrow column '{}' is not Utf8/LargeUtf8", field.name),
+                                message: format!(
+                                    "arrow column '{}' is not Utf8/LargeUtf8",
+                                    field.name
+                                ),
                             });
                         }
                     }
@@ -500,8 +502,9 @@ pub mod arrow {
         for b in batches.iter().skip(1) {
             if b.schema().as_ref() != sch_ref.as_ref() {
                 return Err(IngestionError::SchemaMismatch {
-                    message: "record_batches_to_dataset: all batches must share the same Arrow schema"
-                        .to_string(),
+                    message:
+                        "record_batches_to_dataset: all batches must share the same Arrow schema"
+                            .to_string(),
                 });
             }
         }
@@ -662,9 +665,8 @@ mod tests {
             Schema::new(vec![Field::new("s", DataType::Utf8)]),
             vec![vec![Value::Utf8("abc".into())]],
         );
-        let spec2 = TransformSpec::new(ds2.schema.clone()).with_step(TransformStep::Utf8Sha256Hex {
-            column: "s".into(),
-        });
+        let spec2 = TransformSpec::new(ds2.schema.clone())
+            .with_step(TransformStep::Utf8Sha256Hex { column: "s".into() });
         let h = spec2.apply(&ds2).unwrap().rows[0][0].clone();
         let Value::Utf8(hex) = h else {
             panic!("expected utf8");

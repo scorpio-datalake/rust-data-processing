@@ -52,7 +52,9 @@ pub fn summarize_utf8_column_changes(
 }
 
 /// Pretty JSON for [`summarize_utf8_column_changes`].
-pub fn render_privacy_report_json(rows: &[Utf8ColumnChangeSummary]) -> crate::error::IngestionResult<String> {
+pub fn render_privacy_report_json(
+    rows: &[Utf8ColumnChangeSummary],
+) -> crate::error::IngestionResult<String> {
     serde_json::to_string_pretty(rows).map_err(|e| crate::error::IngestionError::SchemaMismatch {
         message: format!("privacy report json: {e}"),
     })
@@ -80,17 +82,11 @@ mod tests {
         let sc = Schema::new(vec![Field::new("email", DataType::Utf8)]);
         let before = DataSet::new(
             sc.clone(),
-            vec![
-                vec![Value::Utf8("a@b.c".into())],
-                vec![Value::Null],
-            ],
+            vec![vec![Value::Utf8("a@b.c".into())], vec![Value::Null]],
         );
         let after = DataSet::new(
             sc,
-            vec![
-                vec![Value::Utf8("a@***".into())],
-                vec![Value::Null],
-            ],
+            vec![vec![Value::Utf8("a@***".into())], vec![Value::Null]],
         );
         let r = summarize_utf8_column_changes(&before, &after, &["email".into()]);
         assert_eq!(r[0].cells_changed, 1);

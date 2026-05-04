@@ -623,7 +623,10 @@ mod tests {
                 vec![Value::Int64(2)],
             ],
         );
-        assert_eq!(reduce(&odd, "x", ReduceOp::Median), Some(Value::Float64(2.0)));
+        assert_eq!(
+            reduce(&odd, "x", ReduceOp::Median),
+            Some(Value::Float64(2.0))
+        );
         let even = DataSet::new(
             schema,
             vec![

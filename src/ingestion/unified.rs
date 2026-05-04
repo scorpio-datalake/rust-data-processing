@@ -20,7 +20,9 @@ use super::observability::{
     IngestionContext, IngestionObserver, IngestionSeverity, IngestionStats,
 };
 use super::polars_bridge::{infer_schema_from_dataframe_lossy, polars_error_to_ingestion};
-use super::watermark::{apply_watermark_after_ingest, max_value_in_column, validate_watermark_config};
+use super::watermark::{
+    apply_watermark_after_ingest, max_value_in_column, validate_watermark_config,
+};
 use super::{csv, excel, json, parquet};
 use polars::prelude::*;
 

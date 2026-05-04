@@ -13,14 +13,18 @@ use crate::types::{DataSet, DataType, Schema, Value};
 use super::IngestionOptions;
 
 /// Ensure watermark options are consistent with `schema` and with each other.
-pub fn validate_watermark_config(schema: &Schema, options: &IngestionOptions) -> IngestionResult<()> {
+pub fn validate_watermark_config(
+    schema: &Schema,
+    options: &IngestionOptions,
+) -> IngestionResult<()> {
     let col = &options.watermark_column;
     let floor = &options.watermark_exclusive_above;
     match (col.as_ref(), floor.as_ref()) {
         (None, None) => Ok(()),
         (Some(_), None) | (None, Some(_)) => Err(IngestionError::SchemaMismatch {
-            message: "watermark_column and watermark_exclusive_above must both be set or both omitted"
-                .to_string(),
+            message:
+                "watermark_column and watermark_exclusive_above must both be set or both omitted"
+                    .to_string(),
         }),
         (Some(name), Some(floor_val)) => {
             if matches!(floor_val, Value::Null) {
@@ -28,9 +32,11 @@ pub fn validate_watermark_config(schema: &Schema, options: &IngestionOptions) ->
                     message: "watermark_exclusive_above must not be Null".to_string(),
                 });
             }
-            let idx = schema.index_of(name).ok_or_else(|| IngestionError::SchemaMismatch {
-                message: format!("watermark column '{name}' not found in schema"),
-            })?;
+            let idx = schema
+                .index_of(name)
+                .ok_or_else(|| IngestionError::SchemaMismatch {
+                    message: format!("watermark column '{name}' not found in schema"),
+                })?;
             let field = &schema.fields[idx];
             ensure_value_matches_type(floor_val, &field.data_type, "watermark_exclusive_above")?;
             Ok(())
@@ -64,9 +70,11 @@ pub fn apply_watermark_filter(
     column: &str,
     floor: &Value,
 ) -> IngestionResult<DataSet> {
-    let idx = schema.index_of(column).ok_or_else(|| IngestionError::SchemaMismatch {
-        message: format!("watermark column '{column}' not found in schema"),
-    })?;
+    let idx = schema
+        .index_of(column)
+        .ok_or_else(|| IngestionError::SchemaMismatch {
+            message: format!("watermark column '{column}' not found in schema"),
+        })?;
     let dt = &schema.fields[idx].data_type;
 
     let mut kept = Vec::with_capacity(ds.rows.len());
@@ -87,7 +95,10 @@ pub fn apply_watermark_after_ingest(
     schema: &Schema,
     options: &IngestionOptions,
 ) -> IngestionResult<DataSet> {
-    match (&options.watermark_column, &options.watermark_exclusive_above) {
+    match (
+        &options.watermark_column,
+        &options.watermark_exclusive_above,
+    ) {
         (None, None) => Ok(ds),
         (Some(col), Some(floor)) => apply_watermark_filter(ds, schema, col, floor),
         _ => Err(IngestionError::SchemaMismatch {
@@ -125,7 +136,7 @@ fn compare_cell_to_floor(
                 _ => {
                     return Err(IngestionError::SchemaMismatch {
                         message: "watermark value type mismatch (expected int64)".to_string(),
-                    })
+                    });
                 }
             };
             Ok(a.cmp(&b))
@@ -137,7 +148,7 @@ fn compare_cell_to_floor(
                 _ => {
                     return Err(IngestionError::SchemaMismatch {
                         message: "watermark value type mismatch (expected float64)".to_string(),
-                    })
+                    });
                 }
             };
             Ok(a.total_cmp(&b))
@@ -149,7 +160,7 @@ fn compare_cell_to_floor(
                 _ => {
                     return Err(IngestionError::SchemaMismatch {
                         message: "watermark value type mismatch (expected bool)".to_string(),
-                    })
+                    });
                 }
             };
             Ok(a.cmp(&b))
@@ -163,7 +174,7 @@ fn compare_cell_to_floor(
                         column: column.to_string(),
                         raw: format!("{cell:?}"),
                         message: "expected utf8 for watermark column".to_string(),
-                    })
+                    });
                 }
             };
             let b = match floor {
@@ -171,7 +182,7 @@ fn compare_cell_to_floor(
                 _ => {
                     return Err(IngestionError::SchemaMismatch {
                         message: "watermark value type mismatch (expected utf8)".to_string(),
-                    })
+                    });
                 }
             };
             Ok(a.cmp(b))
@@ -272,7 +283,11 @@ fn max_of_typed(dt: &DataType, a: &Value, b: &Value) -> Value {
             if !bf.is_finite() {
                 return a.clone();
             }
-            Value::Float64(if af.total_cmp(&bf) == Ordering::Less { bf } else { af })
+            Value::Float64(if af.total_cmp(&bf) == Ordering::Less {
+                bf
+            } else {
+                af
+            })
         }
         DataType::Bool => {
             let ab = match a {

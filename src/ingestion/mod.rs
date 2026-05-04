@@ -74,8 +74,8 @@ pub mod excel {
 #[cfg(feature = "db_connectorx")]
 pub mod db;
 pub mod json;
-pub mod partition;
 pub mod parquet;
+pub mod partition;
 #[cfg(not(feature = "db_connectorx"))]
 pub mod db {
     //! Direct DB ingestion stubs when `db_connectorx` is disabled.
@@ -100,7 +100,11 @@ pub mod db {
         Err(disabled())
     }
 
-    pub fn ingest_from_db_infer(_conn: &str, _query: &str, _options: &super::IngestionOptions) -> IngestionResult<DataSet> {
+    pub fn ingest_from_db_infer(
+        _conn: &str,
+        _query: &str,
+        _options: &super::IngestionOptions,
+    ) -> IngestionResult<DataSet> {
         Err(disabled())
     }
 }
@@ -115,15 +119,18 @@ pub use observability::{
     IngestionStats, StdErrObserver,
 };
 pub use partition::{
-    PartitionSegment, PartitionedFile, discover_hive_partitioned_files, hive_segments_for_relative_parent,
-    parse_partition_segment, paths_from_directory_scan, paths_from_explicit_list, paths_from_glob,
+    PartitionSegment, PartitionedFile, discover_hive_partitioned_files,
+    hive_segments_for_relative_parent, parse_partition_segment, paths_from_directory_scan,
+    paths_from_explicit_list, paths_from_glob,
 };
 pub use unified::{
-    ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest, OrderedBatchIngestMetadata,
-    infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path, ingest_from_path_infer,
+    ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest,
+    OrderedBatchIngestMetadata, infer_schema_from_path, ingest_from_ordered_paths,
+    ingest_from_path, ingest_from_path_infer,
 };
 pub use watermark::{
-    apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column, validate_watermark_config,
+    apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column,
+    validate_watermark_config,
 };
 
 pub use db::{ingest_from_db, ingest_from_db_infer};
