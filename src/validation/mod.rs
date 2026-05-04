@@ -142,7 +142,7 @@ pub fn validate_frame(df: &DataFrame, spec: &ValidationSpec) -> IngestionResult<
     let mut exprs: Vec<Expr> = Vec::with_capacity(spec.checks.len());
 
     for (i, chk) in spec.checks.iter().enumerate() {
-        exprs.push(fail_count_expr(chk).alias(&fail_count_col_name(i)));
+        exprs.push(fail_count_expr(chk).alias(fail_count_col_name(i)));
     }
 
     let agg = lf.select(exprs).collect().map_err(|e| {
@@ -233,13 +233,13 @@ pub fn render_validation_report_markdown(rep: &ValidationReport) -> String {
     out.push_str("### Results\n\n");
     for r in &rep.results {
         let status = if r.failed_count == 0 { "PASS" } else { "FAIL" };
-        out.push_str(&format!("- **{status}**: `{}`\n", format!("{:?}", r.check)));
+        out.push_str(&format!("- **{status}**: `{:?}`\n", r.check));
         out.push_str(&format!("  - Failed: **{}**\n", r.failed_count));
         out.push_str(&format!("  - Message: {}\n", r.message));
         if !r.examples.is_empty() {
             out.push_str("  - Examples:\n");
             for ex in &r.examples {
-                out.push_str(&format!("    - `{}`\n", format!("{ex:?}")));
+                out.push_str(&format!("    - `{ex:?}`\n"));
             }
         }
     }

@@ -98,7 +98,7 @@ pub fn ingest_json_from_str(input: &str, schema: &Schema) -> IngestionResult<Dat
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) {
         match v {
             serde_json::Value::Array(items) => ingest_json_values(&items, schema),
-            serde_json::Value::Object(_) => ingest_json_values(&vec![v], schema),
+            serde_json::Value::Object(_) => ingest_json_values(&[v], schema),
             _ => Err(IngestionError::SchemaMismatch {
                 message: "json must be an object, an array of objects, or NDJSON".to_string(),
             }),
