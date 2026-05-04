@@ -78,6 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f "${GITHUB_WORKSPACE}/site/python/rust_data_processing/examples.html"
+          test -f "${GITHUB_WORKSPACE}/site/python/rust_data_processing.html"
           # Stable URL (avoids deep path); same file as the pdoc module page.
           cp -f "${GITHUB_WORKSPACE}/site/python/rust_data_processing/examples.html" \
             "${GITHUB_WORKSPACE}/site/python/examples.html"
@@ -88,6 +89,8 @@ jobs:
           mkdir -p site/rust
           cp -a target/doc/. site/rust/
           cp -f docs/landing/index.html site/index.html
+          # Root /rust_data_processing.html was never part of the layout; pdoc lives under python/.
+          cp -f docs/landing/rust_data_processing.html site/rust_data_processing.html
 
       # Only needed for the deploy job (skip on PRs to avoid unused Pages artifacts).
       - name: Upload Pages artifact

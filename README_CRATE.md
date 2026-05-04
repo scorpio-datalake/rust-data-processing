@@ -1,10 +1,10 @@
 # rust-data-processing
 
-![Phase 1 scope: sources → rust-data-processing → Python / optional AI & ML surfaces](./docs/images/phase-1-scope-overview.png)
+![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/vihangdesai2018-png/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
 
-**Rust** library: schema-first ingestion (CSV, JSON, Parquet, Excel with Cargo features) into an in-memory [`DataSet`](https://docs.rs/rust-data-processing/latest/rust_data_processing/types/struct.DataSet.html), plus Polars-backed pipelines, optional SQL, profiling, validation, and map/reduce-style processing.
+**Rust** library: schema-first ingestion (CSV, JSON, Parquet, Excel with Cargo features) into an in-memory [`DataSet`](https://docs.rs/rust-data-processing/latest/rust_data_processing/types/struct.DataSet.html), plus Polars-backed pipelines, optional SQL, profiling, validation, map/reduce-style processing, **Phase 2** export (JSONL, train/test splits), UTF-8 privacy transforms and summaries, median aggregations, Arrow interop, and incremental ingest helpers.
 
-*Infographic: Phase 1 — single-node, library-first flow (ingest → `DataSet`, pipelines, SQL, profile, validate, outliers, transforms, parallel execution, PyO3 bindings, optional chatbot / notebook story).*
+*Infographic: Phase 2 — Phase 1 single-node flow (ingest → `DataSet`, pipelines, SQL, profile, validate, outliers, transforms, parallel execution) plus JSONL export, privacy tooling, median, Arrow batch paths, watermark / ordered-file / Hive-style discovery; JVM bindings planned Phase 3.*
 
 **Limits (masking / “PII”):** UTF-8 transforms and validation checks are **mechanical** helpers only; callers supply policy and must not treat outputs as legal guarantees. See `Planning/P2_E6_PRIVACY_POLICY.md` in the repository.
 
@@ -18,7 +18,9 @@ This file is the **crate README** shown on [crates.io](https://crates.io/crates/
 | **Repository** | [github.com/vihangdesai2018-png/rust-data-processing](https://github.com/vihangdesai2018-png/rust-data-processing) |
 | **Markdown API overview** | [`API.md`](./API.md) (shipped in this crate) |
 | **Rust examples & cookbook** | [`docs/rust/README.md`](./docs/rust/README.md) |
-| **HTML site (Rust + Python pages)** | [GitHub Pages](https://vihangdesai2018-png.github.io/rust-data-processing/) — use **Rust (rustdoc)** for this crate; [setup](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/docs/DOCUMENTATION.md) if the site is empty. |
+| **Python package (PyPI)** | [pypi.org/project/rust-data-processing](https://pypi.org/project/rust-data-processing/) |
+| **Python runnable examples (HTML)** | [GitHub Pages — examples](https://vihangdesai2018-png.github.io/rust-data-processing/python/examples.html) |
+| **HTML site (Rust + Python pages)** | [GitHub Pages — home](https://vihangdesai2018-png.github.io/rust-data-processing/) — **Rust (rustdoc):** [crate index on Pages](https://vihangdesai2018-png.github.io/rust-data-processing/rust/rust_data_processing/index.html) (or [docs.rs](https://docs.rs/rust-data-processing)); **Python (pdoc):** [module root](https://vihangdesai2018-png.github.io/rust-data-processing/python/rust_data_processing.html). [Setup](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/docs/DOCUMENTATION.md) if the site is empty. |
 
 ## Quick start (Rust)
 

@@ -7,10 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`README_CRATE.md`:** Phase 2 hero image uses **`raw.githubusercontent.com`** (same as PyPI) so [crates.io](https://crates.io/crates/rust-data-processing) and [docs.rs](https://docs.rs/rust-data-processing) always load the current PNG; documentation table adds **PyPI**, **Python examples (HTML)**, and explicit **GitHub Pages** URLs for Rust rustdoc vs Python pdoc (root `/rust_data_processing.html` is not rustdoc; see below).
+- **GitHub Pages:** Add `docs/landing/rust_data_processing.html` → `site/rust_data_processing.html` so `https://…/rust_data_processing.html` redirects to **`python/rust_data_processing.html`** (pdoc) with a visible link to **`rust/rust_data_processing/index.html`** (rustdoc). **`docs/DOCUMENTATION.md`** lists the canonical paths.
+
 ### Added
 
 - **Phase 2 (batch):** `ReduceOp::Median` / `Agg::Median`; UTF-8 privacy `TransformStep`s (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`); validation `Check::Utf8LenCharsBetween`; modules **`export`** (JSONL + deterministic train/test indices), **`privacy`** (UTF-8 diff summaries), **`reports`** (byte-safe truncation); Arrow **`record_batches_to_dataset`** + `LargeUtf8` support; Python bindings `export_dataset_jsonl`, `privacy_summarize_utf8_changes_json`, `reports_truncate_utf8_bytes`.
 - **Docs & examples:** lake read ADR + user guide, SFT format guide, outreach shortlist, ML reduce gap audit, P2-E6 policy + P2-E7 deferral notes, vector export recipe, `examples/{dbt,airflow,tabular_nn,llm_prep}/`, `notebooks/` index + starter notebooks.
+
+## [0.2.1] - 2026-05-04
+
+### Fixed
+
+- **crates.io / docs.rs / PyPI README:** Hero infographic now uses **`docs/images/phase-2-scope-overview.png`** and Phase 2 copy in **`README_CRATE.md`** and **`python-wrapper/README_PYPI.md`** (0.2.0 still showed the Phase 1 graphic on registries).
 
 ## [0.2.0] - 2026-05-04
 
@@ -88,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `profiling`, `validation`, `outliers`, `transform` (TransformSpec), `cdc` boundary types.
 - Optional `db_connectorx` for DB → Arrow → `DataSet` ingestion.
 
+[0.2.1]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.2.1
 [0.2.0]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.2.0
 [0.1.8]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.8
 [0.1.7]: https://github.com/vihangdesai2018-png/rust-data-processing/releases/tag/v0.1.7

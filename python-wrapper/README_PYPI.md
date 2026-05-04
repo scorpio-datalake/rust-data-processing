@@ -1,10 +1,10 @@
 # rust-data-processing
 
-![Phase 1 scope: sources → rust-data-processing → Python / optional AI & ML surfaces](https://raw.githubusercontent.com/vihangdesai2018-png/rust-data-processing/main/docs/images/phase-1-scope-overview.png)
+![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/vihangdesai2018-png/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
 
-Python bindings for the **[rust-data-processing](https://docs.rs/rust-data-processing)** crate: schema-first ingestion from CSV, JSON, Parquet, and Excel into an in-memory **`DataSet`**, with profiling, validation, Polars-backed pipelines, and SQL.
+Python bindings for the **[rust-data-processing](https://docs.rs/rust-data-processing)** crate: schema-first ingestion from CSV, JSON, Parquet, and Excel into an in-memory **`DataSet`**, with profiling, validation, Polars-backed pipelines, SQL, and **Phase 2** JSONL export, privacy transforms and summaries, median, Arrow interop, and incremental ingest helpers.
 
-*Infographic: Phase 1 — single-node, library-first flow (ingest → `DataSet`, pipelines, SQL, profile, validate, outliers, transforms, parallel execution, PyO3 bindings, optional chatbot / notebook story).*
+*Infographic: Phase 2 — Phase 1 flow plus export, privacy, median, Arrow, incremental ETL; JVM planned Phase 3.*
 
 This page is the **PyPI** project description (Python-only). Clone the [repository](https://github.com/vihangdesai2018-png/rust-data-processing) for developer setup, Rust sources, and the full monorepo README.
 
@@ -46,6 +46,7 @@ Copy-paste snippets: **[Phase 2 Python examples (Markdown in repo)](https://gith
 
 | | Link |
 | --- | --- |
+| **This package on PyPI** | [pypi.org/project/rust-data-processing](https://pypi.org/project/rust-data-processing/) |
 | **Python examples (HTML, pdoc)** | [GitHub Pages — examples](https://vihangdesai2018-png.github.io/rust-data-processing/python/examples.html) |
 | **Python API (HTML, pdoc)** | [GitHub Pages — Python](https://vihangdesai2018-png.github.io/rust-data-processing/python/) |
 | **Python API (markdown)** | [API.md in the repository](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/python-wrapper/API.md) |
