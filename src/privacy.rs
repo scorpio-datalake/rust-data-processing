@@ -32,14 +32,11 @@ pub fn summarize_utf8_column_changes(
         let mut non_null = 0usize;
         let mut changed = 0usize;
         for (br, ar) in before.rows.iter().zip(after.rows.iter()) {
-            match (br.get(bi), ar.get(ai)) {
-                (Some(Value::Utf8(sb)), Some(Value::Utf8(sa))) => {
-                    non_null += 1;
-                    if sb != sa {
-                        changed += 1;
-                    }
+            if let (Some(Value::Utf8(sb)), Some(Value::Utf8(sa))) = (br.get(bi), ar.get(ai)) {
+                non_null += 1;
+                if sb != sa {
+                    changed += 1;
                 }
-                _ => {}
             }
         }
         out.push(Utf8ColumnChangeSummary {
