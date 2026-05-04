@@ -42,8 +42,11 @@ jobs:
         with:
           cache-targets: "true"
 
+      # Omit `--locked` here: `cargo doc` still needs a resolvable graph, but a brief Cargo.toml /
+      # Cargo.lock mismatch (e.g. version bump before `cargo generate-lockfile`) should not block
+      # the docs job — `rust_ci.yml` enforces `--locked` on fmt, clippy, and tests.
       - name: cargo doc (rustdoc)
-        run: cargo doc --no-deps --locked
+        run: cargo doc --no-deps
 
       - name: setup uv
         uses: astral-sh/setup-uv@v8.0.0
