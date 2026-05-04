@@ -218,8 +218,7 @@ fn write_parquet(path: &Path, n: usize) -> std::io::Result<()> {
     let s_name = Series::new("name".into(), names);
 
     let cols: Vec<Column> = vec![s_id.into(), s_active.into(), s_score.into(), s_name.into()];
-    let mut df = DataFrame::new(n, cols)
-        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    let mut df = DataFrame::new(n, cols).map_err(|e| std::io::Error::other(e.to_string()))?;
 
     let mut f = File::create(path)?;
     ParquetWriter::new(&mut f)
