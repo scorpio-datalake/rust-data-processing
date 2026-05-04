@@ -1,6 +1,6 @@
 # Python quick start and examples
 
-![Phase 1 scope: sources → rust-data-processing → Python / optional AI & ML surfaces](../images/phase-1-scope-overview.png)
+![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](../images/phase-2-scope-overview.png)
 
 The same Markdown is **included in the HTML docs** (pdoc) as [`rust_data_processing.examples`](https://vihangdesai2018-png.github.io/rust-data-processing/python/examples.html) — see `python-wrapper/rust_data_processing/examples.py`.
 
