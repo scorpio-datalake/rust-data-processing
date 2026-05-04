@@ -218,13 +218,12 @@ fn write_parquet(path: &Path, n: usize) -> std::io::Result<()> {
     let s_name = Series::new("name".into(), names);
 
     let cols: Vec<Column> = vec![s_id.into(), s_active.into(), s_score.into(), s_name.into()];
-    let mut df = DataFrame::new(n, cols)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    let mut df = DataFrame::new(n, cols).map_err(|e| std::io::Error::other(e.to_string()))?;
 
     let mut f = File::create(path)?;
     ParquetWriter::new(&mut f)
         .finish(&mut df)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     Ok(())
 }
 
@@ -233,16 +232,16 @@ fn write_xlsx(path: &Path, n: usize) -> std::io::Result<()> {
     let mut wb = Workbook::new();
     let ws = wb.add_worksheet();
     ws.set_name("Sheet1")
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     ws.write_string(0, 0, "id")
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     ws.write_string(0, 1, "active")
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     ws.write_string(0, 2, "score")
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     ws.write_string(0, 3, "name")
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
 
     for i in 0..n {
         let row = (i + 1) as u32;
@@ -250,17 +249,17 @@ fn write_xlsx(path: &Path, n: usize) -> std::io::Result<()> {
         let score = (i as f64) * 0.1;
 
         ws.write_number(row, 0, i as f64)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         ws.write_boolean(row, 1, active)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         ws.write_number(row, 2, score)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         ws.write_string(row, 3, &format!("name_{i}"))
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
 
     wb.save(path)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
     Ok(())
 }
 

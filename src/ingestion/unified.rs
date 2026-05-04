@@ -14,12 +14,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::error::{IngestionError, IngestionResult};
-use crate::types::{DataSet, Schema};
+use crate::types::{DataSet, Schema, Value};
 
 use super::observability::{
     IngestionContext, IngestionObserver, IngestionSeverity, IngestionStats,
 };
 use super::polars_bridge::{infer_schema_from_dataframe_lossy, polars_error_to_ingestion};
+use super::watermark::{
+    apply_watermark_after_ingest, max_value_in_column, validate_watermark_config,
+};
 use super::{csv, excel, json, parquet};
 use polars::prelude::*;
 
@@ -50,9 +53,10 @@ impl IngestionFormat {
 }
 
 /// How to choose sheet(s) when ingesting an Excel workbook.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ExcelSheetSelection {
     /// Ingest the first sheet (default).
+    #[default]
     First,
     /// Ingest a single named sheet.
     Sheet(String),
@@ -60,12 +64,6 @@ pub enum ExcelSheetSelection {
     AllSheets,
     /// Ingest only the listed sheets (in order) and concatenate rows.
     Sheets(Vec<String>),
-}
-
-impl Default for ExcelSheetSelection {
-    fn default() -> Self {
-        Self::First
-    }
 }
 
 /// Options controlling unified ingestion behavior.
@@ -81,6 +79,12 @@ pub struct IngestionOptions {
     pub observer: Option<Arc<dyn IngestionObserver>>,
     /// Severity threshold at which `on_alert` is invoked.
     pub alert_at_or_above: IngestionSeverity,
+    /// Column name for incremental / high-water filtering (must be used with
+    /// [`Self::watermark_exclusive_above`]).
+    pub watermark_column: Option<String>,
+    /// Keep only rows where `watermark_column` is **strictly greater than** this value (same
+    /// [`crate::types::DataType`] as the column). Applied after ingest for file and DB sources.
+    pub watermark_exclusive_above: Option<Value>,
 }
 
 impl fmt::Debug for IngestionOptions {
@@ -90,6 +94,8 @@ impl fmt::Debug for IngestionOptions {
             .field("excel_sheet_selection", &self.excel_sheet_selection)
             .field("observer_set", &self.observer.is_some())
             .field("alert_at_or_above", &self.alert_at_or_above)
+            .field("watermark_column", &self.watermark_column)
+            .field("watermark_exclusive_above", &self.watermark_exclusive_above)
             .finish()
     }
 }
@@ -101,6 +107,8 @@ impl Default for IngestionOptions {
             excel_sheet_selection: ExcelSheetSelection::default(),
             observer: None,
             alert_at_or_above: IngestionSeverity::Critical,
+            watermark_column: None,
+            watermark_exclusive_above: None,
         }
     }
 }
@@ -220,6 +228,34 @@ impl Default for IngestionOptions {
 /// # }
 /// ```
 ///
+/// ## Incremental load (high-watermark on files)
+///
+/// Set [`IngestionOptions::watermark_column`] and [`IngestionOptions::watermark_exclusive_above`]
+/// to keep only rows where the watermark column is **strictly greater** than the floor value.
+/// Nulls in that column are dropped. The same options apply to
+/// [`ingest_from_db`](crate::ingestion::ingest_from_db) when the **`db_connectorx`** Cargo feature
+/// is enabled (filter runs after the query result is loaded).
+///
+/// ```no_run
+/// use rust_data_processing::ingestion::{ingest_from_path, IngestionOptions};
+/// use rust_data_processing::types::{DataType, Field, Schema, Value};
+///
+/// # fn main() -> Result<(), rust_data_processing::IngestionError> {
+/// let schema = Schema::new(vec![
+///     Field::new("id", DataType::Int64),
+///     Field::new("ts", DataType::Int64),
+/// ]);
+/// let opts = IngestionOptions {
+///     watermark_column: Some("ts".to_string()),
+///     watermark_exclusive_above: Some(Value::Int64(100)),
+///     ..Default::default()
+/// };
+/// let ds = ingest_from_path("tests/fixtures/watermark_events.csv", &schema, &opts)?;
+/// assert_eq!(ds.row_count(), 2);
+/// # Ok(())
+/// # }
+/// ```
+///
 /// ## Excel
 ///
 /// Example. Marked `no_run` so it is **compiled** by doctests
@@ -253,6 +289,8 @@ pub fn ingest_from_path(
     schema: &Schema,
     options: &IngestionOptions,
 ) -> IngestionResult<DataSet> {
+    validate_watermark_config(schema, options)?;
+
     let path = path.as_ref();
     let fmt = match options.format {
         Some(f) => f,
@@ -273,6 +311,8 @@ pub fn ingest_from_path(
         }
     };
 
+    let result = result.and_then(|ds| apply_watermark_after_ingest(ds, schema, options));
+
     if let Some(obs) = options.observer.as_ref() {
         match &result {
             Ok(ds) => obs.on_success(
@@ -292,6 +332,74 @@ pub fn ingest_from_path(
     }
 
     result
+}
+
+/// Per-file [`IngestionOptions`] with watermark fields cleared so each file is loaded in full; the
+/// caller applies [`apply_watermark_after_ingest`] once over the concatenated batch.
+fn options_without_watermark(options: &IngestionOptions) -> IngestionOptions {
+    let mut o = options.clone();
+    o.watermark_column = None;
+    o.watermark_exclusive_above = None;
+    o
+}
+
+/// Metadata from [`ingest_from_ordered_paths`]: which paths were read, the last path in that
+/// sequence, and (when incremental watermark options are set) the maximum value in the watermark
+/// column **after** the batch filter — useful for checkpointing the next run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OrderedBatchIngestMetadata {
+    /// Files ingested, in the order given.
+    pub paths: Vec<PathBuf>,
+    /// Last entry in [`Self::paths`] (typical append-only batch cursor).
+    pub last_path: Option<PathBuf>,
+    /// Maximum of the watermark column over non-null cells in the output dataset, when watermark
+    /// options were set; otherwise `None`.
+    pub max_watermark_value: Option<Value>,
+}
+
+/// Ingest many files **in order**, concatenate rows into one [`DataSet`], then apply the watermark
+/// filter **once** (if configured).
+///
+/// Semantics: the high-water filter applies to the **combined** rows, not per file. For each path,
+/// this calls [`ingest_from_path`] with watermark options temporarily cleared so observers see
+/// full per-file loads; the batch watermark runs after concatenation.
+pub fn ingest_from_ordered_paths<P: AsRef<Path>>(
+    paths: &[P],
+    schema: &Schema,
+    options: &IngestionOptions,
+) -> IngestionResult<(DataSet, OrderedBatchIngestMetadata)> {
+    validate_watermark_config(schema, options)?;
+    if paths.is_empty() {
+        return Err(IngestionError::SchemaMismatch {
+            message: "ingest_from_ordered_paths: empty path list".to_string(),
+        });
+    }
+
+    let path_bufs: Vec<PathBuf> = paths.iter().map(|p| p.as_ref().to_path_buf()).collect();
+    let per_file_opts = options_without_watermark(options);
+
+    let mut all_rows: Vec<Vec<Value>> = Vec::new();
+    for p in &path_bufs {
+        let ds = ingest_from_path(p, schema, &per_file_opts)?;
+        all_rows.extend(ds.rows);
+    }
+
+    let mut ds = DataSet::new(schema.clone(), all_rows);
+    ds = apply_watermark_after_ingest(ds, schema, options)?;
+
+    let max_watermark_value = match &options.watermark_column {
+        Some(col) => max_value_in_column(&ds, schema, col),
+        None => None,
+    };
+
+    let last_path = path_bufs.last().cloned();
+    let meta = OrderedBatchIngestMetadata {
+        paths: path_bufs,
+        last_path,
+        max_watermark_value,
+    };
+
+    Ok((ds, meta))
 }
 
 /// Infer a [`Schema`] for an input file.

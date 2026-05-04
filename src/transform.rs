@@ -60,10 +60,11 @@
 //! # }
 //! ```
 
-use crate::error::IngestionResult;
+use crate::error::{IngestionError, IngestionResult};
 use crate::pipeline::{CastMode, DataFrame};
 use crate::types::{DataSet, DataType, Schema, Value};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 /// A transformation step in a [`TransformSpec`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -96,6 +97,18 @@ pub enum TransformStep {
         name: String,
         source: String,
         delta: f64,
+    },
+    /// Truncate UTF-8 cells to at most `max_chars` Unicode scalars; nulls unchanged.
+    Utf8Truncate { column: String, max_chars: usize },
+    /// Replace non-null UTF-8 with lowercase hex SHA-256 of the original UTF-8 bytes; nulls unchanged.
+    Utf8Sha256Hex { column: String },
+    /// If a UTF-8 cell is longer than `keep_left + keep_right`, keep both ends and insert `redaction` between; shorter cells unchanged.
+    Utf8RedactMiddle {
+        column: String,
+        keep_left: usize,
+        keep_right: usize,
+        /// Literal inserted between preserved ends (e.g. `"***"`).
+        redaction: String,
     },
 }
 
@@ -161,11 +174,102 @@ impl TransformSpec {
                     source,
                     delta,
                 } => df.with_add_f64(name, source, *delta)?,
+                TransformStep::Utf8Truncate { column, max_chars } => {
+                    Self::apply_utf8_dataset_step(df, |ds| {
+                        utf8_truncate_dataset(ds, column, *max_chars)
+                    })?
+                }
+                TransformStep::Utf8Sha256Hex { column } => {
+                    Self::apply_utf8_dataset_step(df, |ds| utf8_sha256_dataset(ds, column))?
+                }
+                TransformStep::Utf8RedactMiddle {
+                    column,
+                    keep_left,
+                    keep_right,
+                    redaction,
+                } => Self::apply_utf8_dataset_step(df, |ds| {
+                    utf8_redact_middle_dataset(ds, column, *keep_left, *keep_right, redaction)
+                })?,
             };
         }
 
         df.collect_with_schema(&self.output_schema)
     }
+
+    fn apply_utf8_dataset_step<F>(df: DataFrame, mut f: F) -> IngestionResult<DataFrame>
+    where
+        F: FnMut(&mut DataSet) -> IngestionResult<()>,
+    {
+        let mut ds = df.collect()?;
+        f(&mut ds)?;
+        DataFrame::from_dataset(&ds)
+    }
+}
+
+fn utf8_field_index(ds: &DataSet, column: &str) -> IngestionResult<usize> {
+    let idx = ds
+        .schema
+        .index_of(column)
+        .ok_or_else(|| IngestionError::SchemaMismatch {
+            message: format!("unknown column '{column}' for UTF-8 transform"),
+        })?;
+    if ds.schema.fields[idx].data_type != DataType::Utf8 {
+        return Err(IngestionError::SchemaMismatch {
+            message: format!("column '{column}' must be Utf8 for this transform"),
+        });
+    }
+    Ok(idx)
+}
+
+fn utf8_truncate_dataset(ds: &mut DataSet, column: &str, max_chars: usize) -> IngestionResult<()> {
+    let idx = utf8_field_index(ds, column)?;
+    for row in &mut ds.rows {
+        if let Value::Utf8(s) = &mut row[idx] {
+            let t: String = s.chars().take(max_chars).collect();
+            *s = t;
+        }
+    }
+    Ok(())
+}
+
+fn utf8_sha256_dataset(ds: &mut DataSet, column: &str) -> IngestionResult<()> {
+    use std::fmt::Write as _;
+    let idx = utf8_field_index(ds, column)?;
+    for row in &mut ds.rows {
+        if let Value::Utf8(s) = &mut row[idx] {
+            let mut h = Sha256::new();
+            h.update(s.as_bytes());
+            let out = h.finalize();
+            let mut hex = String::with_capacity(64);
+            for b in out.iter() {
+                let _ = write!(&mut hex, "{b:02x}");
+            }
+            *s = hex;
+        }
+    }
+    Ok(())
+}
+
+fn utf8_redact_middle_dataset(
+    ds: &mut DataSet,
+    column: &str,
+    keep_left: usize,
+    keep_right: usize,
+    redaction: &str,
+) -> IngestionResult<()> {
+    let idx = utf8_field_index(ds, column)?;
+    for row in &mut ds.rows {
+        if let Value::Utf8(s) = &mut row[idx] {
+            let chs: Vec<char> = s.chars().collect();
+            let n = chs.len();
+            if n > keep_left + keep_right {
+                let left: String = chs.iter().take(keep_left).collect();
+                let right: String = chs.iter().skip(n.saturating_sub(keep_right)).collect();
+                *s = format!("{left}{redaction}{right}");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Arrow interop helpers (feature-gated).
@@ -173,7 +277,10 @@ impl TransformSpec {
 pub mod arrow {
     use std::sync::Arc;
 
-    use arrow::array::{Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray};
+    use arrow::array::{
+        Array, ArrayRef, BooleanArray, Float64Array, Int64Array, LargeStringArray, StringArray,
+    };
+    use arrow::compute::concat_batches;
     use arrow::datatypes::{DataType as ArrowDataType, Field, Schema as ArrowSchema};
     use arrow::record_batch::RecordBatch;
 
@@ -359,9 +466,18 @@ pub mod arrow {
                             } else {
                                 Value::Utf8(a.value(row_i).to_string())
                             }
+                        } else if let Some(a) = arr.as_any().downcast_ref::<LargeStringArray>() {
+                            if a.is_null(row_i) {
+                                Value::Null
+                            } else {
+                                Value::Utf8(a.value(row_i).to_string())
+                            }
                         } else {
                             return Err(IngestionError::SchemaMismatch {
-                                message: format!("arrow column '{}' is not Utf8", field.name),
+                                message: format!(
+                                    "arrow column '{}' is not Utf8/LargeUtf8",
+                                    field.name
+                                ),
                             });
                         }
                     }
@@ -371,6 +487,36 @@ pub mod arrow {
             out_rows.push(row);
         }
         Ok(DataSet::new(schema.clone(), out_rows))
+    }
+
+    /// Concatenate compatible Arrow batches then map into a [`DataSet`] using the same rules as
+    /// [`record_batch_to_dataset`].
+    pub fn record_batches_to_dataset(
+        batches: &[RecordBatch],
+        schema: &Schema,
+    ) -> IngestionResult<DataSet> {
+        if batches.is_empty() {
+            return Ok(DataSet::new(schema.clone(), Vec::new()));
+        }
+        let sch_ref = batches[0].schema();
+        for b in batches.iter().skip(1) {
+            if b.schema().as_ref() != sch_ref.as_ref() {
+                return Err(IngestionError::SchemaMismatch {
+                    message:
+                        "record_batches_to_dataset: all batches must share the same Arrow schema"
+                            .to_string(),
+                });
+            }
+        }
+        let merged = if batches.len() == 1 {
+            batches[0].clone()
+        } else {
+            concat_batches(&sch_ref, batches).map_err(|e| IngestionError::Engine {
+                message: "arrow concat_batches failed".to_string(),
+                source: Box::new(e),
+            })?
+        };
+        record_batch_to_dataset(&merged, schema)
     }
 }
 
@@ -487,5 +633,44 @@ mod tests {
         assert_eq!(out.rows[1][1], Value::Float64(0.0));
         assert_eq!(out.rows[1][2], Value::Float64(0.0));
         assert_eq!(out.rows[1][3], Value::Utf8("A".to_string()));
+    }
+
+    #[test]
+    fn utf8_privacy_transforms_apply() {
+        let schema = Schema::new(vec![Field::new("s", DataType::Utf8)]);
+        let ds = DataSet::new(
+            schema.clone(),
+            vec![
+                vec![Value::Utf8("abcdef".into())],
+                vec![Value::Utf8("hi".into())],
+            ],
+        );
+        let out_schema = schema.clone();
+        let spec = TransformSpec::new(out_schema)
+            .with_step(TransformStep::Utf8Truncate {
+                column: "s".into(),
+                max_chars: 3,
+            })
+            .with_step(TransformStep::Utf8RedactMiddle {
+                column: "s".into(),
+                keep_left: 1,
+                keep_right: 1,
+                redaction: "***".into(),
+            });
+        let out = spec.apply(&ds).unwrap();
+        assert_eq!(out.rows[0][0], Value::Utf8("a***c".into()));
+        assert_eq!(out.rows[1][0], Value::Utf8("hi".into()));
+
+        let ds2 = DataSet::new(
+            Schema::new(vec![Field::new("s", DataType::Utf8)]),
+            vec![vec![Value::Utf8("abc".into())]],
+        );
+        let spec2 = TransformSpec::new(ds2.schema.clone())
+            .with_step(TransformStep::Utf8Sha256Hex { column: "s".into() });
+        let h = spec2.apply(&ds2).unwrap().rows[0][0].clone();
+        let Value::Utf8(hex) = h else {
+            panic!("expected utf8");
+        };
+        assert_eq!(hex.len(), 64);
     }
 }

@@ -30,7 +30,11 @@ This document describes behavior shared by `processing::reduce`, `processing::mu
 
 `pipeline::Agg` supports per-group:
 
-- **CountRows**, **CountNotNull**, **Sum**, **Min**, **Max**, **Mean**, **Variance**, **StdDev**, **SumSquares**, **L2Norm**, **CountDistinctNonNull**.
+- **CountRows**, **CountNotNull**, **Sum**, **Min**, **Max**, **Mean**, **Median**, **Variance**, **StdDev**, **SumSquares**, **L2Norm**, **CountDistinctNonNull**.
+
+## Median
+
+- **`ReduceOp::Median`** (in-memory) and **`Agg::Median`** (group-by): nulls ignored; result is always **`Value::Float64`**. Even element count: average of the two middle order-statistics (aligned with typical SQL / Polars median behavior).
 
 Combine multiple `Agg` variants in one `DataFrame::group_by` call for feature summaries keyed by categorical columns.
 

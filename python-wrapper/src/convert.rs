@@ -141,6 +141,13 @@ pub(crate) fn ingestion_options_from_py(
     if let Some(v) = d.get_item("excel_sheet_selection")? {
         o.excel_sheet_selection = excel_selection_from_py(&v)?;
     }
+    if let Some(v) = d.get_item("watermark_column")? {
+        let s: String = v.extract()?;
+        o.watermark_column = Some(s);
+    }
+    if let Some(v) = d.get_item("watermark_exclusive_above")? {
+        o.watermark_exclusive_above = Some(value_from_py(&v)?);
+    }
     Ok(o)
 }
 
@@ -235,6 +242,7 @@ pub(crate) fn parse_reduce_op(s: &str) -> PyResult<rust_data_processing::process
         "sum_squares" | "sumsq" => Ok(ReduceOp::SumSquares),
         "l2_norm" | "l2" => Ok(ReduceOp::L2Norm),
         "count_distinct_non_null" | "count_distinct" => Ok(ReduceOp::CountDistinctNonNull),
+        "median" => Ok(ReduceOp::Median),
         _ => Err(PyValueError::new_err(format!(
             "unknown reduce op '{s}'; see API.md for supported names"
         ))),
@@ -373,6 +381,30 @@ pub(crate) fn validation_spec_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Valida
                     .extract()?;
                 Check::Unique {
                     column,
+                    severity: severity_from_py(&sev)?,
+                }
+            }
+            "utf8_len_chars_between" => {
+                let column: String = c
+                    .get_item("column")?
+                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'column'"))?
+                    .extract()?;
+                let min_chars: u32 = c
+                    .get_item("min_chars")?
+                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'min_chars'"))?
+                    .extract()?;
+                let max_chars: u32 = c
+                    .get_item("max_chars")?
+                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'max_chars'"))?
+                    .extract()?;
+                let sev: String = c
+                    .get_item("severity")?
+                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'severity'"))?
+                    .extract()?;
+                Check::Utf8LenCharsBetween {
+                    column,
+                    min_chars,
+                    max_chars,
                     severity: severity_from_py(&sev)?,
                 }
             }

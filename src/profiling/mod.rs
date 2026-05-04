@@ -36,18 +36,13 @@ use crate::types::{DataSet, DataType};
 use polars::prelude::*;
 
 /// How profiling should sample rows before computing metrics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SamplingMode {
     /// Profile the full dataset.
+    #[default]
     Full,
     /// Profile only the first N rows.
     Head(usize),
-}
-
-impl Default for SamplingMode {
-    fn default() -> Self {
-        Self::Full
-    }
 }
 
 /// Options for profiling.
@@ -232,18 +227,18 @@ pub fn profile_frame(df: &DataFrame, options: &ProfileOptions) -> IngestionResul
     exprs.push(len().alias("__rows"));
 
     for (name, _dt, is_numeric) in &cols {
-        exprs.push(col(name).null_count().alias(&format!("{name}__nulls")));
+        exprs.push(col(name).null_count().alias(format!("{name}__nulls")));
         // Distinct count excluding nulls (common profiling expectation).
         exprs.push(
             col(name)
                 .drop_nulls()
                 .n_unique()
-                .alias(&format!("{name}__distinct")),
+                .alias(format!("{name}__distinct")),
         );
         if *is_numeric {
-            exprs.push(col(name).min().alias(&format!("{name}__min")));
-            exprs.push(col(name).max().alias(&format!("{name}__max")));
-            exprs.push(col(name).mean().alias(&format!("{name}__mean")));
+            exprs.push(col(name).min().alias(format!("{name}__min")));
+            exprs.push(col(name).max().alias(format!("{name}__max")));
+            exprs.push(col(name).mean().alias(format!("{name}__mean")));
             for q in &options.quantiles {
                 if !(0.0..=1.0).contains(q) {
                     return Err(IngestionError::SchemaMismatch {
@@ -254,7 +249,7 @@ pub fn profile_frame(df: &DataFrame, options: &ProfileOptions) -> IngestionResul
                 exprs.push(
                     col(name)
                         .quantile(lit(*q), QuantileMethod::Nearest)
-                        .alias(&format!("{name}__p{pct}")),
+                        .alias(format!("{name}__p{pct}")),
                 );
             }
         }

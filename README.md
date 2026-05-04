@@ -1,16 +1,18 @@
 # rust-data-processing
 
-**Rust** crate and **Python** package for ingesting common file formats (CSV / JSON / Parquet / Excel (feature-gated)) into an in-memory `DataSet`, with schema validation + inference helpers, in-memory + parallel processing primitives, and a Polars-backed DataFrame-centric pipeline API. Phase 1 also targets profiling, validation, and outlier-detection APIs and report formats, while keeping a small engine-agnostic public surface (SQL support is Polars-backed). Use whichever binding fits your stack—the capabilities are the same under the hood.
+**Rust** crate and **Python** package for ingesting common file formats (CSV / JSON / Parquet / Excel (feature-gated)) into an in-memory `DataSet`, with schema validation + inference helpers, in-memory + parallel processing primitives, and a Polars-backed DataFrame-centric pipeline API. **Phase 1** delivered profiling, validation, and outlier-detection APIs and report formats; **Phase 2** extends that surface with export (JSONL, train/test indices), UTF-8 privacy transforms, richer validation, and related Python bindings—still with a small engine-agnostic public core (SQL remains Polars-backed). Use whichever binding fits your stack—the capabilities are the same under the hood.
 
 ## Documentation (read the APIs online)
 
-| | Link |
-| --- | --- |
+
+|                                                | Link                                                                                                                                                                                                                                     |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://vihangdesai2018-png.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).* |
-| **Rust crate on crates.io** | [docs.rs — rust-data-processing](https://docs.rs/rust-data-processing) *(populates after the first successful publish)* |
-| **Markdown API guides** | [`API.md`](API.md) (Rust); Python: [`python-wrapper/API.md`](python-wrapper/API.md) |
-| **Rust examples (this repo)** | [`docs/rust/README.md`](docs/rust/README.md) — `Cargo.toml`, ingestion, DataFrame/SQL, cookbook, execution, benchmarks |
-| **Python examples (this repo)** | [`docs/python/README.md`](docs/python/README.md) — same topics via `rust_data_processing` |
+| **Rust crate on crates.io**                    | [docs.rs — rust-data-processing](https://docs.rs/rust-data-processing) *(populates after the first successful publish)*                                                                                                                  |
+| **Markdown API guides**                        | [`API.md`](API.md) (Rust); Python: [`python-wrapper/API.md`](python-wrapper/API.md)                                                                                                                                                      |
+| **Rust examples (this repo)**                  | [`docs/rust/README.md`](docs/rust/README.md) — `Cargo.toml`, ingestion, DataFrame/SQL, cookbook, execution, benchmarks                                                                                                                   |
+| **Python examples (this repo)**                | [`docs/python/README.md`](docs/python/README.md) — same topics via `rust_data_processing`                                                                                                                                                |
+
 
 ## Quick start (Python)
 
@@ -59,35 +61,36 @@ Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or 
 - Open a **[GitHub Issue](https://github.com/vihangdesai2018-png/rust-data-processing/issues)** and use **Bug Report** or **Feature Request** so we get version, OS, and repro steps.
 - **Security:** do not file publicly — read [`SECURITY.md`](SECURITY.md).
 - How we triage and prioritize: [`docs/ISSUE_TRIAGE.md`](docs/ISSUE_TRIAGE.md).
-
 - **Status**: library APIs are in `src/lib.rs`; the binary (`src/main.rs`) is currently just a placeholder.
 - **Developer guide**: see `README_DEV.md` (module map, workflows, conventions)
 - **Benchmark snapshot (pipeline bench)**: on this repo (Windows, Criterion), `filter → map → reduce(sum)`:
   - **In-memory `processing`**:
-    - 100k rows: ~10.42 ms median (\(\approx 9.6\) million rows/sec)
-    - 1M rows: ~113.5 ms median (\(\approx 8.8\) million rows/sec)
+    - 100k rows: ~10.42 ms median (\approx 9.6 million rows/sec)
+    - 1M rows: ~113.5 ms median (\approx 8.8 million rows/sec)
   - **Polars-backed `pipeline::DataFrame` (lazy)**:
-    - 100k rows: ~7.80 ms median (\(\approx 12.8\) million rows/sec)
-    - 1M rows: ~74.10 ms median (\(\approx 13.5\) million rows/sec)
+    - 100k rows: ~7.80 ms median (\approx 12.8 million rows/sec)
+    - 1M rows: ~74.10 ms median (\approx 13.5 million rows/sec)
   - **Reproduce**: `cargo bench --bench pipelines -- --warm-up-time 2 --measurement-time 6 --sample-size 50`
 
-## Phase 1 scope (roadmap)
+## Phase 2 scope (roadmap)
+
+![Library scope overview — Phase 2](docs/images/phase-2-scope-overview.png)
 
 Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Planning/`** folder (gitignored—never committed). Nothing in the repo removes those files; this section is the public README summary only.
 
-- [x] Polars-first delegation for ingestion + DataFrame-centric pipelines
-- [x] Polars-backed SQL support (default-on)
-- [x] Engine-agnostic configuration (`IngestionOptionsBuilder`) + unified error model (`IngestionError`)
-- [x] Benchmarks + parity checks (ingestion + pipelines + end-to-end)
-- [x] Cookbook examples (Polars-first docs + SQL examples)
-- [x] “Pit of success” defaults (sane knobs; avoid promising engine-specific tuning we can’t support)
-- [x] Feature flags + dependency surface minimization
-- [x] Transformation wrappers + end-user transformation schema/spec (“to/from”) on top of Polars + existing in-memory layers
-- [x] Feature-gated direct DB ingestion via ConnectorX (DB → Arrow → `DataSet`) + compatibility research notes
-- [x] CDC feasibility spike + interface boundary (Phase 2 candidate)
-- [x] Profiling APIs: metrics set + sampling/large-data modes
-- [x] Validation APIs: DSL + built-in checks + severity handling + reporting
-- [x] Outlier detection: primitives + explainable outputs
+- Polars-first delegation for ingestion + DataFrame-centric pipelines
+- Polars-backed SQL support (default-on)
+- Engine-agnostic configuration (`IngestionOptionsBuilder`) + unified error model (`IngestionError`)
+- Benchmarks + parity checks (ingestion + pipelines + end-to-end)
+- Cookbook examples (Polars-first docs + SQL examples)
+- “Pit of success” defaults (sane knobs; avoid promising engine-specific tuning we can’t support)
+- Feature flags + dependency surface minimization
+- Transformation wrappers + end-user transformation schema/spec (“to/from”) on top of Polars + existing in-memory layers
+- Feature-gated direct DB ingestion via ConnectorX (DB → Arrow → `DataSet`) + compatibility research notes
+- CDC feasibility spike + interface boundary (Phase 2 candidate)
+- Profiling APIs: metrics set + sampling/large-data modes
+- Validation APIs: DSL + built-in checks + severity handling + reporting
+- Outlier detection: primitives + explainable outputs
 
 ## Platform support
 
@@ -97,9 +100,7 @@ Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Pl
   - **macOS**: install Xcode Command Line Tools (`xcode-select --install`) for the system linker/C toolchain.
   - **Linux**: install a basic build toolchain (e.g. GCC/Clang via your distro’s `build-essential` equivalent).
   - **Windows**: see [Development on Windows (toolchain + linker)](#development-on-windows-toolchain--linker).
-
   Parquet support pulls in native compression dependencies (e.g. `zstd-sys`); Cargo will build them automatically once a C toolchain is available.
-
 - **Benchmarks**:
   - `cargo bench --bench pipelines` is cross-platform.
   - `benchmarks.ps1` is a Windows/PowerShell convenience wrapper; on Linux/macOS you can run it via `pwsh` or just run `cargo bench` directly.
@@ -108,6 +109,8 @@ Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Pl
 ## Python bindings
 
 Bindings live under **`python-wrapper/`** (**PyO3** + **maturin** + **uv**). User-facing docs: **`python-wrapper/README.md`**, **`python-wrapper/API.md`**, **`python-wrapper/README_DEV.md`**. The native module calls this crate; Polars stays on the Rust side.
+
+**JVM / Java:** not shipped yet; a **Maven-resolvable** Java layer over the same Rust core is **planned for Phase 3** so releases can stay focused on Rust and Python first. See **[CHANGELOG.md](CHANGELOG.md)** (Unreleased → Planned).
 
 **Rust** examples (ingestion, DataFrame/SQL, transforms, profiling, execution, benchmarks): [`docs/rust/README.md`](docs/rust/README.md).
 
@@ -148,7 +151,7 @@ transformations using `rust_data_processing::processing`:
 - `reduce(&DataSet, column, ReduceOp) -> Option<Value>` — includes **mean**, **variance**, **std dev** (`VarianceKind::{Population, Sample}`), **sum of squares**, **L2 norm**, **count distinct** (non-null), plus **count** / **sum** / **min** / **max**
 - `feature_wise_mean_std(&DataSet, &[&str], VarianceKind)` — one pass over rows for mean + std on several numeric columns (`FeatureMeanStd`)
 - `arg_max_row` / `arg_min_row` — first row index where a column is max/min (ties: smallest index)
-- `top_k_by_frequency` — top‑\(k\) `(value, count)` pairs for label-style columns
+- `top_k_by_frequency` — top‑k `(value, count)` pairs for label-style columns
 
 Polars-backed equivalents for whole-frame scalars: `pipeline::DataFrame::reduce`, `feature_wise_mean_std`. **Semantics**: [`docs/REDUCE_AGG_SEMANTICS.md`](docs/REDUCE_AGG_SEMANTICS.md).
 
@@ -178,7 +181,7 @@ Disable default features (including SQL) if you want a smaller dependency surfac
 rust-data-processing = { path = ".", default-features = false }
 ```
 
-## “Pit of success” defaults (Phase 1)
+## “Pit of success” defaults (Phase 1–2)
 
 - **Ingestion defaults**: format is auto-detected by extension; observers are off by default; failures are surfaced as `IngestionError` (no automatic retries).
 - **Execution defaults**: `ExecutionOptions::default()` uses available parallelism, a moderate `chunk_size`, and throttles in-flight chunks.
@@ -268,8 +271,7 @@ SPDX-License-Identifier: `MIT OR Apache-2.0`
 
 Maintainers: see [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) and [`docs/How_TO_deploy.md`](docs/How_TO_deploy.md). After the first successful `cargo publish`, API docs appear on [docs.rs](https://docs.rs/rust-data-processing) for the published version.
 
-
-#Lib Info 
+#Lib Info
 
 Runnable examples + docs: Python examples [https://lnkd.in/emVFbbja](https://lnkd.in/emVFbbja)
 GitHub: [https://lnkd.in/eQ6JkG3A](https://lnkd.in/eQ6JkG3A)

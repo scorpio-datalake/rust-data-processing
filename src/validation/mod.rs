@@ -73,6 +73,13 @@ pub enum Check {
         column: String,
         severity: Severity,
     },
+    /// UTF-8 string length in **Unicode scalar values** (Rust `char` count), nulls ignored for the length expr (null rows fail as “not in range” if you need strictness, combine with `NotNull`).
+    Utf8LenCharsBetween {
+        column: String,
+        min_chars: u32,
+        max_chars: u32,
+        severity: Severity,
+    },
 }
 
 /// A collection of checks.
@@ -135,7 +142,7 @@ pub fn validate_frame(df: &DataFrame, spec: &ValidationSpec) -> IngestionResult<
     let mut exprs: Vec<Expr> = Vec::with_capacity(spec.checks.len());
 
     for (i, chk) in spec.checks.iter().enumerate() {
-        exprs.push(fail_count_expr(chk).alias(&fail_count_col_name(i)));
+        exprs.push(fail_count_expr(chk).alias(fail_count_col_name(i)));
     }
 
     let agg = lf.select(exprs).collect().map_err(|e| {
@@ -226,13 +233,13 @@ pub fn render_validation_report_markdown(rep: &ValidationReport) -> String {
     out.push_str("### Results\n\n");
     for r in &rep.results {
         let status = if r.failed_count == 0 { "PASS" } else { "FAIL" };
-        out.push_str(&format!("- **{status}**: `{}`\n", format!("{:?}", r.check)));
+        out.push_str(&format!("- **{status}**: `{:?}`\n", r.check));
         out.push_str(&format!("  - Failed: **{}**\n", r.failed_count));
         out.push_str(&format!("  - Message: {}\n", r.message));
         if !r.examples.is_empty() {
             out.push_str("  - Examples:\n");
             for ex in &r.examples {
-                out.push_str(&format!("    - `{}`\n", format!("{ex:?}")));
+                out.push_str(&format!("    - `{ex:?}`\n"));
             }
         }
     }
@@ -249,7 +256,8 @@ fn severity_of(chk: &Check) -> Severity {
         | Check::RangeF64 { severity, .. }
         | Check::RegexMatch { severity, .. }
         | Check::InSet { severity, .. }
-        | Check::Unique { severity, .. } => *severity,
+        | Check::Unique { severity, .. }
+        | Check::Utf8LenCharsBetween { severity, .. } => *severity,
     }
 }
 
@@ -271,6 +279,16 @@ fn default_message(chk: &Check, failed: usize) -> String {
         }
         Check::Unique { column, .. } => {
             format!("column '{column}' has {failed} duplicate(s) among non-null values")
+        }
+        Check::Utf8LenCharsBetween {
+            column,
+            min_chars,
+            max_chars,
+            ..
+        } => {
+            format!(
+                "column '{column}' has {failed} value(s) whose UTF-8 length is outside [{min_chars}, {max_chars}] Unicode scalars"
+            )
         }
     }
 }
@@ -301,6 +319,19 @@ fn fail_count_expr(chk: &Check) -> Expr {
             let non_null = col(column).is_not_null().sum();
             let unique = col(column).drop_nulls().n_unique();
             (non_null - unique).alias("__dup")
+        }
+        Check::Utf8LenCharsBetween {
+            column,
+            min_chars,
+            max_chars,
+            ..
+        } => {
+            let len = col(column)
+                .cast(DataType::String)
+                .str()
+                .len_chars()
+                .fill_null(lit(0u32));
+            (len.clone().lt(lit(*min_chars)).or(len.gt(lit(*max_chars)))).sum()
         }
     }
 }
@@ -395,6 +426,22 @@ fn collect_examples(
                 .not(),
         ),
         Check::Unique { .. } => return Ok(Vec::new()), // examples for duplicates would require group-by; skip in Phase 1
+        Check::Utf8LenCharsBetween {
+            column,
+            min_chars,
+            max_chars,
+            ..
+        } => {
+            let len = col(column)
+                .cast(DataType::String)
+                .str()
+                .len_chars()
+                .fill_null(lit(0u32));
+            (
+                column.as_str(),
+                len.clone().lt(lit(*min_chars)).or(len.gt(lit(*max_chars))),
+            )
+        }
     };
 
     lf = lf
@@ -509,5 +556,25 @@ mod tests {
 
         let md = render_validation_report_markdown(&rep);
         assert!(md.contains("## Validation report"));
+    }
+
+    #[test]
+    fn utf8_len_chars_between_flags_too_short_and_too_long() {
+        let ds = DataSet::new(
+            Schema::new(vec![Field::new("code", DataType::Utf8)]),
+            vec![
+                vec![Value::Utf8("ab".into())],
+                vec![Value::Utf8("abcd".into())],
+                vec![Value::Utf8("abcdef".into())],
+            ],
+        );
+        let spec = ValidationSpec::new(vec![Check::Utf8LenCharsBetween {
+            column: "code".into(),
+            min_chars: 3,
+            max_chars: 5,
+            severity: Severity::Error,
+        }]);
+        let rep = validate_dataset(&ds, &spec).unwrap();
+        assert!(rep.summary.failed_checks >= 1);
     }
 }

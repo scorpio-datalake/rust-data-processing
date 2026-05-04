@@ -42,6 +42,7 @@ Bindings for the [`rust-data-processing`](../README.md) crate. Types stay in **c
 | Function | Returns |
 |----------|---------|
 | `ingest_from_path(path, schema, options=None)` | `DataSet` |
+| `ingest_from_ordered_paths(paths, schema, options=None)` | `(DataSet, metadata dict)` — same `options` as single-file ingest; watermark applies once after concatenating rows; metadata has `paths`, `last_path`, `max_watermark_value` |
 | `infer_schema_from_path(path, options=None)` | schema list |
 | `ingest_from_path_infer(path, options=None)` | `DataSet` |
 | `ingest_with_inferred_schema(path, options=None)` | `(DataSet, schema list)` — convenience; same two-step behavior as Rust. |
@@ -50,7 +51,38 @@ Bindings for the [`rust-data-processing`](../README.md) crate. Types stay in **c
 
 **Database data without the `db` feature:** You only need **`--features db`** if you want **`ingest_from_db` / `ingest_from_db_infer`** (ConnectorX inside the native extension). If you already use **psycopg2**, **SQLAlchemy**, **asyncpg**, or any other Python DB API, run your query in Python, convert rows to `list[list]` aligned to a [schema](#conventions), and use **`DataSet(schema, rows)`**. Profiling, validation, SQL-on-`DataSet`, and pipelines work the same; you are not required to enable `db`.
 
-**`options`**: optional `dict` — `format` (`"csv"`, `"json"`, `"parquet"`, `"excel"`, …), optional `excel_sheet_selection` (`mode`, `name`, `names` — see [README](README.md)), plus **observability** (below).
+**`options`**: optional `dict` — `format` (`"csv"`, `"json"`, `"parquet"`, `"excel"`, …), optional `excel_sheet_selection` (`mode`, `name`, `names` — see [README](README.md)), optional **incremental / watermark** keys (below), plus **observability** (below).
+
+### Incremental / watermark (`options` dict)
+
+Same semantics as Rust `IngestionOptions`: after the file (or DB result) is loaded, keep only rows where the watermark column is **strictly greater** than the floor value; nulls in that column are dropped. Both keys must be set together.
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `watermark_column` | `str` | Schema column name used as the high-watermark key. |
+| `watermark_exclusive_above` | scalar | Rows must be strictly above this value (`int` / `float` / `bool` / `str` — must match column type). |
+
+```python
+rdp.ingest_from_path(
+    "events.csv",
+    schema,
+    {"watermark_column": "ts", "watermark_exclusive_above": 100},
+)
+```
+
+With **`ingest_from_db` / `ingest_from_db_infer`**, the same keys apply when the extension is built with the **`db`** feature (ConnectorX); filtering runs after the query result is materialized.
+
+### Partition discovery (Hive-style layouts)
+
+| Function | Returns |
+|----------|---------|
+| `discover_hive_partitioned_files(root, file_pattern=None)` | `list[dict]` — each `{"path": str, "segments": [{"key": str, "value": str}, ...]}` |
+| `paths_from_glob(pattern)` | `list[str]` — existing files matching the glob (sorted) |
+| `paths_from_directory_scan(root, relative_pattern=None)` | `list[str]` — recursive directory listing; optional glob on path relative to `root`; sorted for stable ordering |
+| `paths_from_explicit_list(paths)` | `list[str]` — existing files only; deduped, order preserved |
+| `parse_partition_segment(component)` | `dict` `\| None` — `{"key", "value"}` for a `key=value` segment, else `None` |
+
+Use **forward slashes** in `file_pattern` (matched against paths relative to `root`) for portability, e.g. `"**/*.csv"`.
 
 ### Ingestion observability (`options` dict)
 
@@ -118,7 +150,7 @@ Each dict has `"type"` and fields depending on type:
 |--------|------------|
 | `count_rows` | `alias` |
 | `count_not_null` | `column`, `alias` |
-| `sum`, `min`, `max`, `mean` | `column`, `alias` |
+| `sum`, `min`, `max`, `mean`, `median` | `column`, `alias` |
 | `variance`, `std_dev` | `column`, `alias`, optional `kind` (`population` / `sample`) |
 | `sum_squares`, `l2_norm` | `column`, `alias` |
 | `count_distinct_non_null` | `column`, `alias` |
@@ -138,7 +170,27 @@ Each dict has `"type"` and fields depending on type:
 
 ### Reduce op names (`processing_reduce`, `DataFrame.reduce`)
 
-`count`, `sum`, `min`, `max`, `mean`, `variance_population`, `variance_sample`, `stddev_population`, `stddev_sample`, `sum_squares`, `l2_norm`, `count_distinct_non_null` (plus common aliases — see Rust docs).
+`count`, `sum`, `min`, `max`, `mean`, `median`, `variance_population`, `variance_sample`, `stddev_population`, `stddev_sample`, `sum_squares`, `l2_norm`, `count_distinct_non_null` (plus common aliases — see Rust docs).
+
+---
+
+## Export, privacy summaries, truncation (Phase 2)
+
+| Function | Role |
+|----------|------|
+| `export_dataset_jsonl(dataset, columns)` | One JSON object per row (UTF-8); `columns` is ordered `list[str]` of schema names. |
+| `export_train_test_row_indices(row_count, test_fraction)` | Returns `(train_indices, test_indices)` as two lists of `int` (deterministic split; see Rust `export::train_test_row_indices`). |
+| `export_filter_rows_max_utf8_chars(dataset, column, max_chars)` | New `DataSet`: drops rows where UTF-8 `column` exceeds `max_chars` Unicode scalars; nulls kept. |
+| `privacy_summarize_utf8_changes_json(before, after, columns)` | JSON string summarizing UTF-8 cell diffs per column name. |
+| `privacy_summarize_utf8_changes_markdown(before, after, columns)` | Markdown bullet list for the same summaries. |
+| `reports_truncate_utf8_bytes(text, max_bytes)` | Truncates UTF-8 safely to a byte budget; adds a short suffix marker. |
+
+**`rust_data_processing` package helpers** (pure Python, same module):
+
+| Helper | Role |
+|--------|------|
+| `export_jsonl_records(dataset, columns)` | `list[dict]` from `export_dataset_jsonl` lines. |
+| `privacy_summarize_utf8_changes(before, after, columns, as_markdown=False)` | Parsed `list[dict]` or Markdown string. |
 
 ---
 
@@ -149,7 +201,7 @@ Each dict has `"type"` and fields depending on type:
 | `transform_apply_json(dataset, spec_json)` | `spec_json` is JSON for Rust `TransformSpec` (serde shape). |
 | `transform_apply(dataset, spec)` | `spec` may be a `str` or a `dict` (serialized to JSON internally). |
 
-Serde uses Rust enum names for steps, e.g. `Select`, `Rename`, `Cast`, `FillNull`, … and `DataType` variants as strings (`Int64`, `Float64`, …).
+Serde uses Rust enum names for steps, e.g. `Select`, `Rename`, `Cast`, `FillNull`, `Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`, … and `DataType` variants as strings (`Int64`, `Float64`, …).
 
 ---
 
@@ -173,7 +225,7 @@ Serde uses Rust enum names for steps, e.g. `Select`, `Rename`, `Cast`, `FillNull
 | `validate_dataset_markdown(dataset, spec)` | Markdown |
 | `validate_dataset(dataset, spec)` | `dict` |
 
-**`spec`**: `dict` with `checks` (list) and optional `max_examples`. Each check has `kind`: `not_null`, `range_f64`, `regex_match`, `in_set`, `unique`, plus fields per kind (`column`, `severity`, …).
+**`spec`**: `dict` with `checks` (list) and optional `max_examples`. Each check has `kind`: `not_null`, `range_f64`, `regex_match`, `in_set`, `unique`, `utf8_len_chars_between` (`min_chars`, `max_chars` as integers), plus fields per kind (`column`, `severity`, …).
 
 ---
 

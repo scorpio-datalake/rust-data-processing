@@ -329,10 +329,7 @@ pub fn render_outlier_report_markdown(rep: &OutlierReport) -> String {
     out.push_str(&format!("- Rows profiled: **{}**\n", rep.row_count));
     out.push_str(&format!("- Outliers: **{}**\n\n", rep.outlier_count));
     out.push_str("### Stats\n\n");
-    out.push_str(&format!(
-        "- Method: `{}`\n",
-        format!("{:?}", rep.stats.method)
-    ));
+    out.push_str(&format!("- Method: `{:?}`\n", rep.stats.method));
     if let Some(v) = rep.stats.mean {
         out.push_str(&format!("- mean: `{v:.6}`\n"));
     }

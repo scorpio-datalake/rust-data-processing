@@ -4,19 +4,35 @@
 # while being explicit about any temporary exceptions.
 #
 # Note: This repo includes optional database ingestion via ConnectorX (`db_connectorx`).
-# ConnectorX currently pulls in advisories with no upstream fix available without
-# larger dependency/MSRV shifts. We track these as Phase 1a follow-ups and keep
-# the ignores narrowly scoped to advisory IDs.
+# ConnectorX pulls transitive unmaintained / informational advisories with no upstream fix
+# without larger dependency/MSRV shifts. Polars / parquet also pull informational advisories
+# (e.g. unmaintained `bincode`, `paste`) until upstream bumps land. Track removals in CHANGELOG.
 
 [advisories]
 ignore = [
-  # ConnectorX transitive dependency; no fixed upgrade available.
-  # Applies to optional `db_connectorx` feature path.
+  # ConnectorX transitive; no fixed upgrade available.
   "RUSTSEC-2022-0040",
 
   # `time` DoS via stack exhaustion: fixed in >=0.3.47 which currently requires a newer Rust.
   # Reached via ConnectorX → mysql_common → time.
   "RUSTSEC-2026-0009",
+
+  # --- ConnectorX / SQL drivers (optional `db_connectorx`; still present in Cargo.lock) ---
+  "RUSTSEC-2021-0139", # ansi_term via bindgen → tiberius
+  "RUSTSEC-2024-0375", # atty unmaintained
+  "RUSTSEC-2021-0145", # atty unsound
+  "RUSTSEC-2021-0153", # encoding via tiberius
+  "RUSTSEC-2023-0067", # fehler
+  "RUSTSEC-2024-0384", # instant via parking_lot
+  "RUSTSEC-2026-0002", # lru via mysql
+
+  # --- Default build: Polars / parquet / object_store stack ---
+  "RUSTSEC-2025-0141", # bincode unmaintained (polars-utils)
+  "RUSTSEC-2024-0436", # paste unmaintained (parquet; also oracle when ConnectorX enabled)
+
+  # `rand`: informational unsound under narrow custom-logger conditions; reached via Polars and
+  # ConnectorX paths. Upstream rand patch levels are gated on ecosystem upgrades.
+  "RUSTSEC-2026-0097",
 ]
 
 # Keep informational advisories visible in logs but do not fail CI on them by default.
