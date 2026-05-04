@@ -65,3 +65,17 @@ uv run pdoc -d google -o ../_site/python rust_data_processing
 ## Issue triage and reporting
 
 See [ISSUE_TRIAGE.md](ISSUE_TRIAGE.md) and root [README.md § Reporting bugs](../README.md#reporting-bugs).
+
+## Architecture sample (Mermaid)
+
+Default diagram style for this repo: **Mermaid** (renders on GitHub). Example high-level flow:
+
+```mermaid
+flowchart LR
+  Files[Files CSV JSON Parquet] --> Ingest[ingest_from_path]
+  Ingest --> DS[DataSet]
+  DS --> Pipe[pipeline DataFrame]
+  DS --> Val[validate_dataset]
+  DS --> Prof[profile_dataset]
+  Pipe --> Out[Parquet CSV JSONL]
+```

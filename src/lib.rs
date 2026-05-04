@@ -64,6 +64,9 @@
 //!
 //! - [`ingestion`]: unified ingestion entrypoints and format-specific implementations
 //! - [`types`]: schema + in-memory dataset types
+//! - [`export`]: JSON Lines export + deterministic train/test row indices
+//! - [`privacy`]: UTF-8 change summaries after masking transforms (reports only)
+//! - [`reports`]: deterministic truncation helpers for large JSON/text blobs
 //! - [`processing`]: in-memory dataset transformations (filter/map/reduce, feature-wise stats, arg max/min, top‑k frequency)
 //! - [`execution`]: execution engine for parallel pipelines + throttling + metrics
 //! - `sql`: SQL support (Polars-backed; enabled by default)
@@ -279,6 +282,7 @@
 //!   use a numerically stable one-pass (Welford) accumulation; mean / sum-of-squares / L2 norm are
 //!   returned as [`types::Value::Float64`]. Sample variance / std dev require at least two values.
 //! - [`processing::ReduceOp::CountDistinctNonNull`]: distinct non-null values (also for UTF-8 and bool).
+//! - [`processing::ReduceOp::Median`]: median of numeric values as [`types::Value::Float64`] (even length: mean of the two middle values).
 //! - [`pipeline::DataFrame::reduce`] provides the Polars-backed equivalent for whole-frame scalars.
 //! - [`processing::feature_wise_mean_std`]: one scan, mean + std for several numeric columns; [`pipeline::DataFrame::feature_wise_mean_std`] for Polars.
 //! - [`processing::arg_max_row`], [`processing::arg_min_row`], [`processing::top_k_by_frequency`]: row extrema and label top‑k.
@@ -286,11 +290,14 @@
 pub mod cdc;
 pub mod error;
 pub mod execution;
+pub mod export;
 pub mod ingestion;
 pub mod outliers;
 pub mod pipeline;
+pub mod privacy;
 pub mod processing;
 pub mod profiling;
+pub mod reports;
 #[cfg(feature = "sql")]
 pub mod sql;
 pub mod transform;

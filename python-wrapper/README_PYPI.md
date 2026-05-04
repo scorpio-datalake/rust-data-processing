@@ -38,6 +38,10 @@ validation = rdp.validate_dataset(
 print("checks", validation["summary"]["total_checks"])
 ```
 
+## Phase 2 (export, privacy, JSONL, median, Delta handoff)
+
+Copy-paste snippets: **[Phase 2 Python examples (Markdown in repo)](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/docs/python/PHASE2_EXAMPLES.md)**. These APIs are also summarized in **[API.md](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/python-wrapper/API.md)** (section **Export, privacy summaries, truncation (Phase 2)**).
+
 ## Documentation
 
 | | Link |

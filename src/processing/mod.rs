@@ -7,7 +7,7 @@
 //!
 //! - [`filter()`]: row filtering by predicate
 //! - [`map()`]: row mapping by user function
-//! - [`reduce()`]: common reductions (count/sum/min/max/mean/variance/std/sum-squares/L2/count-distinct)
+//! - [`reduce()`]: common reductions (count/sum/min/max/mean/variance/std/sum-squares/L2/count-distinct/median)
 //! - [`feature_wise_mean_std()`], [`arg_max_row()`], [`arg_min_row()`], [`top_k_by_frequency()`]:
 //!   multi-column stats, arg extrema, and label frequency top‑k
 //!

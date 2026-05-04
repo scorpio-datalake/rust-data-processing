@@ -289,7 +289,7 @@ fn chunk_ranges(row_count: usize, chunk_size: usize) -> Vec<std::ops::Range<usiz
     if row_count == 0 {
         return Vec::new();
     }
-    let mut out = Vec::with_capacity((row_count + chunk_size - 1) / chunk_size);
+    let mut out = Vec::with_capacity(row_count.div_ceil(chunk_size));
     let mut start = 0usize;
     while start < row_count {
         let end = (start + chunk_size).min(row_count);

@@ -19,12 +19,23 @@ from ._rust_data_processing import (
     SqlContext,
     detect_outliers_json,
     detect_outliers_markdown,
+    discover_hive_partitioned_files,
+    export_dataset_jsonl,
+    export_filter_rows_max_utf8_chars,
+    export_train_test_row_indices,
     extension_version,
     ingest_from_db,
     ingest_from_db_infer,
+    ingest_from_ordered_paths,
     ingest_from_path,
     ingest_from_path_infer,
     infer_schema_from_path,
+    parse_partition_segment,
+    paths_from_directory_scan,
+    paths_from_explicit_list,
+    paths_from_glob,
+    privacy_summarize_utf8_changes_json,
+    privacy_summarize_utf8_changes_markdown,
     processing_arg_max_row,
     processing_arg_min_row,
     processing_feature_wise_mean_std,
@@ -34,6 +45,7 @@ from ._rust_data_processing import (
     processing_top_k_by_frequency,
     profile_dataset_json,
     profile_dataset_markdown,
+    reports_truncate_utf8_bytes,
     sql_query_dataset,
     transform_apply_json,
     validate_dataset_json,
@@ -81,6 +93,25 @@ def detect_outliers(
     return json.loads(detect_outliers_json(dataset, column, method, options))
 
 
+def export_jsonl_records(dataset: DataSet, columns: list[str]) -> list[dict[str, Any]]:
+    """Parse :func:`export_dataset_jsonl` output into a list of row dicts."""
+    text = export_dataset_jsonl(dataset, columns)
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def privacy_summarize_utf8_changes(
+    before: DataSet,
+    after: DataSet,
+    columns: list[str],
+    *,
+    as_markdown: bool = False,
+) -> list[dict[str, Any]] | str:
+    """UTF-8 diff summary per column: parsed JSON list (default) or Markdown string."""
+    if as_markdown:
+        return privacy_summarize_utf8_changes_markdown(before, after, columns)
+    return json.loads(privacy_summarize_utf8_changes_json(before, after, columns))
+
+
 __all__ = [
     "DataFrame",
     "DataSet",
@@ -91,13 +122,26 @@ __all__ = [
     "detect_outliers",
     "detect_outliers_json",
     "detect_outliers_markdown",
+    "discover_hive_partitioned_files",
+    "export_dataset_jsonl",
+    "export_filter_rows_max_utf8_chars",
+    "export_jsonl_records",
+    "export_train_test_row_indices",
     "extension_version",
     "ingest_from_db",
     "ingest_from_db_infer",
+    "ingest_from_ordered_paths",
     "ingest_from_path",
     "ingest_from_path_infer",
     "ingest_with_inferred_schema",
     "infer_schema_from_path",
+    "parse_partition_segment",
+    "paths_from_directory_scan",
+    "paths_from_explicit_list",
+    "paths_from_glob",
+    "privacy_summarize_utf8_changes",
+    "privacy_summarize_utf8_changes_json",
+    "privacy_summarize_utf8_changes_markdown",
     "processing_arg_max_row",
     "processing_arg_min_row",
     "processing_feature_wise_mean_std",
@@ -108,6 +152,7 @@ __all__ = [
     "profile_dataset",
     "profile_dataset_json",
     "profile_dataset_markdown",
+    "reports_truncate_utf8_bytes",
     "sql_query_dataset",
     "transform_apply",
     "transform_apply_json",

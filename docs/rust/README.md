@@ -2,7 +2,7 @@
 
 ![Phase 1 scope: sources → rust-data-processing → Python / optional AI & ML surfaces](../images/phase-1-scope-overview.png)
 
-This page collects **Rust** snippets for the `rust-data-processing` crate. The [repository README](../../README.md) leads with Python; Python mirrors many of these examples in [`docs/python/README.md`](../python/README.md). For the conceptual API surface see [`API.md`](../../API.md).
+This page collects **Rust** snippets for the `rust-data-processing` crate. The [repository README](../../README.md) leads with Python; Python mirrors many of these examples in [`docs/python/README.md`](../python/README.md), including **Phase 2** copy-paste blocks in [`docs/python/PHASE2_EXAMPLES.md`](../python/PHASE2_EXAMPLES.md) (JSONL export, privacy transforms, median, Delta handoff). For the conceptual API surface see [`API.md`](../../API.md).
 
 *Phase 1 overview (infographic): file sources (CSV, JSON, Parquet, NDJSON, optional Excel and DB via ConnectorX), core engine capabilities (pipelines, SQL, transforms, profile, validation, outliers, map/reduce, parallel execution), Python bindings (`rust_data_processing`), and optional AI / ML-oriented surfaces described in project docs.*
 

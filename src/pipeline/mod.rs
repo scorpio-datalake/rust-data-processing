@@ -147,22 +147,22 @@ pub enum Agg {
         column: String,
         alias: String,
     },
+    /// Median of numeric values (cast to `Float64` first), nulls ignored.
+    Median {
+        column: String,
+        alias: String,
+    },
 }
 
 /// Casting behavior for [`DataFrame::cast_with_mode`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CastMode {
     /// Casting errors fail the pipeline at `collect()` time.
+    #[default]
     Strict,
     /// Casting errors yield nulls instead of failing.
     Lossy,
-}
-
-impl Default for CastMode {
-    fn default() -> Self {
-        Self::Strict
-    }
 }
 
 /// A DataFrame-centric pipeline compiled into a lazy plan.
@@ -411,7 +411,7 @@ impl DataFrame {
                 message: format!("missing reduce output column '{REDUCE_SCALAR_COL}'"),
             })?
             .as_materialized_series();
-        if s.len() == 0 {
+        if s.is_empty() {
             return Ok(Some(Value::Null));
         }
         let av = s.get(0).map_err(|e| IngestionError::SchemaMismatch {
@@ -441,7 +441,7 @@ impl DataFrame {
             .collect_schema()
             .map_err(|e| polars_error_to_ingestion("failed to collect polars schema", e))?;
         for c in columns {
-            if df_schema.get(*c).is_none() {
+            if df_schema.get(c).is_none() {
                 return Err(IngestionError::SchemaMismatch {
                     message: format!("feature_wise_mean_std: unknown column '{c}'"),
                 });
@@ -479,7 +479,7 @@ impl DataFrame {
         }
 
         let mut out = Vec::with_capacity(columns.len());
-        for i in 0..columns.len() {
+        for (i, _) in columns.iter().enumerate() {
             let mean_s = df
                 .column(&format!("__fwm_{i}_mean"))
                 .map_err(|_| IngestionError::SchemaMismatch {
@@ -544,6 +544,7 @@ fn polars_reduce_expr(column: &str, op: ReduceOp) -> Expr {
         ReduceOp::SumSquares => c.clone().strict_cast(P::Float64).pow(lit(2.0)).sum(),
         ReduceOp::L2Norm => c.clone().strict_cast(P::Float64).pow(lit(2.0)).sum().sqrt(),
         ReduceOp::CountDistinctNonNull => c.drop_nulls().n_unique(),
+        ReduceOp::Median => c.clone().strict_cast(P::Float64).median(),
     }
 }
 
@@ -601,6 +602,10 @@ fn agg_to_expr(agg: &Agg) -> Expr {
         Agg::CountDistinctNonNull { column, alias } => col(column.as_str())
             .drop_nulls()
             .n_unique()
+            .alias(alias.as_str()),
+        Agg::Median { column, alias } => col(column.as_str())
+            .strict_cast(P::Float64)
+            .median()
             .alias(alias.as_str()),
     }
 }

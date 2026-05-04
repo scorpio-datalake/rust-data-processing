@@ -6,6 +6,10 @@
 //! - performs ingestion into an in-memory [`crate::types::DataSet`]
 //! - optionally reports success/failure/alerts to an [`IngestionObserver`]
 //!
+//! For **append-only ordered batches**, use [`ingest_from_ordered_paths`] (concatenate rows, then
+//! apply the watermark filter once). For stable directory listings, see [`paths_from_directory_scan`]
+//! and [`partition`] module docs on deterministic ordering.
+//!
 //! For ergonomic configuration, prefer [`IngestionOptionsBuilder`] over constructing
 //! [`IngestionOptions`] directly.
 //!
@@ -71,6 +75,7 @@ pub mod excel {
 pub mod db;
 pub mod json;
 pub mod parquet;
+pub mod partition;
 #[cfg(not(feature = "db_connectorx"))]
 pub mod db {
     //! Direct DB ingestion stubs when `db_connectorx` is disabled.
@@ -86,26 +91,46 @@ pub mod db {
         }
     }
 
-    pub fn ingest_from_db(_conn: &str, _query: &str, _schema: &Schema) -> IngestionResult<DataSet> {
+    pub fn ingest_from_db(
+        _conn: &str,
+        _query: &str,
+        _schema: &Schema,
+        _options: &super::IngestionOptions,
+    ) -> IngestionResult<DataSet> {
         Err(disabled())
     }
 
-    pub fn ingest_from_db_infer(_conn: &str, _query: &str) -> IngestionResult<DataSet> {
+    pub fn ingest_from_db_infer(
+        _conn: &str,
+        _query: &str,
+        _options: &super::IngestionOptions,
+    ) -> IngestionResult<DataSet> {
         Err(disabled())
     }
 }
 pub mod observability;
 pub(crate) mod polars_bridge;
 pub mod unified;
+pub mod watermark;
 
 pub use builder::IngestionOptionsBuilder;
 pub use observability::{
     CompositeObserver, FileObserver, IngestionContext, IngestionObserver, IngestionSeverity,
     IngestionStats, StdErrObserver,
 };
+pub use partition::{
+    PartitionSegment, PartitionedFile, discover_hive_partitioned_files,
+    hive_segments_for_relative_parent, parse_partition_segment, paths_from_directory_scan,
+    paths_from_explicit_list, paths_from_glob,
+};
 pub use unified::{
     ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest,
-    infer_schema_from_path, ingest_from_path, ingest_from_path_infer,
+    OrderedBatchIngestMetadata, infer_schema_from_path, ingest_from_ordered_paths,
+    ingest_from_path, ingest_from_path_infer,
+};
+pub use watermark::{
+    apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column,
+    validate_watermark_config,
 };
 
 pub use db::{ingest_from_db, ingest_from_db_infer};

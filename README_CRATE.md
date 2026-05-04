@@ -6,6 +6,8 @@
 
 *Infographic: Phase 1 — single-node, library-first flow (ingest → `DataSet`, pipelines, SQL, profile, validate, outliers, transforms, parallel execution, PyO3 bindings, optional chatbot / notebook story).*
 
+**Limits (masking / “PII”):** UTF-8 transforms and validation checks are **mechanical** helpers only; callers supply policy and must not treat outputs as legal guarantees. See `Planning/P2_E6_PRIVACY_POLICY.md` in the repository.
+
 This file is the **crate README** shown on [crates.io](https://crates.io/crates/rust-data-processing) and at the top of [docs.rs](https://docs.rs/rust-data-processing) (Rust-only). The [repository’s `README.md`](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/README.md) is the full monorepo overview (including Python).
 
 ## Documentation

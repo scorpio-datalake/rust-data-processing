@@ -6,6 +6,7 @@
 mod convert;
 mod observer_bridge;
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use convert::*;
@@ -13,9 +14,15 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use rust_data_processing::execution::ExecutionEngine;
+use rust_data_processing::export::{
+    dataset_to_jsonl, filter_rows_max_utf8_chars, train_test_row_indices,
+};
 use rust_data_processing::ingestion::{
-    IngestionOptions, infer_schema_from_path, ingest_from_db, ingest_from_db_infer,
-    ingest_from_path, ingest_from_path_infer,
+    IngestionOptions, discover_hive_partitioned_files as discover_hive_partitioned_files_rs,
+    infer_schema_from_path, ingest_from_db, ingest_from_db_infer, ingest_from_ordered_paths,
+    ingest_from_path, ingest_from_path_infer, parse_partition_segment as parse_partition_segment_rs,
+    paths_from_directory_scan as paths_from_directory_scan_rs,
+    paths_from_explicit_list as paths_from_explicit_list_rs, paths_from_glob as paths_from_glob_rs,
 };
 use rust_data_processing::outliers::{
     detect_outliers_dataset, render_outlier_report_json, render_outlier_report_markdown,
@@ -24,9 +31,13 @@ use rust_data_processing::pipeline::{Agg, CastMode, DataFrame, JoinKind, Predica
 use rust_data_processing::processing::{
     VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce, top_k_by_frequency,
 };
+use rust_data_processing::privacy::{
+    render_privacy_report_json, render_privacy_report_markdown, summarize_utf8_column_changes,
+};
 use rust_data_processing::profiling::{
     profile_dataset, render_profile_report_json, render_profile_report_markdown,
 };
+use rust_data_processing::reports::truncate_utf8_by_bytes;
 use rust_data_processing::sql;
 use rust_data_processing::transform::TransformSpec;
 use rust_data_processing::types::{DataSet, Value};
@@ -97,6 +108,10 @@ fn agg_from_py(d: &Bound<'_, PyDict>) -> PyResult<Agg> {
             alias: dict_req_str(d, "alias")?,
         }),
         "count_distinct_non_null" | "count_distinct" => Ok(Agg::CountDistinctNonNull {
+            column: dict_req_str(d, "column")?,
+            alias: dict_req_str(d, "alias")?,
+        }),
+        "median" => Ok(Agg::Median {
             column: dict_req_str(d, "column")?,
             alias: dict_req_str(d, "alias")?,
         }),
@@ -679,6 +694,39 @@ fn infer_schema_from_path_py(
     schema_to_py_list(py, &s)
 }
 
+/// Ingest an ordered list of files, concatenate rows, apply watermark once; returns `(dataset, metadata_dict)`.
+#[pyfunction(name = "ingest_from_ordered_paths")]
+#[pyo3(signature = (paths, schema, options=None))]
+fn ingest_from_ordered_paths_py(
+    py: Python<'_>,
+    paths: Vec<String>,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<(PyDataSet, PyObject)> {
+    let schema = schema_from_py(schema)?;
+    let opts = merge_ingestion_options(py, options)?;
+    let pbs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let (ds, meta) =
+        ingest_from_ordered_paths(&pbs, &schema, &opts).map_err(ingestion_err_to_py)?;
+    let d = PyDict::new(py);
+    let path_list = PyList::empty(py);
+    for p in &meta.paths {
+        path_list.append(p.to_string_lossy().to_string())?;
+    }
+    d.set_item("paths", path_list)?;
+    d.set_item(
+        "last_path",
+        meta.last_path
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string()),
+    )?;
+    match &meta.max_watermark_value {
+        Some(v) => d.set_item("max_watermark_value", value_to_py(py, v))?,
+        None => d.set_item("max_watermark_value", py.None())?,
+    }
+    Ok((PyDataSet::from_inner(ds), d.into()))
+}
+
 #[pyfunction(name = "ingest_from_path_infer")]
 #[pyo3(signature = (path, options=None))]
 fn ingest_from_path_infer_py(
@@ -693,16 +741,31 @@ fn ingest_from_path_infer_py(
 }
 
 #[pyfunction(name = "ingest_from_db")]
-fn ingest_from_db_py(conn: &str, query: &str, schema: &Bound<'_, PyAny>) -> PyResult<PyDataSet> {
+#[pyo3(signature = (conn, query, schema, options=None))]
+fn ingest_from_db_py(
+    py: Python<'_>,
+    conn: &str,
+    query: &str,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDataSet> {
     let schema = schema_from_py(schema)?;
-    ingest_from_db(conn, query, &schema)
+    let opts = merge_ingestion_options(py, options)?;
+    ingest_from_db(conn, query, &schema, &opts)
         .map(PyDataSet::from_inner)
         .map_err(ingestion_err_to_py)
 }
 
 #[pyfunction(name = "ingest_from_db_infer")]
-fn ingest_from_db_infer_py(conn: &str, query: &str) -> PyResult<PyDataSet> {
-    ingest_from_db_infer(conn, query)
+#[pyo3(signature = (conn, query, options=None))]
+fn ingest_from_db_infer_py(
+    py: Python<'_>,
+    conn: &str,
+    query: &str,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDataSet> {
+    let opts = merge_ingestion_options(py, options)?;
+    ingest_from_db_infer(conn, query, &opts)
         .map(PyDataSet::from_inner)
         .map_err(ingestion_err_to_py)
 }
@@ -724,6 +787,54 @@ fn transform_apply_json(ds: &PyDataSet, spec_json: &str) -> PyResult<PyDataSet> 
     spec.apply(&ds.inner)
         .map(PyDataSet::from_inner)
         .map_err(ingestion_err_to_py)
+}
+
+#[pyfunction(name = "export_dataset_jsonl")]
+fn export_dataset_jsonl_py(ds: &PyDataSet, columns: Vec<String>) -> PyResult<String> {
+    dataset_to_jsonl(&ds.inner, &columns).map_err(ingestion_err_to_py)
+}
+
+#[pyfunction(name = "privacy_summarize_utf8_changes_json")]
+fn privacy_summarize_utf8_changes_json_py(
+    before: &PyDataSet,
+    after: &PyDataSet,
+    columns: Vec<String>,
+) -> PyResult<String> {
+    let rows = summarize_utf8_column_changes(&before.inner, &after.inner, &columns);
+    render_privacy_report_json(&rows).map_err(ingestion_err_to_py)
+}
+
+#[pyfunction(name = "reports_truncate_utf8_bytes")]
+fn reports_truncate_utf8_bytes_py(text: &str, max_bytes: usize) -> String {
+    truncate_utf8_by_bytes(text, max_bytes)
+}
+
+/// Deterministic train/test row index split: `(train_indices, test_indices)` as two lists of `int`.
+#[pyfunction(name = "export_train_test_row_indices")]
+fn export_train_test_row_indices_py(row_count: usize, test_fraction: f64) -> (Vec<usize>, Vec<usize>) {
+    train_test_row_indices(row_count, test_fraction)
+}
+
+/// Drop rows where `column` (Utf8) exceeds `max_chars` Unicode scalars; nulls kept.
+#[pyfunction(name = "export_filter_rows_max_utf8_chars")]
+fn export_filter_rows_max_utf8_chars_py(
+    ds: &PyDataSet,
+    column: &str,
+    max_chars: usize,
+) -> PyResult<PyDataSet> {
+    filter_rows_max_utf8_chars(&ds.inner, column, max_chars)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+#[pyfunction(name = "privacy_summarize_utf8_changes_markdown")]
+fn privacy_summarize_utf8_changes_markdown_py(
+    before: &PyDataSet,
+    after: &PyDataSet,
+    columns: Vec<String>,
+) -> PyResult<String> {
+    let rows = summarize_utf8_column_changes(&before.inner, &after.inner, &columns);
+    Ok(render_privacy_report_markdown(&rows))
 }
 
 #[pyfunction]
@@ -937,6 +1048,87 @@ fn extension_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Discover files under a Hive-style `key=value` directory tree (see Rust `ingestion::partition` rustdoc).
+///
+/// Returns a list of dicts: `{"path": str, "segments": [{"key": str, "value": str}, ...]}`.
+#[pyfunction]
+#[pyo3(signature = (root, file_pattern=None))]
+fn discover_hive_partitioned_files(
+    py: Python<'_>,
+    root: &str,
+    file_pattern: Option<&str>,
+) -> PyResult<PyObject> {
+    let files = discover_hive_partitioned_files_rs(root, file_pattern).map_err(ingestion_err_to_py)?;
+    let list = PyList::empty(py);
+    for pf in files {
+        let d = PyDict::new(py);
+        d.set_item("path", pf.path.to_string_lossy().to_string())?;
+        let segs = PyList::empty(py);
+        for s in &pf.segments {
+            let seg = PyDict::new(py);
+            seg.set_item("key", &s.key)?;
+            seg.set_item("value", &s.value)?;
+            segs.append(seg)?;
+        }
+        d.set_item("segments", segs)?;
+        list.append(d)?;
+    }
+    Ok(list.into())
+}
+
+/// Expand a filesystem glob to existing file paths (sorted).
+#[pyfunction]
+fn paths_from_glob(py: Python<'_>, pattern: &str) -> PyResult<PyObject> {
+    let paths = paths_from_glob_rs(pattern).map_err(ingestion_err_to_py)?;
+    let list = PyList::empty(py);
+    for p in paths {
+        list.append(p.to_string_lossy().to_string())?;
+    }
+    Ok(list.into())
+}
+
+/// List files under `root` (recursive), optional glob on path relative to root; sorted for stable ordering.
+#[pyfunction(name = "paths_from_directory_scan")]
+#[pyo3(signature = (root, relative_pattern=None))]
+fn paths_from_directory_scan_py(
+    py: Python<'_>,
+    root: &str,
+    relative_pattern: Option<&str>,
+) -> PyResult<PyObject> {
+    let paths = paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
+    let list = PyList::empty(py);
+    for p in paths {
+        list.append(p.to_string_lossy().to_string())?;
+    }
+    Ok(list.into())
+}
+
+/// Validate paths exist as files; return them in order with duplicates removed (first wins).
+#[pyfunction]
+fn paths_from_explicit_list(py: Python<'_>, paths: Vec<String>) -> PyResult<PyObject> {
+    let pbs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    let out = paths_from_explicit_list_rs(&pbs).map_err(ingestion_err_to_py)?;
+    let list = PyList::empty(py);
+    for p in out {
+        list.append(p.to_string_lossy().to_string())?;
+    }
+    Ok(list.into())
+}
+
+/// Parse a single path component as `key=value`, or return `None` if invalid.
+#[pyfunction]
+fn parse_partition_segment(py: Python<'_>, component: &str) -> PyResult<PyObject> {
+    match parse_partition_segment_rs(component) {
+        Some(s) => {
+            let d = PyDict::new(py);
+            d.set_item("key", s.key)?;
+            d.set_item("value", s.value)?;
+            Ok(d.into())
+        }
+        None => Ok(py.None()),
+    }
+}
+
 #[pymodule]
 fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDataSet>()?;
@@ -945,12 +1137,19 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutionEngine>()?;
 
     m.add_function(wrap_pyfunction!(ingest_from_path_py, m)?)?;
+    m.add_function(wrap_pyfunction!(ingest_from_ordered_paths_py, m)?)?;
     m.add_function(wrap_pyfunction!(infer_schema_from_path_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_path_infer_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_infer_py, m)?)?;
     m.add_function(wrap_pyfunction!(sql_query_dataset, m)?)?;
     m.add_function(wrap_pyfunction!(transform_apply_json, m)?)?;
+    m.add_function(wrap_pyfunction!(export_dataset_jsonl_py, m)?)?;
+    m.add_function(wrap_pyfunction!(export_train_test_row_indices_py, m)?)?;
+    m.add_function(wrap_pyfunction!(export_filter_rows_max_utf8_chars_py, m)?)?;
+    m.add_function(wrap_pyfunction!(privacy_summarize_utf8_changes_json_py, m)?)?;
+    m.add_function(wrap_pyfunction!(privacy_summarize_utf8_changes_markdown_py, m)?)?;
+    m.add_function(wrap_pyfunction!(reports_truncate_utf8_bytes_py, m)?)?;
     m.add_function(wrap_pyfunction!(profile_dataset_json, m)?)?;
     m.add_function(wrap_pyfunction!(profile_dataset_markdown, m)?)?;
     m.add_function(wrap_pyfunction!(validate_dataset_json, m)?)?;
@@ -965,6 +1164,11 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(processing_arg_min_row, m)?)?;
     m.add_function(wrap_pyfunction!(processing_top_k_by_frequency, m)?)?;
     m.add_function(wrap_pyfunction!(extension_version, m)?)?;
+    m.add_function(wrap_pyfunction!(discover_hive_partitioned_files, m)?)?;
+    m.add_function(wrap_pyfunction!(paths_from_glob, m)?)?;
+    m.add_function(wrap_pyfunction!(paths_from_directory_scan_py, m)?)?;
+    m.add_function(wrap_pyfunction!(paths_from_explicit_list, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_partition_segment, m)?)?;
 
     Ok(())
 }

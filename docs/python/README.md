@@ -12,9 +12,19 @@ Install (from PyPI after release, or from a checkout with `maturin develop` — 
 pip install rust-data-processing
 ```
 
+**Notebooks:** see **[`notebooks/README.md`](../../notebooks/README.md)** in the repository for Jupyter examples.
+
 ```python
 import rust_data_processing as rdp
 ```
+
+### Delta Lake / Apache Iceberg (read path)
+
+The Rust crate’s **default build** does not embed a Delta/Iceberg table engine (see [`Planning/ADR_P2_E2_LAKE_TABLE_READ.md`](../../Planning/ADR_P2_E2_LAKE_TABLE_READ.md)). In Python, use **`deltalake`** or **`pyiceberg`** to scan a table, write **Parquet**, then call **`rdp.ingest_from_path`** on that file — or stay in Python/Polars for the heavy scan. Details: [`docs/LAKE_TABLE_READ.md`](../LAKE_TABLE_READ.md).
+
+### Phase 2 examples (export, privacy, median, validation, …)
+
+Copy-paste snippets live in **[`PHASE2_EXAMPLES.md`](PHASE2_EXAMPLES.md)** (same folder as this README).
 
 ### What this page covers
 
@@ -22,11 +32,13 @@ Use this as a **tour of the Python API** (the same page is rendered on [GitHub P
 
 | Topic | Where below |
 | --- | --- |
-| **File ETL** (CSV, JSON, Parquet, Excel) | [Quick start](#quick-start-library-usage), [JSON / Parquet / Excel](#json-parquet-and-excel) |
+| **File ETL** (CSV, JSON, Parquet, Excel) | [Quick start](#quick-start-library-usage), [JSON / Parquet / Excel](#json-parquet-and-excel), [Ordered paths & directory scans](#ordered-paths-and-directory-scans-incremental-batches) |
 | **Databases** (Python driver vs built-in ConnectorX) | [Database sources: two ways](#database-sources-two-ways), [ConnectorX](#direct-db-ingestion-connectorx-feature-gated) |
 | **SQL & lazy `DataFrame`** | [SQL](#sql-queries-polars-backed-phase-1), [DataFrame pipelines](#dataframe-centric-pipelines-polars-backed-phase-1), [Cookbook](#cookbook-phase-1) |
 | **Declarative transforms** | [`TransformSpec`](#end-user-transformation-spec-transformspec-phase-1) |
 | **ML / QA** (profile, validate, outliers) | [ML-oriented flow](#ml--training-dataset-prep-phase-1), [Profiling](#profiling-phase-1), [Validation](#validation-phase-1), [Outliers](#outlier-detection-phase-1) |
+| **Phase 2** (JSONL export, privacy, truncation, UTF-8 transforms, median, Delta handoff) | [Phase 2 examples](PHASE2_EXAMPLES.md), [Delta / Iceberg](#delta-lake--apache-iceberg-read-path) |
+| **SFT / fine-tuning prep** (Alpaca JSONL, HF optional, chat column) | [SFT Python examples](SFT_PYTHON_EXAMPLES.md), [`SFT_DATA_FORMATS.md`](../SFT_DATA_FORMATS.md) |
 | **Row-wise & parallel processing** | [Processing pipelines](#processing-pipelines-epic-1--story-12), [Execution engine](#execution-engine-parallel-pipelines-story-13) |
 | **Ingestion observability** | [Observability](#observability-failurealert-hooks) |
 | **CDC boundary types** | [CDC](#cdc-interface-boundary-phase-1-spike) |
@@ -88,6 +100,20 @@ ds_parquet = rdp.ingest_from_path("path/to/file.parquet", schema_flat, {"format"
 
 # Excel — optional sheet selection in options (see python-wrapper/README.md)
 ds_excel = rdp.ingest_from_path("path/to/file.xlsx", schema_flat, {"format": "excel"})
+```
+
+### Ordered paths and directory scans (incremental batches)
+
+Use **`paths_from_directory_scan`** for a recursive listing with an optional glob on paths **relative to the root**; results are **sorted** so ordering is repeatable. Combine with **`ingest_from_ordered_paths`**: files are read in list order, rows are concatenated, then the same **watermark** options as single-file ingest apply **once** to the combined rows (not per file). The function returns `(DataSet, metadata)` where `metadata` includes `paths`, `last_path`, and `max_watermark_value` (when `watermark_column` / `watermark_exclusive_above` are set) for checkpointing the next run.
+
+```python
+paths = rdp.paths_from_directory_scan("data/incoming", "**/*.csv")
+ds, meta = rdp.ingest_from_ordered_paths(
+    paths,
+    schema,
+    {"watermark_column": "ts", "watermark_exclusive_above": 100},
+)
+print(meta["last_path"], meta["max_watermark_value"])
 ```
 
 ## DataFrame-centric pipelines (Polars-backed) (Phase 1)
