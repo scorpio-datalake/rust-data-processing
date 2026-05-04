@@ -42,7 +42,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use glob::{glob, Pattern};
+use glob::{Pattern, glob};
 use walkdir::WalkDir;
 
 use crate::error::{IngestionError, IngestionResult};
@@ -121,17 +121,19 @@ pub fn discover_hive_partitioned_files(
 
     let pattern = match file_pattern {
         None => None,
-        Some(p) => Some(
-            Pattern::new(p).map_err(|e| IngestionError::SchemaMismatch {
-                message: format!("invalid glob pattern '{p}': {e}"),
-            })?,
-        ),
+        Some(p) => Some(Pattern::new(p).map_err(|e| IngestionError::SchemaMismatch {
+            message: format!("invalid glob pattern '{p}': {e}"),
+        })?),
     };
 
     let root = root.to_path_buf();
     let mut out = Vec::new();
 
-    for entry in WalkDir::new(&root).follow_links(false).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&root)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         if !path.is_file() {
             continue;
@@ -143,11 +145,14 @@ pub fn discover_hive_partitioned_files(
         };
 
         if let Some(ref pat) = pattern {
-            if !pat.matches_path_with(&rel, glob::MatchOptions {
-                case_sensitive: true,
-                require_literal_separator: true,
-                require_literal_leading_dot: false,
-            }) {
+            if !pat.matches_path_with(
+                &rel,
+                glob::MatchOptions {
+                    case_sensitive: true,
+                    require_literal_separator: true,
+                    require_literal_leading_dot: false,
+                },
+            ) {
                 continue;
             }
         }
@@ -214,17 +219,19 @@ pub fn paths_from_directory_scan(
 
     let pattern = match relative_pattern {
         None => None,
-        Some(p) => Some(
-            Pattern::new(p).map_err(|e| IngestionError::SchemaMismatch {
-                message: format!("invalid glob pattern '{p}': {e}"),
-            })?,
-        ),
+        Some(p) => Some(Pattern::new(p).map_err(|e| IngestionError::SchemaMismatch {
+            message: format!("invalid glob pattern '{p}': {e}"),
+        })?),
     };
 
     let root = root.to_path_buf();
     let mut out = Vec::new();
 
-    for entry in WalkDir::new(&root).follow_links(false).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&root)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         if !path.is_file() {
             continue;
@@ -236,11 +243,14 @@ pub fn paths_from_directory_scan(
         };
 
         if let Some(ref pat) = pattern {
-            if !pat.matches_path_with(&rel, glob::MatchOptions {
-                case_sensitive: true,
-                require_literal_separator: true,
-                require_literal_leading_dot: false,
-            }) {
+            if !pat.matches_path_with(
+                &rel,
+                glob::MatchOptions {
+                    case_sensitive: true,
+                    require_literal_separator: true,
+                    require_literal_leading_dot: false,
+                },
+            ) {
                 continue;
             }
         }
@@ -262,10 +272,7 @@ pub fn paths_from_explicit_list(paths: &[PathBuf]) -> IngestionResult<Vec<PathBu
     for p in paths {
         if !p.is_file() {
             return Err(IngestionError::SchemaMismatch {
-                message: format!(
-                    "explicit path is not an existing file: {}",
-                    p.display()
-                ),
+                message: format!("explicit path is not an existing file: {}", p.display()),
             });
         }
         if seen.insert(p.clone()) {

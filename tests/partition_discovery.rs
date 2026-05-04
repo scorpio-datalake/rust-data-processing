@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use rust_data_processing::ingestion::{
-    discover_hive_partitioned_files, paths_from_explicit_list, paths_from_glob, PartitionSegment,
+    PartitionSegment, discover_hive_partitioned_files, paths_from_explicit_list, paths_from_glob,
 };
 
 fn fixture_root(name: &str) -> PathBuf {
@@ -18,7 +18,10 @@ fn discover_hive_two_partitions_plus_root_file() {
 
     files.sort_by(|a, b| a.path.cmp(&b.path));
 
-    let at_root = files.iter().find(|f| f.path.ends_with("at_root.csv")).unwrap();
+    let at_root = files
+        .iter()
+        .find(|f| f.path.ends_with("at_root.csv"))
+        .unwrap();
     assert!(at_root.segments.is_empty());
 
     let us = files

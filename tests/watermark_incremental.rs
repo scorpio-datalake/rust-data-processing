@@ -94,8 +94,12 @@ fn db_stub_accepts_options_without_panic() {
     let schema = events_schema();
     let opts = IngestionOptions::default();
     let e = ingest_from_db("not a url", "SELECT 1", &schema, &opts).unwrap_err();
-    assert!(e.to_string().contains("db ingestion is disabled") || e.to_string().contains("invalid"));
+    assert!(
+        e.to_string().contains("db ingestion is disabled") || e.to_string().contains("invalid")
+    );
 
     let e2 = ingest_from_db_infer("not a url", "SELECT 1", &opts).unwrap_err();
-    assert!(e2.to_string().contains("db ingestion is disabled") || e2.to_string().contains("invalid"));
+    assert!(
+        e2.to_string().contains("db ingestion is disabled") || e2.to_string().contains("invalid")
+    );
 }

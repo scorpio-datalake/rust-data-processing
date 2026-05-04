@@ -6,7 +6,8 @@ use crate::types::{DataSet, Schema, Value};
 use super::observability::IngestionObserver;
 use super::observability::IngestionSeverity;
 use super::unified::{
-    self, ExcelSheetSelection, IngestionFormat, IngestionOptions, OrderedBatchIngestMetadata, ingest_from_path,
+    self, ExcelSheetSelection, IngestionFormat, IngestionOptions, OrderedBatchIngestMetadata,
+    ingest_from_path,
 };
 
 /// Builder for [`IngestionOptions`].
@@ -113,7 +114,10 @@ mod tests {
         assert_eq!(built.alert_at_or_above, direct.alert_at_or_above);
         assert_eq!(built.observer.is_some(), direct.observer.is_some());
         assert_eq!(built.watermark_column, direct.watermark_column);
-        assert_eq!(built.watermark_exclusive_above, direct.watermark_exclusive_above);
+        assert_eq!(
+            built.watermark_exclusive_above,
+            direct.watermark_exclusive_above
+        );
     }
 
     #[test]

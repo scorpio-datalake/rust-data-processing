@@ -10,11 +10,7 @@ pub fn truncate_utf8_by_bytes(input: &str, max_bytes: usize) -> String {
     while end > 0 && !input.is_char_boundary(end) {
         end -= 1;
     }
-    format!(
-        "{}… [truncated from {} bytes]",
-        &input[..end],
-        input.len()
-    )
+    format!("{}… [truncated from {} bytes]", &input[..end], input.len())
 }
 
 #[cfg(test)]

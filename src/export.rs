@@ -25,9 +25,11 @@ pub fn dataset_to_jsonl(ds: &DataSet, column_order: &[String]) -> IngestionResul
     let idx: Vec<usize> = column_order
         .iter()
         .map(|name| {
-            ds.schema.index_of(name).ok_or_else(|| IngestionError::SchemaMismatch {
-                message: format!("dataset_to_jsonl: unknown column '{name}'"),
-            })
+            ds.schema
+                .index_of(name)
+                .ok_or_else(|| IngestionError::SchemaMismatch {
+                    message: format!("dataset_to_jsonl: unknown column '{name}'"),
+                })
         })
         .collect::<Result<_, _>>()?;
 
@@ -37,8 +39,10 @@ pub fn dataset_to_jsonl(ds: &DataSet, column_order: &[String]) -> IngestionResul
         for (name, &i) in column_order.iter().zip(&idx) {
             m.insert(name.clone(), cell_to_json(&row[i]));
         }
-        let line = serde_json::to_string(&JsonValue::Object(m)).map_err(|e| IngestionError::SchemaMismatch {
-            message: format!("dataset_to_jsonl: json encode failed: {e}"),
+        let line = serde_json::to_string(&JsonValue::Object(m)).map_err(|e| {
+            IngestionError::SchemaMismatch {
+                message: format!("dataset_to_jsonl: json encode failed: {e}"),
+            }
         })?;
         out.push_str(&line);
         out.push('\n');
@@ -59,10 +63,17 @@ pub fn train_test_row_indices(row_count: usize, test_fraction: f64) -> (Vec<usiz
 }
 
 /// Keep only rows whose UTF-8 value in `column` has at most `max_chars` Unicode scalars; other rows dropped.
-pub fn filter_rows_max_utf8_chars(ds: &DataSet, column: &str, max_chars: usize) -> IngestionResult<DataSet> {
-    let idx = ds.schema.index_of(column).ok_or_else(|| IngestionError::SchemaMismatch {
-        message: format!("filter_rows_max_utf8_chars: unknown column '{column}'"),
-    })?;
+pub fn filter_rows_max_utf8_chars(
+    ds: &DataSet,
+    column: &str,
+    max_chars: usize,
+) -> IngestionResult<DataSet> {
+    let idx = ds
+        .schema
+        .index_of(column)
+        .ok_or_else(|| IngestionError::SchemaMismatch {
+            message: format!("filter_rows_max_utf8_chars: unknown column '{column}'"),
+        })?;
     if ds.schema.fields[idx].data_type != crate::types::DataType::Utf8 {
         return Err(IngestionError::SchemaMismatch {
             message: format!("column '{column}' must be Utf8"),

@@ -24,8 +24,8 @@ use connectorx::source_router::SourceConn;
 use crate::error::{IngestionError, IngestionResult};
 use crate::types::{DataSet, DataType, Field, Schema, Value};
 
-use super::watermark::{apply_watermark_after_ingest, validate_watermark_config};
 use super::IngestionOptions;
+use super::watermark::{apply_watermark_after_ingest, validate_watermark_config};
 
 /// Ingest a SQL query from a database into a [`DataSet`], validating/casting into `schema`.
 ///
@@ -50,7 +50,11 @@ pub fn ingest_from_db(
 /// Convenience: infer a best-effort schema from the query result, then ingest.
 ///
 /// This uses a lossy mapping into `DataType::{Int64, Float64, Bool, Utf8}`.
-pub fn ingest_from_db_infer(conn: &str, query: &str, options: &IngestionOptions) -> IngestionResult<DataSet> {
+pub fn ingest_from_db_infer(
+    conn: &str,
+    query: &str,
+    options: &IngestionOptions,
+) -> IngestionResult<DataSet> {
     let batches = run_connectorx(conn, &[query.to_string()])?;
     let schema = infer_schema_from_record_batches_lossy(&batches)?;
     validate_watermark_config(&schema, options)?;
@@ -257,11 +261,12 @@ fn arrow_value_to_value(
 
 #[cfg(test)]
 mod tests {
-    use super::{ingest_from_db_infer, IngestionOptions};
+    use super::{IngestionOptions, ingest_from_db_infer};
 
     #[test]
     fn db_ingest_returns_error_for_invalid_connection_string() {
-        let err = ingest_from_db_infer("not a url", "SELECT 1", &IngestionOptions::default()).unwrap_err();
+        let err = ingest_from_db_infer("not a url", "SELECT 1", &IngestionOptions::default())
+            .unwrap_err();
         assert!(err.to_string().contains("invalid db connection string"));
     }
 }
