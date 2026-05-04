@@ -53,9 +53,10 @@ impl IngestionFormat {
 }
 
 /// How to choose sheet(s) when ingesting an Excel workbook.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ExcelSheetSelection {
     /// Ingest the first sheet (default).
+    #[default]
     First,
     /// Ingest a single named sheet.
     Sheet(String),
@@ -63,12 +64,6 @@ pub enum ExcelSheetSelection {
     AllSheets,
     /// Ingest only the listed sheets (in order) and concatenate rows.
     Sheets(Vec<String>),
-}
-
-impl Default for ExcelSheetSelection {
-    fn default() -> Self {
-        Self::First
-    }
 }
 
 /// Options controlling unified ingestion behavior.
@@ -386,7 +381,7 @@ pub fn ingest_from_ordered_paths<P: AsRef<Path>>(
     let mut all_rows: Vec<Vec<Value>> = Vec::new();
     for p in &path_bufs {
         let ds = ingest_from_path(p, schema, &per_file_opts)?;
-        all_rows.extend(ds.rows.into_iter());
+        all_rows.extend(ds.rows);
     }
 
     let mut ds = DataSet::new(schema.clone(), all_rows);
