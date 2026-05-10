@@ -1,0 +1,16 @@
+# Regenerate header (requires `cargo install cbindgen` — opt-in tooling; not wired into main workspace):
+#
+#   cbindgen -c spikes/jvm-panama-ffi/cbindgen.toml -o spikes/jvm-panama-ffi/include/rdp_ffi.h spikes/jvm-panama-ffi
+#
+language = "C"
+cpp_compat = false
+include_guard = "RDP_FFI_SPIKE_H"
+sys_includes = ["stdint.h"]
+documentation_style = "c99"
+
+[export]
+exclude = []
+
+[parse]
+parse_deps = false
+clean = false

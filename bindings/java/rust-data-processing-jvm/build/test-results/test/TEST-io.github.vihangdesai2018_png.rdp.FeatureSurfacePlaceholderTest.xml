@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" tests="9" skipped="9" failures="0" errors="0" timestamp="2026-05-10T21:54:56.639Z" hostname="VIHANG_HOME" time="0.01">
+  <properties/>
+  <testcase name="parity: validation" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.001">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: ingestion" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: types / DataSet" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: Kafka (Phase 3)" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: outliers" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: pipeline / SQL" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: profiling" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: processing (filter/map/reduce)" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="parity: transform" classname="io.github.vihangdesai2018_png.rdp.FeatureSurfacePlaceholderTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

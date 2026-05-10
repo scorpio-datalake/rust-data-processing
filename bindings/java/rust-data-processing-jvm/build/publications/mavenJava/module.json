@@ -1,0 +1,60 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "io.github.vihangdesai2018_png",
+    "module": "rust-data-processing-jvm",
+    "version": "0.1.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.2.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "rust-data-processing-jvm-0.1.0-SNAPSHOT.jar",
+          "url": "rust-data-processing-jvm-0.1.0-SNAPSHOT.jar",
+          "size": 704,
+          "sha512": "a20748b38bae06e39ed581e458e1a66aed745eb46d4899d3f437fdb4f2e3d4b3fff6a793943c0527eb5a894dd6fedbd617a4052becfbcadc811dd8c2081e1626",
+          "sha256": "f6bbb48fc1c2db27fd913a96dc21d001d7228953fb12489b0af2d7c66229a7ca",
+          "sha1": "ee53f4708a7eff88f311ba63264cf9c2f632a792",
+          "md5": "55e9147f3940b5418b08be39c49a9c78"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "rust-data-processing-jvm-0.1.0-SNAPSHOT.jar",
+          "url": "rust-data-processing-jvm-0.1.0-SNAPSHOT.jar",
+          "size": 704,
+          "sha512": "a20748b38bae06e39ed581e458e1a66aed745eb46d4899d3f437fdb4f2e3d4b3fff6a793943c0527eb5a894dd6fedbd617a4052becfbcadc811dd8c2081e1626",
+          "sha256": "f6bbb48fc1c2db27fd913a96dc21d001d7228953fb12489b0af2d7c66229a7ca",
+          "sha1": "ee53f4708a7eff88f311ba63264cf9c2f632a792",
+          "md5": "55e9147f3940b5418b08be39c49a9c78"
+        }
+      ]
+    }
+  ]
+}

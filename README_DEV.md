@@ -4,7 +4,7 @@ This doc is for contributors working inside the repo. Keep it in sync with the a
 
 ### Local planning (`Planning/` — gitignored)
 
-The entire **`Planning/`** directory is listed in **`.gitignore`**. Keep **Phase 1**, **Phase 1a**, **Phase 2**, and **Phase 3** material there locally—e.g. **`PHASE1_PLAN.md`**, **`PHASE1A_PLAN.md`**, **`Phase2_plan.md`**, **`PHASE2_EPICS.md`**, **`PHASE3_EPICS.md`**, release drafts, or story checklists. Git does not track that folder and no workflow deletes it; it is only for your machine.
+Phase **3** JVM/Kafka progress is tracked **only** in **`Planning/PHASE3_EPICS.md`** (parity rows + stories). Older Phase 1 / Phase 2 planning markdown under **`Planning/`** was consolidated away; do not recreate parallel epic files.
 
 Operational docs that **are** shared with the repo (release checklist, deploy steps, aggregate semantics, CI policy) live under **`docs/`** and are separate from private planning notes.
 
@@ -244,5 +244,5 @@ cargo test --no-default-features
   - If you change behavior in ingestion/pipelines, update or add benchmarks/tests to keep parity expectations explicit.
 - **Docs upkeep**:
   - If you add/rename modules or public APIs, update **both** `README.md` and this file (`README_DEV.md`).
-  - Keep the roadmap summary in `README.md` aligned with your local **`Planning/`** trackers (e.g. **`PHASE1_PLAN.md`**) if you maintain them.
+  - Keep the roadmap summary in `README.md` aligned with **`Planning/PHASE3_EPICS.md`** for JVM/Kafka (Phase 3).
 

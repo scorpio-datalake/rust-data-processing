@@ -65,6 +65,16 @@ uv run maturin develop --release
 uv run pdoc -d google -o ../_site/python rust_data_processing
 ```
 
+## Phase 3 (Panama JVM + Maven + Gradle + Kafka surfaces)
+
+Phase **3 GA** mandates **Panama**, **Maven**, **Gradle**, **Kafka** on Rust/Python/JVM (including BYO connectors), and **Rust↔JVM API parity** (same capabilities as the Rust crate unless documentedly impossible). **`Planning/PHASE3_EPICS.md`** owns the Phase 3 checklist (single tracker).
+
+Scaffold (**`bindings/`**, Maven + Gradle; parity tracker **`Planning/PHASE3_EPICS.md`**) runs **`mvn verify`**, **`./gradlew check`**, **`publishToMavenLocal`** on **Linux / Windows / macOS** × JDK **21** — **`.github/workflows/jvm_bindings_ci.yml`** (plus **`scripts/check_jvm_ffi_manifest.py`**).
+
+**Maven Central onboarding (tokens / cost):** **[`docs/java/MAVEN_CENTRAL_PUBLISHING.md`](java/MAVEN_CENTRAL_PUBLISHING.md)**.
+
+**Increment 1 (spike concluded)** — proving **`cdylib`**, **`rdp_ffi.h`**, and FFM linkage only: **[`docs/adr/003-jvm-panama-ffi-spike.md`](adr/003-jvm-panama-ffi-spike.md)**, **`spikes/jvm-panama-ffi/README.md`**. Quick compile check: **`cargo test --manifest-path spikes/jvm-panama-ffi/Cargo.toml`**. That directory is **not** the Phase **3 GA** Maven/Gradle product tree.
+
 ## Issue triage and reporting
 
 See [ISSUE_TRIAGE.md](ISSUE_TRIAGE.md) and root [README.md § Reporting bugs](../README.md#reporting-bugs).

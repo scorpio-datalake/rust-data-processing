@@ -11,6 +11,8 @@ documentation = "https://docs.rs/rust-data-processing"
 keywords = ["csv", "json", "parquet", "dataset", "etl"]
 categories = ["database-implementations", "parser-implementations"]
 exclude = [
+    "bindings/",
+    "spikes/",
     "Planning/",
     "python-wrapper/",
     "docs/python/",

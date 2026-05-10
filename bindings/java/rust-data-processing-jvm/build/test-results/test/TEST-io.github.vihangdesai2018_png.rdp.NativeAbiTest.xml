@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.vihangdesai2018_png.rdp.NativeAbiTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-05-10T21:54:56.664Z" hostname="VIHANG_HOME" time="0.075">
+  <properties/>
+  <testcase name="rdpFfiAbiVersion_matchesRustConstant()" classname="io.github.vihangdesai2018_png.rdp.NativeAbiTest" time="0.075"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

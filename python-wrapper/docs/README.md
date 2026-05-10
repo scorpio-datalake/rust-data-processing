@@ -21,6 +21,6 @@ uv run pdoc -d google -o ../_site/python rust_data_processing rust_data_processi
 
 From the repository root (PowerShell), the same output is produced by `./scripts/build_docs.ps1 -All` → `_site/python/index.html`.
 
-Rust-side reference: repository root **`API.md`**, **`README.md`**, and **`docs/REDUCE_AGG_SEMANTICS.md`** (aggregate semantics). The Python package mirrors the main crate APIs where practical; gaps are listed in **`PARITY.md`** and optionally in a local **`Planning/PHASE1A_PLAN.md`** if you maintain one.
+Rust-side reference: repository root **`API.md`**, **`README.md`**, and **`docs/REDUCE_AGG_SEMANTICS.md`** (aggregate semantics). The Python package mirrors the main crate APIs where practical; gaps are listed in **`PARITY.md`**. JVM parity is tracked in **`Planning/PHASE3_EPICS.md`** only.
 
 Maintainer overview of doc hosting: **`docs/DOCUMENTATION.md`**.
