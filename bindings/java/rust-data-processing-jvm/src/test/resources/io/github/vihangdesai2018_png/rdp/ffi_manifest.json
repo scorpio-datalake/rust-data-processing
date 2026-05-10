@@ -1,4 +1,0 @@
-{
-  "abi_version_constant": 400,
-  "exported_symbols": ["rdp_ffi_abi_version"]
-}

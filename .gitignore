@@ -30,3 +30,7 @@ test_run_*.log
 benchmarks.log
 # Local planning / story tracking — not for version control
 Planning/
+
+# Java / Gradle outputs under bindings/java (never commit — run mvn/gradlew locally).
+bindings/java/**/build/
+bindings/java/**/.gradle/

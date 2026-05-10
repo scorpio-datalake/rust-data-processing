@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.github.vihangdesai2018_png</groupId>
+  <groupId>io.github.rust_data_processing</groupId>
   <artifactId>rust-data-processing-jvm</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>rust-data-processing JVM bindings</name>
@@ -28,7 +28,6 @@
       <groupId>org.json</groupId>
       <artifactId>json</artifactId>
       <version>20250107</version>
-      <scope>test</scope>
     </dependency>
     <!-- JMH sources live under src/jmh/java and are excluded from the shipped JAR (see maven-jar-plugin). -->
     <dependency>
@@ -80,7 +79,7 @@
         <version>3.4.2</version>
         <configuration>
           <excludes>
-            <exclude>io/github/vihangdesai2018_png/rdp/jmh/**</exclude>
+            <exclude>io/github/rust_data_processing/jmh/**</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -123,7 +122,7 @@
                 <argument>1</argument>
                 <argument>-t</argument>
                 <argument>1</argument>
-                <argument>io.github.vihangdesai2018_png.rdp.jmh.RdpAbiVersionBenchmark</argument>
+                <argument>io.github.rust_data_processing.jmh.RdpAbiVersionBenchmark</argument>
               </arguments>
             </configuration>
           </execution>

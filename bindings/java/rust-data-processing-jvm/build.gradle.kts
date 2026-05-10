@@ -7,7 +7,7 @@ plugins {
 val rdpVersion =
     layout.projectDirectory.file("../VERSION").asFile.readText(Charsets.UTF_8).trim()
 
-group = "io.github.vihangdesai2018_png"
+group = "io.github.rust_data_processing"
 version = rdpVersion
 
 java {

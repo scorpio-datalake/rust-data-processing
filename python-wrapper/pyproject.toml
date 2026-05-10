@@ -22,8 +22,8 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/vihangdesai2018-png/rust-data-processing"
-Documentation = "https://vihangdesai2018-png.github.io/rust-data-processing/python/examples.html"
+Repository = "https://github.com/rust-data-processing/rust-data-processing"
+Documentation = "https://rust-data-processing.github.io/rust-data-processing/python/examples.html"
 
 [dependency-groups]
 dev = [

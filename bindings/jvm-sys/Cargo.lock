@@ -2644,7 +2644,9 @@ dependencies = [
 name = "rdp-jvm-sys"
 version = "0.1.0"
 dependencies = [
+ "csv",
  "rust-data-processing",
+ "serde_json",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ This document defines how we handle GitHub Issues for **rust-data-processing** b
 
 ## Where to report
 
-- **Bugs and features:** [GitHub Issues](https://github.com/vihangdesai2018-png/rust-data-processing/issues) using the **Bug Report** or **Feature Request** form when possible.
+- **Bugs and features:** [GitHub Issues](https://github.com/rust-data-processing/rust-data-processing/issues) using the **Bug Report** or **Feature Request** form when possible.
 - **Security vulnerabilities:** follow [`SECURITY.md`](../SECURITY.md); do **not** use public issues.
 
 ## Labels (convention)

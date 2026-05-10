@@ -7,7 +7,7 @@
 
 |                                                | Link                                                                                                                                                                                                                                     |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://vihangdesai2018-png.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).* |
+| **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://rust-data-processing.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).* |
 | **Rust crate on crates.io**                    | [docs.rs — rust-data-processing](https://docs.rs/rust-data-processing) *(populates after the first successful publish)*                                                                                                                  |
 | **Markdown API guides**                        | [`API.md`](API.md) (Rust); Python: [`python-wrapper/API.md`](python-wrapper/API.md)                                                                                                                                                      |
 | **Rust examples (this repo)**                  | [`docs/rust/README.md`](docs/rust/README.md) — `Cargo.toml`, ingestion, DataFrame/SQL, cookbook, execution, benchmarks                                                                                                                   |
@@ -59,7 +59,7 @@ Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or 
 
 ## Reporting bugs
 
-- Open a **[GitHub Issue](https://github.com/vihangdesai2018-png/rust-data-processing/issues)** and use **Bug Report** or **Feature Request** so we get version, OS, and repro steps.
+- Open a **[GitHub Issue](https://github.com/rust-data-processing/rust-data-processing/issues)** and use **Bug Report** or **Feature Request** so we get version, OS, and repro steps.
 - **Security:** do not file publicly — read [`SECURITY.md`](SECURITY.md).
 - How we triage and prioritize: [`docs/ISSUE_TRIAGE.md`](docs/ISSUE_TRIAGE.md).
 - **Status**: library APIs are in `src/lib.rs`; the binary (`src/main.rs`) is currently just a placeholder.

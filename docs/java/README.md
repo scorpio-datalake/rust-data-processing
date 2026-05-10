@@ -46,7 +46,9 @@
 
 | **`bindings/java/VERSION`** | Single SemVer line — **`pom.xml`** / **`gradle.properties`** must match (**CI enforced**) |
 
-| **`bindings/java/rust-data-processing-jvm/`** | **`pom.xml`**, Gradle **`maven-publish`**, tests (**`FfiExportedSymbolsContractTest`**, **`ParityMatrixDeferredExportTest`**, **`RdpJvmSysTestSupport`**) |
+| **`bindings/java/rust-data-processing-jvm/`** | **`pom.xml`**, Gradle **`maven-publish`**, tests (**`FfiExportedSymbolsContractTest`**, **`PytestMirrorAssertions`**, **`ParityMatrixDeferredExportTest`**, **`RdpJvmSysTestSupport`**) |
+
+| **`bindings/java/rust-data-processing-jvm-examples/`** | Runnable demos + **`ExamplesMirrorSmokeTest`** — pytest-scenario mirrors only (publish/run separately from Python **`examples/`** or Rust doc examples) |
 
 
 

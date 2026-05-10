@@ -42,7 +42,7 @@ After **`./gradlew publishToMavenLocal`**:
 ```kotlin
 repositories { mavenLocal() }
 dependencies {
-    implementation("io.github.vihangdesai2018_png:rust-data-processing-jvm:0.1.0-SNAPSHOT")
+    implementation("io.github.rust_data_processing:rust-data-processing-jvm:0.1.0-SNAPSHOT")
 }
 ```
 
@@ -52,7 +52,7 @@ Use the exact version from **`bindings/java/VERSION`**.
 
 ```xml
 <dependency>
-  <groupId>io.github.vihangdesai2018_png</groupId>
+  <groupId>io.github.rust_data_processing</groupId>
   <artifactId>rust-data-processing-jvm</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>

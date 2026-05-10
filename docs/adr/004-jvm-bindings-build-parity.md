@@ -24,7 +24,7 @@ This ADR records the **repository layout** and **ABI version** policy for the fi
 | --- | --- |
 | **Rust FFI crate path** | **`bindings/jvm-sys`** (`cargo package` **`publish=false`**) produces **`rdp_jvm_sys`**. **`rdp_ffi_abi_version`** starts at **`400`** (≠ spike **`3`**). Bump with every native breaking change / semantic shift. |
 | **Optional linkage to main crate** | Feature **`link-main`** (and **`full`**) attaches **`rust-data-processing`** when wiring APIs; **`default`** build stays slim for iterative JVM toolchain work (**CI default** builds without **`link-main`** until FFI surface stabilises). |
-| **Maven coordinates** | **`io.github.vihangdesai2018_png`** : **`rust-data-processing-jvm`** (**`bindings/java/rust-data-processing-jvm/pom.xml`**) · **Gradle** mirrored in **`build.gradle.kts`**. |
+| **Maven coordinates** | **`io.github.rust_data_processing`** : **`rust-data-processing-jvm`** (**`bindings/java/rust-data-processing-jvm/pom.xml`**) · **Gradle** mirrored in **`build.gradle.kts`**. |
 | **Codegen** | **`jextract`** output expected under **`src/main/java/...`** (policy: generated vs checked-in finalized in **`P3-E1-S1b`** CI task). |
 
 ---

@@ -6,10 +6,14 @@
 #[cfg(feature = "link-main")]
 use rust_data_processing as _;
 
+mod parity_support;
+mod parity;
+mod parity_mirrors;
+
 /// Bump only when ABI / calling conventions for exported symbols break.
 #[no_mangle]
 pub extern "C" fn rdp_ffi_abi_version() -> u32 {
-    400
+    402
 }
 
 #[cfg(test)]
@@ -18,6 +22,6 @@ mod tests {
 
     #[test]
     fn abi_constant() {
-        assert_eq!(rdp_ffi_abi_version(), 400);
+        assert_eq!(rdp_ffi_abi_version(), 402);
     }
 }

@@ -1,6 +1,6 @@
 # Phase 3 P3-E1: build rdp_jvm_sys → manifest + version checks → Maven verify + Gradle check (+ publishToMavenLocal smoke).
 # Java tests: Surefire runs src/test/java/**/*Test.java on `mvn verify`; Gradle runs the same JUnit 5 suite on `./gradlew check`.
-# FfiExportedSymbolsContractTest runs when RDP_JVM_SYS is set; ParityMatrixDeferredExportTest skips until parity symbols exist.
+# FfiExportedSymbolsContractTest + ParityMatrixDeferredExportTest run when RDP_JVM_SYS points at the built rdp_jvm_sys artifact.
 # JMH: `mvn verify` runs exec-maven-plugin at integration-test; `./gradlew jmh` runs the same hotspot benchmarks (requires JAVA_TOOL_OPTIONS).
 # Matrix: Linux / Windows / macOS × JDK 21 (P3-E1-S1c, P3-E1-S4a).
 
@@ -66,7 +66,7 @@ jobs:
             ~/.m2/repository
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: jvm-${{ runner.os }}-${{ hashFiles('bindings/java/rust-data-processing-jvm/pom.xml', 'bindings/java/rust-data-processing-jvm/build.gradle.kts', 'bindings/java/rust-data-processing-jvm/gradle/wrapper/gradle-wrapper.properties') }}
+          key: jvm-${{ runner.os }}-${{ hashFiles('bindings/java/rust-data-processing-jvm/pom.xml', 'bindings/java/rust-data-processing-jvm-examples/pom.xml', 'bindings/java/rust-data-processing-jvm/build.gradle.kts', 'bindings/java/rust-data-processing-jvm/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             jvm-${{ runner.os }}-
 
@@ -93,8 +93,12 @@ jobs:
         run: echo "RDP_JVM_SYS=$GITHUB_WORKSPACE/bindings/jvm-sys/target/release/rdp_jvm_sys.dll" >> "$GITHUB_ENV"
 
       # `-B` batch mode only; avoid `-q` so logs show Surefire test execution (RUNNING / PASSED / SKIPPED).
-      - name: Maven verify
+      - name: Maven verify + install (main JVM bindings JAR)
         working-directory: bindings/java/rust-data-processing-jvm
+        run: mvn -B verify install
+
+      - name: Java pytest-mirror examples module (Surefire smoke + packaged demos)
+        working-directory: bindings/java/rust-data-processing-jvm-examples
         run: mvn -B verify
 
       - name: Gradle check
