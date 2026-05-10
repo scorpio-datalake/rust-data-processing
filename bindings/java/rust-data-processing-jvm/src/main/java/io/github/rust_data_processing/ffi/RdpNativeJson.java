@@ -18,6 +18,13 @@ import org.json.JSONObject;
  */
 public final class RdpNativeJson {
 
+  /**
+   * Classpath location of the JSON manifest shipped in the {@code rust-data-processing-jvm} JAR
+   * (must match {@code bindings/jvm-sys/ffi_manifest.json} in the repository).
+   */
+  public static final String FFI_MANIFEST_RESOURCE =
+      "/io/github/rust_data_processing/ffi_manifest.json";
+
   private static final GroupLayout RDP_JSON_SLICE_LAYOUT =
       MemoryLayout.structLayout(
           ValueLayout.ADDRESS.withName("ptr"),

@@ -1,6 +1,6 @@
 # Documentation builds and hosting
 
-End-user readable API documentation is produced in two ways: **Rust** via **rustdoc** (`cargo doc`) and **Python** via **pdoc**. CI assembles both into a single static site deployed to **GitHub Pages** on pushes to `main`.
+End-user readable API documentation is produced as **Rust** via **rustdoc** (`cargo doc`), **Python** via **pdoc**, and **Java** as **Markdown → HTML** (`docs/java/EXAMPLES.md` via Pandoc). CI assembles all of these into a single static site deployed to **GitHub Pages** on pushes to `main`.
 
 ## Published URLs
 
@@ -10,6 +10,7 @@ End-user readable API documentation is produced in two ways: **Rust** via **rust
 | Rust + Python (main branch) | Combined site from CI (requires Pages setup below) | `https://<owner>.github.io/<repo>/` — for this repo: [rust-data-processing GitHub Pages](https://rust-data-processing.github.io/rust-data-processing/) |
 | Rust (main branch, rustdoc on Pages) | Crate API HTML | […/rust/rust_data_processing/index.html](https://rust-data-processing.github.io/rust-data-processing/rust/rust_data_processing/index.html) |
 | Python (main branch, pdoc on Pages) | Top-level module | […/python/rust_data_processing.html](https://rust-data-processing.github.io/rust-data-processing/python/rust_data_processing.html) |
+| Java (main branch, Pandoc on Pages) | Examples tour (JVM bindings) | […/java/examples.html](https://rust-data-processing.github.io/rust-data-processing/java/examples.html) (source: [`docs/java/EXAMPLES.md`](java/EXAMPLES.md)) |
 | Back-compat | Bare `/rust_data_processing.html` at site root | Redirects to the Python module page above (same as […/rust_data_processing.html](https://rust-data-processing.github.io/rust-data-processing/rust_data_processing.html)) |
 
 Until the first successful **crates.io** publish, docs.rs may be empty; use the **GitHub Pages** link for the latest **main** rustdoc.
@@ -23,6 +24,8 @@ Until the first successful **crates.io** publish, docs.rs may be empty; use the 
 Rust steps: `cargo doc --no-deps --locked` → output copied to `site/rust/`.
 
 Python steps (in `python-wrapper/`): `uv sync --group dev`, `maturin develop --release`, then `pdoc -d google -o …/site/python rust_data_processing`.
+
+Java examples page: CI installs **Pandoc**, runs `pandoc docs/java/EXAMPLES.md -o site/java/examples.html` (see `.github/workflows/docs.yml`) with a small header stylesheet under `docs/landing/java-examples-pandoc-header.html`.
 
 **Images:** Markdown included via `rust_data_processing.examples` lives in [`docs/python/README.md`](python/README.md) and may reference [`docs/images/`](images/) (for example the Phase 1 scope infographic). After pdoc runs, CI copies `docs/images/` into `site/python/images/` and `site/images/` so `../images/...` links work for both `python/examples.html` and `python/rust_data_processing/examples.html`.
 
@@ -56,6 +59,7 @@ Then:
 
 - Rust: `target/doc/rust_data_processing/index.html`
 - Python: `_site/python/index.html` (under repo root, created by the script)
+- Java: `_site/java/examples.html` when **Pandoc** is on `PATH` (otherwise the script prints a skip warning)
 
 ### Manual Python pdoc (from `python-wrapper/`)
 

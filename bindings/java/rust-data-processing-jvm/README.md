@@ -25,7 +25,9 @@ mvn -q verify
 
 **JMH:** `mvn verify` runs microbenchmarks from `src/jmh/java` during the **`integration-test`** phase (after unit tests). Gradle: `./gradlew jmh`. Skip Maven JMH only: `mvn verify -Drdp.jmh.skip=true`.
 
-**Examples:** pytest-style mirrors are exercised by **`PytestMirrorAssertions`** (same checks as `python-wrapper/tests`). Runnable entrypoints live in **`bindings/java/rust-data-processing-jvm-examples/`** (`RunPytestMirrorExample`). After `mvn install` in this directory, build and test that module with `mvn verify` (requires `RDP_JVM_SYS`).
+**Examples:** pytest-style mirrors are exercised by **`PytestMirrorAssertions`** (same checks as `python-wrapper/tests`). Runnable entrypoints live in **`bindings/java/rust-data-processing-jvm-examples/`** (`RunPytestMirrorExample`, `LoadFfiManifestExample`). After `mvn install` in this directory, build and test that module with `mvn verify` (requires `RDP_JVM_SYS`).
+
+**`ffi_manifest.json`:** bundled in the JAR at **`RdpNativeJson.FFI_MANIFEST_RESOURCE`**; usage (read manifest, call exports, classpath) is documented in **`docs/java/FFI_MANIFEST_JAVA_USAGE.md`**.
 
 **JDK:**
 

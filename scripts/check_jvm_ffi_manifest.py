@@ -9,8 +9,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "bindings/jvm-sys/ffi_manifest.json"
-JVM_TEST_MANIFEST = REPO / (
-    "bindings/java/rust-data-processing-jvm/src/test/resources/"
+JVM_BUNDLED_MANIFEST = REPO / (
+    "bindings/java/rust-data-processing-jvm/src/main/resources/"
     "io/github/rust_data_processing/ffi_manifest.json"
 )
 HEADER = REPO / "bindings/jvm-sys/include/rdp_jvm_sys.h"
@@ -39,15 +39,15 @@ def main() -> int:
         )
         return 1
 
-    if not JVM_TEST_MANIFEST.is_file():
-        print(f"error: missing JVM test resource {JVM_TEST_MANIFEST.relative_to(REPO)}", file=sys.stderr)
+    if not JVM_BUNDLED_MANIFEST.is_file():
+        print(f"error: missing JVM bundled manifest {JVM_BUNDLED_MANIFEST.relative_to(REPO)}", file=sys.stderr)
         return 1
-    jvm_test_bytes = JVM_TEST_MANIFEST.read_bytes()
+    jvm_bundled_bytes = JVM_BUNDLED_MANIFEST.read_bytes()
     manifest_bytes = MANIFEST.read_bytes()
-    if jvm_test_bytes != manifest_bytes:
+    if jvm_bundled_bytes != manifest_bytes:
         print(
-            "error: JVM test resource ffi_manifest.json must match bindings/jvm-sys/ffi_manifest.json "
-            f"(copy or regenerate). Compare:\n  {MANIFEST.relative_to(REPO)}\n  {JVM_TEST_MANIFEST.relative_to(REPO)}",
+            "error: JVM bundled ffi_manifest.json must match bindings/jvm-sys/ffi_manifest.json "
+            f"(copy or regenerate). Compare:\n  {MANIFEST.relative_to(REPO)}\n  {JVM_BUNDLED_MANIFEST.relative_to(REPO)}",
             file=sys.stderr,
         )
         return 1

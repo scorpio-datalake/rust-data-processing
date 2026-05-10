@@ -14,6 +14,9 @@
 
 | **[FFI_API_SLICE.md](FFI_API_SLICE.md)** | Rust-only vs FFI-projected surface |
 
+| **[EXAMPLES.md](EXAMPLES.md)** | **Java examples tour** (Panama, parity exports, watermarks / partition discovery, links to Python `examples.html`) — published on Pages as **`java/examples.html`** |
+| **[FFI_MANIFEST_JAVA_USAGE.md](FFI_MANIFEST_JAVA_USAGE.md)** | **`ffi_manifest.json`** on the classpath, Maven, native lib, **`RdpNativeJson`**, runnable **`java -cp`** examples |
+
 | **[ARROW_FFI_JVM.md](ARROW_FFI_JVM.md)** | Arrow IPC milestone (**S1d**) |
 
 | **[NATIVE_ARTIFACT_PACKAGING.md](NATIVE_ARTIFACT_PACKAGING.md)** | Classifier JARs / **`META-INF/native`** (**S1e**) |

@@ -83,6 +83,21 @@ jobs:
           cp -f "${GITHUB_WORKSPACE}/site/python/rust_data_processing/examples.html" \
             "${GITHUB_WORKSPACE}/site/python/examples.html"
 
+      - name: Java examples page (Markdown → HTML)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y pandoc
+          mkdir -p "${GITHUB_WORKSPACE}/site/java"
+          pandoc "${GITHUB_WORKSPACE}/docs/java/EXAMPLES.md" \
+            -f markdown+smart \
+            -o "${GITHUB_WORKSPACE}/site/java/examples.html" \
+            --standalone \
+            --metadata title="Java examples — JVM bindings" \
+            -V lang=en \
+            -H "${GITHUB_WORKSPACE}/docs/landing/java-examples-pandoc-header.html"
+          test -f "${GITHUB_WORKSPACE}/site/java/examples.html"
+
       - name: Assemble site
         run: |
           set -euo pipefail

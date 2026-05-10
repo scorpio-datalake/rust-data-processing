@@ -32,8 +32,7 @@ import org.junit.jupiter.api.Test;
  */
 final class FfiExportedSymbolsContractTest {
 
-  private static final String MANIFEST_RESOURCE =
-      "/io/github/rust_data_processing/ffi_manifest.json";
+  private static final String MANIFEST_RESOURCE = RdpNativeJson.FFI_MANIFEST_RESOURCE;
 
   private static final GroupLayout RDP_JSON_SLICE_LAYOUT =
       MemoryLayout.structLayout(
@@ -46,7 +45,9 @@ final class FfiExportedSymbolsContractTest {
     try (InputStream in =
         FfiExportedSymbolsContractTest.class.getResourceAsStream(MANIFEST_RESOURCE)) {
       assertNotNull(
-          in, "Place ffi_manifest.json under src/test/resources/io/github/rust_data_processing/");
+          in,
+          "Bundled ffi_manifest.json missing from classpath (expected under"
+              + " src/main/resources/io/github/rust_data_processing/ in rust-data-processing-jvm).");
       JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
       assertEquals(402, o.getInt("abi_version_constant"));
       JSONArray syms = o.getJSONArray("exported_symbols");
