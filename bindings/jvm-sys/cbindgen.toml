@@ -1,0 +1,8 @@
+# Regenerate (optional tooling):
+#   cbindgen -c bindings/jvm-sys/cbindgen.toml -o bindings/jvm-sys/include/rdp_jvm_sys.h bindings/jvm-sys
+language = "C"
+include_guard = "RDP_JVM_SYS_H"
+sys_includes = ["stdint.h"]
+
+[parse]
+parse_deps = false

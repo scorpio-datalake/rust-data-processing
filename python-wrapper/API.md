@@ -272,7 +272,7 @@ Submodule **`rust_data_processing.cdc`** exposes dataclasses aligned with `rust_
 - **PyArrow / pandas** conversion (optional future extra).
 - **DB ingestion** works from Python only when the extension is built with `--features db` (ConnectorX + sources in the parent crate).
 
-See [PARITY.md](PARITY.md) (Phase 1a parity matrix; a fuller tracker may live in your local **`Planning/PHASE1A_PLAN.md`** if you maintain one).
+See [PARITY.md](PARITY.md) (Python ↔ Rust). JVM parity rows live only in **`Planning/PHASE3_EPICS.md`**.
 
 ---
 

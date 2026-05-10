@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Planning:** Phase **3** JVM/Kafka tracking consolidated into **`Planning/PHASE3_EPICS.md`** only (parity rows + **P3-E1-S2d/S2e** secret stories). Removed **`docs/java/PARITY_MATRIX.md`** and superseded **`Planning/`** phase-plan markdown (`PHASE1_*`, **`Phase2_plan.md`**, **`PHASE2_EPICS.md`**, and related local notes) per single-tracker policy.
 - **`README_CRATE.md`:** Phase 2 hero image uses **`raw.githubusercontent.com`** (same as PyPI) so [crates.io](https://crates.io/crates/rust-data-processing) and [docs.rs](https://docs.rs/rust-data-processing) always load the current PNG; documentation table adds **PyPI**, **Python examples (HTML)**, and explicit **GitHub Pages** URLs for Rust rustdoc vs Python pdoc (root `/rust_data_processing.html` is not rustdoc; see below).
 - **GitHub Pages:** Add `docs/landing/rust_data_processing.html` → `site/rust_data_processing.html` so `https://…/rust_data_processing.html` redirects to **`python/rust_data_processing.html`** (pdoc) with a visible link to **`rust/rust_data_processing/index.html`** (rustdoc). **`docs/DOCUMENTATION.md`** lists the canonical paths.
 
 ### Added
 
+- **JVM Phase 3 bindings:** **`bindings/jvm-sys`** (`rdp_ffi_abi_version` = **400**, **`jvm_ffi`** feature, **`ffi_manifest.json`**); **`bindings/java/rust-data-processing-jvm`** (Maven, Gradle **`maven-publish`**, **`NativeAbiTest`**, **`FeatureSurfacePlaceholderTest`**, **`central-release`** profile); **`scripts/check_jvm_ffi_manifest.py`**, **`scripts/check_java_version_consistency.py`**; **`bindings/java/VERSION`** ↔ **`pom.xml`** ↔ **`gradle.properties`**.
+- **Docs:** **`docs/adr/{004,005}-*.md`**, **`docs/java/{README,gradle,RELEASE,FFI_API_SLICE,ARROW_FFI_JVM,NATIVE_ARTIFACT_PACKAGING,SONATYPE_NAMESPACE_CHECKLIST,JIRA_INTEGRATION,JEXTRACT}.md`**, **`docs/java/MAVEN_CENTRAL_PUBLISHING.md`**; JVM parity rows live only in **`Planning/PHASE3_EPICS.md`** (standalone **`PARITY_MATRIX`** removed).
+- **CI:** **`.github/workflows/jvm_bindings_ci.yml`** — **Ubuntu / Windows / macOS** × JDK **21**, **`mvn verify`**, **`./gradlew check`**, **`publishToMavenLocal`**, **`actions/cache`** for Maven/Gradle.
+
+- **Phase 3 planning (JVM + Kafka):** **Panama**, **Maven**, **Gradle**, **Rust↔JVM API parity**, tri-surface **Kafka** (+ BYO connectors) in **`Planning/PHASE3_EPICS.md`**; **`docs/DOCUMENTATION.md`**, **`docs/adr/README.md`**, ADR **`docs/adr/003`**. Completed **increment-1** spike crate **[`spikes/jvm-panama-ffi`](spikes/jvm-panama-ffi/README.md)** (**stdlib-only** `cdylib`, [`rdp_ffi.h`](spikes/jvm-panama-ffi/include/rdp_ffi.h), Panama smoke). Root **`Cargo.toml`** excludes **`spikes/`** from the crates.io tarball.
 - **Phase 2 (batch):** `ReduceOp::Median` / `Agg::Median`; UTF-8 privacy `TransformStep`s (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`); validation `Check::Utf8LenCharsBetween`; modules **`export`** (JSONL + deterministic train/test indices), **`privacy`** (UTF-8 diff summaries), **`reports`** (byte-safe truncation); Arrow **`record_batches_to_dataset`** + `LargeUtf8` support; Python bindings `export_dataset_jsonl`, `privacy_summarize_utf8_changes_json`, `reports_truncate_utf8_bytes`.
 - **Docs & examples:** lake read ADR + user guide, SFT format guide, outreach shortlist, ML reduce gap audit, P2-E6 policy + P2-E7 deferral notes, vector export recipe, `examples/{dbt,airflow,tabular_nn,llm_prep}/`, `notebooks/` index + starter notebooks.
 
