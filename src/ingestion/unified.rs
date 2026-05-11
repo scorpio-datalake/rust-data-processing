@@ -592,3 +592,32 @@ impl IngestionRequest {
         ingest_from_path(&self.path, &self.schema, &self.options)
     }
 }
+
+/// Write an in-memory [`DataSet`] to a single Parquet file using Polars.
+///
+/// Intended for JVM / Spark bridges that prefer reading Parquet from disk over large JSON payloads.
+pub fn export_dataset_to_parquet(path: &Path, ds: &DataSet) -> IngestionResult<()> {
+    use super::polars_bridge::{dataset_to_dataframe, polars_error_to_ingestion};
+    use std::fs::File;
+
+    let mut df = dataset_to_dataframe(ds)?;
+    let mut file = File::create(path)?;
+    ParquetWriter::new(&mut file)
+        .finish(&mut df)
+        .map_err(|e| polars_error_to_ingestion("write parquet from DataSet", e))?;
+    Ok(())
+}
+
+/// Write an in-memory [`DataSet`] to a single Arrow IPC **file** using Polars (for JVM / Arrow
+/// bridges that prefer IPC over large JSON `DataSet` payloads).
+pub fn export_dataset_to_arrow_ipc(path: &Path, ds: &DataSet) -> IngestionResult<()> {
+    use super::polars_bridge::{dataset_to_dataframe, polars_error_to_ingestion};
+    use std::fs::File;
+
+    let mut df = dataset_to_dataframe(ds)?;
+    let mut file = File::create(path)?;
+    IpcWriter::new(&mut file)
+        .finish(&mut df)
+        .map_err(|e| polars_error_to_ingestion("write arrow ipc from DataSet", e))?;
+    Ok(())
+}

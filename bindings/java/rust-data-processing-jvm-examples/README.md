@@ -4,11 +4,18 @@ Runnable programs under `io.github.rust_data_processing.examples` exercise the s
 JSON contracts as `rust-data-processing-jvm` unit tests (`PytestMirrorAssertions`), aligned with
 `python-wrapper/tests/*.py`.
 
+**Design note:** these examples intentionally show **small JSON `interchange`** payloads. In real
+applications, run heavy ETL **in Rust** (or Python calling Rust), **write Parquet / CSV / database**
+outputs, and use the JVM mainly for orchestration or bounded reads. When you need rows on the JVM
+only occasionally, keep result sizes small or use a **file handoff** (Rust writes a path; Java or
+local Spark reads the file). See **`docs/java/EXAMPLES.md`** → *Rust-first ETL vs JVM consumption*.
+
 | Class | Purpose |
 | --- | --- |
 | **`LoadFfiManifestExample`** | Read bundled **`ffi_manifest.json`** from the JVM JAR, list **`exported_symbols`**, probe **`rdp_ffi_abi_version`** when **`RDP_JVM_SYS`** is set |
 | **`RunPytestMirrorExample`** | Invoke one **`rdp_parity_*`** export by name and print / validate JSON |
 | **`ParityScenariosWalkthrough`** | Run a **curated set** of parity exports in sequence (types, bindings, mapping spec, transform, processing, SQL, validation, benchmark smoke) so you can see JSON **`interchange`** shapes; optional CLI args = subset of export names |
+| **`ParquetTempExportExample`** | Calls **`rdp_export_parquet_temp`**, prints the JSON envelope, checks the Parquet file exists, deletes it (add Spark on your classpath to read with `spark.read().parquet(path)`) |
 | **`ExamplesNativeLibrary`** | Resolve **`RDP_JVM_SYS`** / **`rdp.jvm.sys.library`** (same rules as tests) |
 
 Full walk-through (Maven, **`java -cp`**, manifest resource path): **`docs/java/FFI_MANIFEST_JAVA_USAGE.md`**.
@@ -38,6 +45,8 @@ export RDP_JVM_SYS=/absolute/path/to/librdp_jvm_sys.so   # or .dll / .dylib
 export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
 java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar" \
   io.github.rust_data_processing.examples.ParityScenariosWalkthrough
+java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar" \
+  io.github.rust_data_processing.examples.ParquetTempExportExample
 ```
 
 These examples are **not** the Python `examples/` tree nor Rust book examples — they live only under this Maven module.

@@ -7,7 +7,7 @@
 /**
  * Tabular / diagnostic payloads cross FFI as UTF-8 JSON. Java maps them with {@code org.json}
  * or row {@code List<Map<String,Object>>} after parsing the envelope field {@code interchange}.
- * Arrow IPC remains a future interchange (see Rust JSON envelope {@code notes.arrow_ipc}).
+ * Arrow IPC temp files: {@code rdp_export_arrow_ipc_temp} (see JSON envelope {@code notes.arrow_ipc}).
  */
 typedef struct RdpJsonSlice {
     uint8_t *ptr;
@@ -23,6 +23,18 @@ uint32_t rdp_ffi_abi_version(void);
 
 /** Release buffer allocated by a parity export (matches {@code Vec::from_raw_parts}). */
 void rdp_json_slice_free(RdpJsonSlice s);
+
+/** Sample DataSet → temp Parquet; JSON envelope includes filesystem path (see docs/java). */
+void rdp_export_parquet_temp(RdpJsonSlice *out);
+
+/** Sample DataSet → temp Arrow IPC file; JSON {@code interchange.kind} = {@code arrow_ipc_export_temp}. */
+void rdp_export_arrow_ipc_temp(RdpJsonSlice *out);
+
+/** Polars SQL sample → temp Parquet (no embedded JSON rows); {@code polars_parquet_export_temp}. */
+void rdp_export_polars_parquet_temp(RdpJsonSlice *out);
+
+/** Excel workbook path + UTF-8 sheet name → JSON {@code interchange.dataset}. */
+void rdp_excel_ingest_path_sheet(RdpJsonSlice *out, const char *path, const char *sheet_name);
 
 void rdp_parity_benchmark_smoke_mirror(RdpJsonSlice *out);
 void rdp_parity_bindings_mirror(RdpJsonSlice *out);

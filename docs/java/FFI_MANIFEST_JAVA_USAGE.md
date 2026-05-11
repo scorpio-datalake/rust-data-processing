@@ -133,7 +133,21 @@ On Windows, use `;` instead of `:` in `-cp` and absolute paths.
 
 ---
 
-## 7. What the manifest does *not* tell you
+## 7. Large results: prefer Rust-side ETL and files
+
+Many `rdp_parity_*` exports return **`interchange.dataset`** as **JSON** (`schema` + `rows`). That is the default interchange for **tests, contracts, and small tables**.
+
+For **production** and **large** `DataSet` / Polars outputs, **do not** rely on shipping the full table through the JVM as JSON. Instead:
+
+1. Run ingest, transforms, SQL, and validation **in Rust** (or Python calling Rust).
+2. **Write** results to **Parquet**, **CSV**, or a **database** (or object storage).
+3. Use the JVM only for **orchestration**, **small JSON responses**, or reading **paths** to files written by Rust — then let **Spark (`local[*]`)** or other readers consume those files.
+
+The same idea applies to **every** parity export that materializes a full **`dataset`** in JSON. See **[`EXAMPLES.md` § Rust-first ETL vs JVM consumption](EXAMPLES.md#rust-first-etl-vs-jvm-consumption)** for the full list and rationale. Arrow-based interchange remains a future milestone (**[`ARROW_FFI_JVM.md`](ARROW_FFI_JVM.md)**).
+
+---
+
+## 8. What the manifest does *not* tell you
 
 - **JSON schema** per export — infer from **`python-wrapper/tests`** and **`PytestMirrorAssertions`**, or inspect **`bindings/jvm-sys`** / Rust parity sources.
 - **Future non-parity APIs** — when new `extern "C"` entry points ship, they must be added to **`ffi_manifest.json`** and regenerated in the JAR; **`FfiExportedSymbolsContractTest`** catches drift for symbols listed in the manifest.

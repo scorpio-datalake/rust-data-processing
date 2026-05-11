@@ -16,12 +16,10 @@ import org.json.JSONObject;
  *   ds_excel = rdp.ingest_from_path(..., schema_flat, {"format": "excel"})
  * </pre>
  *
- * <p>There is no {@code ingest_from_path} on the JVM yet. Use {@link RdpNativeJson#invokeParityExport}
- * for {@code rdp_parity_*} symbols (see {@code ffi_manifest.json}). CSV tabular JSON comes from
- * {@value #RDP_PARITY_INGESTION}; JSON <em>file</em> ingest is exercised inside
- * {@value #RDP_PARITY_WATERMARK_MIRROR} (fixture JSON, metrics in {@code interchange}). Parquet and
- * Excel path ingest are not in a parity export today — keep using Python {@code rdp} for those until
- * FFI catches up.
+ * <p>There is no single {@code ingest_from_path} Java API yet. This class covers <strong>CSV</strong>
+ * ({@value #RDP_PARITY_INGESTION}) and <strong>JSON ingest metrics</strong> ({@value #RDP_PARITY_WATERMARK_MIRROR}).
+ * For <strong>Excel path + sheet</strong> see {@code ExcelSnippets}; for <strong>temp Parquet handoff</strong>
+ * see {@code ParquetSnippets} and {@code RdpNativeJson.invokeExportParquetTemp}.
  */
 public final class JsonParquetExcelSnippets {
 
@@ -102,12 +100,8 @@ public final class JsonParquetExcelSnippets {
   }
 
   /*
-   * Python Parquet / Excel (not mirrored on JVM yet):
-   *
-   *   rdp.ingest_from_path("path/to/file.parquet", schema_flat, {"format": "parquet"})
-   *   rdp.ingest_from_path("path/to/file.xlsx", schema_flat, {"format": "excel"})
-   *
-   * Build options with ingestionOptions("parquet") or ingestionOptions("excel"); wire schema_flat
-   * via schemaFlatTabular() when calling Python from Java (subprocess, HTTP, etc.).
+   * Parquet / Excel from Java: see ParquetSnippets.java (rdp_export_parquet_temp) and
+   * ExcelSnippets.java (rdp_excel_ingest_path_sheet). Arbitrary Parquet path ingest from JVM is still
+   * via Python rdp or Rust crate until a dedicated FFI exists.
    */
 }

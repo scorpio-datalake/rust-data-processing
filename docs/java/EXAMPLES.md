@@ -28,6 +28,53 @@ Use this as a **tour of how Java integrates today** (parity JSON over FFI), not 
 | **Benchmark-style smoke** | [`rdp_parity_benchmark_smoke_mirror`](#processing-and-execution) |
 | **Observability** | [`rdp_parity_observability_mirror`](#observability) |
 | **Multi-scenario walkthrough** | [Runnable walkthrough class](#runnable-walkthrough-class) |
+| **Large results / production layout** | [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption) |
+| **Temp Parquet → local Spark `DataFrame`** | [`rdp_export_parquet_temp`](#temp-parquet-handoff-rdp_export_parquet_temp) |
+
+## Rust-first ETL vs JVM consumption {#rust-first-etl-vs-jvm-consumption}
+
+**Default recommendation:** do as much work as possible **inside the Rust engine** (or via the Python extension calling Rust), and **persist** results where downstream systems already read efficiently — **Parquet**, **CSV**, **database** tables, object storage, etc. Avoid pulling large **`DataSet`** / Polars materializations back over the JVM FFI when you do not need them on the JVM.
+
+**Why:** Parity exports that return tabular data today expose **`interchange.dataset`** as **JSON** (`schema` + `rows`). That is appropriate for **contracts, tests, demos, and small control-plane payloads**. It is **not** the right default for multi‑gigabyte pipelines: memory, GC, and parse cost grow with row count on both sides.
+
+**This guidance applies to every export that materializes a full table in `interchange`**, including (non‑exhaustive):
+
+- **`rdp_parity_types_dataset`**, **`rdp_parity_ingestion`**, **`rdp_parity_pipeline_sql`**, **`rdp_parity_transform`** — tabular **`dataset`**.
+- **`rdp_parity_benchmark_smoke_mirror`** and similar smoke paths that include large-ish synthetic **`dataset`** payloads in JSON.
+
+For **mirrors** that mostly return **metrics, counts, flags, or small JSON** (bindings, mapping spec, SQL suite, partition discovery, watermark, validation summaries, observability, etc.), JVM JSON is usually fine.
+
+**When you do need data on the JVM** (local Spark `DataFrame`, unit tests, small extracts):
+
+- Use **`interchange.dataset`** JSON only for **bounded** row counts you are willing to hold in the heap.
+- Prefer **file-based handoff** when you add or use dedicated FFI: e.g. Rust writes **Parquet or CSV** to a path (temp or durable), returns a **small envelope** (`path`, `row_count`, `schema`, checksum), and Java or **Spark in `local[*]` mode** reads from that path — then delete the temp file if you created one.
+- Longer term, **Arrow IPC / C Data Interface** (see [`ARROW_FFI_JVM.md`](ARROW_FFI_JVM.md)) is the direction for columnar, lower-copy bridges; until then, **Rust writes files → JVM reads files** is the scalable pattern outside a data lake too.
+
+**Summary:** treat JVM parity calls as **orchestration, validation, and small-surface results**; treat **Rust (or Python + Rust) as the place that runs ETL and lands data** to Parquet, CSV, or a database unless you have a deliberate, size-bounded reason to materialize rows in the JVM.
+
+### Temp Parquet handoff (`rdp_export_parquet_temp`) {#temp-parquet-handoff-rdp_export_parquet_temp}
+
+Rust writes a **small sample** `DataSet` (two rows: id/name) to a file under the OS temp directory (`…/rdp_jvm_parquet/rdp_export_<nanos>.parquet`) and returns a **small JSON envelope** (`interchange.kind` = `parquet_export_temp`, `path`, `row_count`, `schema`). No giant `rows` array crosses the boundary.
+
+From Java, call **`RdpNativeJson.invokeExportParquetTemp`**, then read the path with **Spark in `local[*]` mode** (or any Parquet reader), then delete the file. Helpers: **`io.github.rust_data_processing.integration.RdpParquetTemp`**. Runnable: **`ParquetTempExportExample`**.
+
+```java
+import io.github.rust_data_processing.ffi.RdpNativeJson;
+import io.github.rust_data_processing.integration.RdpParquetTemp;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.json.JSONObject;
+
+JSONObject root = RdpNativeJson.invokeExportParquetTemp(linker, lookup, arena);
+String path = RdpParquetTemp.parquetPath(root);
+SparkSession spark = SparkSession.builder().master("local[*]").appName("rdp").getOrCreate();
+Dataset<Row> df = spark.read().parquet(path);
+// … use df …
+RdpParquetTemp.deleteQuietly(path);
+```
+
+The crate also exposes **`rust_data_processing::ingestion::export_dataset_to_parquet`** for Rust callers who write their own paths.
 
 ## Prerequisites
 
@@ -84,6 +131,8 @@ try (Arena arena = Arena.ofConfined()) {
 
 Runnable: **`io.github.rust_data_processing.examples.RunPytestMirrorExample`** — pass the export name as the only CLI argument.
 
+For **how large `dataset` JSON fits into a production architecture**, see [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption).
+
 ## File ETL (ingestion and tabular JSON)
 
 Python uses **`ingest_from_path`** and **`DataSet`** directly. On the JVM, see:
@@ -93,7 +142,7 @@ Python uses **`ingest_from_path`** and **`DataSet`** directly. On the JVM, see:
 
 Validate the envelope and `kind` the same way as **`FfiExportedSymbolsContractTest`** in `rust-data-processing-jvm`.
 
-Illustrative Java (schema JSON + `rdp_parity_ingestion`): [`JsonParquetExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/JsonParquetExcelSnippets.java).
+Illustrative Java snippets (copy into a module that depends on `rust-data-processing-jvm`): [`JsonParquetExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/JsonParquetExcelSnippets.java) (CSV / JSON metrics), [`ExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ExcelSnippets.java) (`rdp_excel_ingest_path_sheet`), [`ParquetSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ParquetSnippets.java) (`rdp_export_parquet_temp`).
 
 <h2 id="ordered-paths-and-directory-scans-incremental-batches">Ordered paths and directory scans (incremental batches)</h2>
 
@@ -125,12 +174,14 @@ JSONObject root =
 PytestMirrorAssertions.validateMirrorExport("rdp_parity_watermark_mirror", root);
 ```
 
-**Practical integration pattern:** implement directory listing, ordered file batches, and checkpoint storage **in Java** (or your orchestrator), and call Rust for **heavy ingestion / transforms** via future dedicated FFI or via **Python / CLI** sidecars until additional `extern "C"` entry points are added. The parity exports prove the **engine behavior** your Java app relies on matches the rest of the stack.
+**Practical integration pattern:** implement directory listing, ordered file batches, and checkpoint storage **in Java** (or your orchestrator), and keep **heavy ingestion / transforms** in **Rust** (or Python calling Rust), **writing outputs to files or a database** rather than streaming huge tables as JSON into the JVM. Use parity exports to **prove behavior** and for **small extracts**; see [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption).
 
 ## SQL and DataFrame parity
 
 - **`rdp_parity_pipeline_sql`** — lazy SQL / Polars pipeline; `interchange` includes **`dataset`**.
 - **`rdp_parity_sql_suite_mirror`** — multi-query SQL mirror (joins, errors); use **`validateMirrorExport`**.
+
+For production-sized Polars outputs, prefer **Rust-side** materialization to **Parquet / CSV / DB** and only use JVM JSON **`dataset`** when the result set is intentionally small; see [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption).
 
 ## Transform and mapping spec
 

@@ -16,6 +16,10 @@ import org.json.JSONObject;
  * end (bindings, mapping spec, transform, processing, SQL, validation, benchmark smoke). With
  * arguments, runs only the symbols you name (must appear in {@code ffi_manifest.json}).
  *
+ * <p>For production, prefer running large ETL in Rust and writing Parquet/CSV/DB instead of pulling
+ * huge {@code interchange.dataset} JSON into the JVM; this walkthrough is for contract visibility
+ * and small payloads (see {@code docs/java/EXAMPLES.md} § Rust-first ETL vs JVM consumption).
+ *
  * <pre>
  *   java ... ParityScenariosWalkthrough
  *   java ... ParityScenariosWalkthrough rdp_parity_transform rdp_parity_processing

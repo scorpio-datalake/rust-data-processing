@@ -19,6 +19,7 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import org.json.JSONArray;
@@ -49,7 +50,7 @@ final class FfiExportedSymbolsContractTest {
           "Bundled ffi_manifest.json missing from classpath (expected under"
               + " src/main/resources/io/github/rust_data_processing/ in rust-data-processing-jvm).");
       JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-      assertEquals(402, o.getInt("abi_version_constant"));
+      assertEquals(403, o.getInt("abi_version_constant"));
       JSONArray syms = o.getJSONArray("exported_symbols");
       boolean hasAbi = false;
       for (int i = 0; i < syms.length(); i++) {
@@ -103,6 +104,59 @@ final class FfiExportedSymbolsContractTest {
                 FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
         free.invokeExact(empty);
         return;
+      case "rdp_export_parquet_temp":
+        {
+          JSONObject root = RdpNativeJson.invokeExportParquetTemp(linker, lookup, arena);
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          JSONObject interchange = root.getJSONObject("interchange");
+          assertEquals("parquet_export_temp", interchange.getString("kind"));
+          assertEquals(2, interchange.getInt("row_count"));
+          Path parquetPath = Path.of(interchange.getString("path"));
+          assertTrue(Files.exists(parquetPath), "parquet file missing: " + parquetPath);
+          Files.deleteIfExists(parquetPath);
+          return;
+        }
+      case "rdp_export_arrow_ipc_temp":
+        {
+          JSONObject root = RdpNativeJson.invokeExportArrowIpcTemp(linker, lookup, arena);
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          JSONObject interchange = root.getJSONObject("interchange");
+          assertEquals("arrow_ipc_export_temp", interchange.getString("kind"));
+          assertEquals(2, interchange.getInt("row_count"));
+          Path ipcPath = Path.of(interchange.getString("path"));
+          assertTrue(Files.exists(ipcPath), "arrow ipc file missing: " + ipcPath);
+          Files.deleteIfExists(ipcPath);
+          return;
+        }
+      case "rdp_export_polars_parquet_temp":
+        {
+          JSONObject root = RdpNativeJson.invokeExportPolarsParquetTemp(linker, lookup, arena);
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          JSONObject interchange = root.getJSONObject("interchange");
+          assertEquals("polars_parquet_export_temp", interchange.getString("kind"));
+          assertEquals(1, interchange.getInt("row_count"));
+          Path polarsPath = Path.of(interchange.getString("path"));
+          assertTrue(Files.exists(polarsPath), "polars parquet file missing: " + polarsPath);
+          Files.deleteIfExists(polarsPath);
+          return;
+        }
+      case "rdp_excel_ingest_path_sheet":
+        {
+          Path excelPath =
+              Path.of("tests")
+                  .resolve("fixtures")
+                  .resolve("people.xlsx")
+                  .toAbsolutePath();
+          Assumptions.assumeTrue(
+              Files.exists(excelPath),
+              "Skip Excel FFI contract when tests/fixtures/people.xlsx is not present");
+          JSONObject root =
+              RdpNativeJson.excelIngestPathSheet(
+                  linker, lookup, arena, excelPath.toString(), "Sheet1");
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          root.getJSONObject("interchange").getJSONObject("dataset");
+          return;
+        }
       default:
         if (name.startsWith("rdp_parity_")) {
           JSONObject root = RdpNativeJson.invokeParityExport(linker, lookup, arena, name);

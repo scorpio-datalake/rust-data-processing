@@ -3,6 +3,9 @@
 //! `interchange.notes.arrow_ipc` for Apache Arrow Java (`VectorSchemaRoot`) in a later milestone.
 
 use crate::parity_support::*;
+use std::ffi::CStr;
+use std::os::raw::c_char;
+use std::path::Path;
 
 #[no_mangle]
 pub unsafe extern "C" fn rdp_parity_types_dataset(out: *mut RdpJsonSlice) {
@@ -84,6 +87,290 @@ fn ingestion_impl() -> Result<serde_json::Value, String> {
         "kind": "ingestion_csv_reader_polars",
         "engine": "polars_csv_then_dataframe_to_dataset",
         "dataset": dataset,
+    }))
+}
+
+/// Ingest an Excel workbook from a filesystem path and a specific sheet name, returning a JSON
+/// `DataSet` under `interchange.dataset`. This is a JVM-only helper (Project Panama) that mirrors
+/// Python `ingest_from_path(path, schema, {"format": "excel", "sheet_name": "Sheet1"})` for simple
+/// tabular layouts.
+///
+/// Safety: `path_ptr` and `sheet_ptr` must be valid, NUL-terminated UTF‑8 C strings for the
+/// duration of the call.
+#[no_mangle]
+pub unsafe extern "C" fn rdp_excel_ingest_path_sheet(
+    out: *mut RdpJsonSlice,
+    path_ptr: *const c_char,
+    sheet_ptr: *const c_char,
+) {
+    let slice = excel_ingest_path_sheet(path_ptr, sheet_ptr);
+    unsafe {
+        write_slice(out, slice);
+    }
+}
+
+fn excel_ingest_path_sheet(path_ptr: *const c_char, sheet_ptr: *const c_char) -> RdpJsonSlice {
+    #[cfg(feature = "link-main")]
+    {
+        use rust_data_processing::ingestion::{
+            ingest_from_path, ExcelSheetSelection, IngestionFormat, IngestionOptions,
+        };
+        use rust_data_processing::types::Schema;
+
+        let path_cstr = unsafe { CStr::from_ptr(path_ptr) };
+        let sheet_cstr = unsafe { CStr::from_ptr(sheet_ptr) };
+
+        let path_str = match path_cstr.to_str() {
+            Ok(s) => s,
+            Err(e) => return json_err(format!("excel path not valid UTF-8: {e}")),
+        };
+        let sheet_name = match sheet_cstr.to_str() {
+            Ok(s) => s.to_string(),
+            Err(e) => return json_err(format!("excel sheet name not valid UTF-8: {e}")),
+        };
+
+        let path = Path::new(path_str);
+
+        // Let the caller control the schema: prefer a simple two-column id/name layout by default.
+        // For richer schemas, encourage Python / Rust helpers; this is primarily to unblock JVM ETL.
+        //
+        // NOTE: To avoid pulling Schema builders across FFI, we infer schema from the file using the
+        // existing unified ingestion entrypoint and then re-use it for a second ingest. This mirrors
+        // Python's "infer then ingest" pattern.
+        let opts_infer = IngestionOptions {
+            format: Some(IngestionFormat::Excel),
+            excel_sheet_selection: ExcelSheetSelection::Sheet(sheet_name.clone()),
+            ..IngestionOptions::default()
+        };
+
+        let schema: Schema = match rust_data_processing::ingestion::infer_schema_from_path(
+            path,
+            &opts_infer,
+        ) {
+            Ok(s) => s,
+            Err(e) => return json_err(format!("infer Excel schema failed: {e}")),
+        };
+
+        let opts = IngestionOptions {
+            format: Some(IngestionFormat::Excel),
+            excel_sheet_selection: ExcelSheetSelection::Sheet(sheet_name),
+            ..IngestionOptions::default()
+        };
+
+        match ingest_from_path(path, &schema, &opts) {
+            Ok(ds) => {
+                match serde_json::to_value(&ds) {
+                    Ok(dataset) => {
+                        json_ok(serde_json::json!({
+                            "kind": "excel_ingest_sheet",
+                            "dataset": dataset,
+                        }))
+                    }
+                    Err(e) => json_err(format!("serialize Excel DataSet failed: {e}")),
+                }
+            }
+            Err(e) => json_err(format!("Excel ingest failed: {e}")),
+        }
+    }
+    #[cfg(not(feature = "link-main"))]
+    {
+        let _ = path_ptr;
+        let _ = sheet_ptr;
+        json_err("rebuild rdp_jvm_sys with --features link-main (or jvm_ffi / full)")
+    }
+}
+
+/// Export a small sample [`DataSet`] to a temporary Parquet file and return a JSON envelope with
+/// `path`, `row_count`, and `schema` (for Java / Spark to read via `spark.read().parquet(path)` then
+/// delete the file).
+#[no_mangle]
+pub unsafe extern "C" fn rdp_export_parquet_temp(out: *mut RdpJsonSlice) {
+    let slice = export_parquet_temp();
+    write_slice(out, slice);
+}
+
+fn export_parquet_temp() -> RdpJsonSlice {
+    #[cfg(feature = "link-main")]
+    {
+        match export_parquet_temp_impl() {
+            Ok(v) => json_ok(v),
+            Err(e) => json_err(e),
+        }
+    }
+    #[cfg(not(feature = "link-main"))]
+    {
+        json_err("rebuild rdp_jvm_sys with --features link-main (or jvm_ffi / full)")
+    }
+}
+
+#[cfg(feature = "link-main")]
+fn export_parquet_temp_impl() -> Result<serde_json::Value, String> {
+    use rust_data_processing::ingestion::export_dataset_to_parquet;
+    use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int64),
+        Field::new("name", DataType::Utf8),
+    ]);
+    let ds = DataSet::new(
+        schema,
+        vec![
+            vec![Value::Int64(1), Value::Utf8("Ada".to_string())],
+            vec![Value::Int64(2), Value::Utf8("Bob".to_string())],
+        ],
+    );
+
+    let base = std::env::temp_dir().join("rdp_jvm_parquet");
+    fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let path = base.join(format!("rdp_export_{stamp}.parquet"));
+
+    export_dataset_to_parquet(&path, &ds).map_err(|e| e.to_string())?;
+
+    let schema_json = serde_json::to_value(&ds.schema).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "kind": "parquet_export_temp",
+        "path": path.to_string_lossy(),
+        "row_count": ds.row_count(),
+        "schema": schema_json,
+    }))
+}
+
+/// Export a small sample [`DataSet`] to a temporary Arrow IPC file (Polars writer). JSON envelope
+/// uses `kind`: `arrow_ipc_export_temp` for Java Arrow / Spark materializers.
+#[no_mangle]
+pub unsafe extern "C" fn rdp_export_arrow_ipc_temp(out: *mut RdpJsonSlice) {
+    let slice = export_arrow_ipc_temp();
+    write_slice(out, slice);
+}
+
+fn export_arrow_ipc_temp() -> RdpJsonSlice {
+    #[cfg(feature = "link-main")]
+    {
+        match export_arrow_ipc_temp_impl() {
+            Ok(v) => json_ok(v),
+            Err(e) => json_err(e),
+        }
+    }
+    #[cfg(not(feature = "link-main"))]
+    {
+        json_err("rebuild rdp_jvm_sys with --features link-main (or jvm_ffi / full)")
+    }
+}
+
+#[cfg(feature = "link-main")]
+fn export_arrow_ipc_temp_impl() -> Result<serde_json::Value, String> {
+    use rust_data_processing::ingestion::export_dataset_to_arrow_ipc;
+    use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int64),
+        Field::new("name", DataType::Utf8),
+    ]);
+    let ds = DataSet::new(
+        schema,
+        vec![
+            vec![Value::Int64(1), Value::Utf8("Ada".to_string())],
+            vec![Value::Int64(2), Value::Utf8("Bob".to_string())],
+        ],
+    );
+
+    let base = std::env::temp_dir().join("rdp_jvm_arrow_ipc");
+    fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let path = base.join(format!("rdp_export_{stamp}.arrow"));
+
+    export_dataset_to_arrow_ipc(&path, &ds).map_err(|e| e.to_string())?;
+
+    let schema_json = serde_json::to_value(&ds.schema).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "kind": "arrow_ipc_export_temp",
+        "path": path.to_string_lossy(),
+        "row_count": ds.row_count(),
+        "schema": schema_json,
+    }))
+}
+
+/// Run a small Polars SQL pipeline (same shape as `rdp_parity_pipeline_sql`), write the result to a
+/// temp Parquet file, and return `kind`: `polars_parquet_export_temp` (no embedded `dataset` JSON).
+#[no_mangle]
+pub unsafe extern "C" fn rdp_export_polars_parquet_temp(out: *mut RdpJsonSlice) {
+    let slice = export_polars_parquet_temp();
+    write_slice(out, slice);
+}
+
+fn export_polars_parquet_temp() -> RdpJsonSlice {
+    #[cfg(all(feature = "link-main", feature = "full"))]
+    {
+        match export_polars_parquet_temp_impl() {
+            Ok(v) => json_ok(v),
+            Err(e) => json_err(e),
+        }
+    }
+    #[cfg(all(feature = "link-main", not(feature = "full")))]
+    {
+        json_err("rebuild rdp_jvm_sys with --features full for Polars temp Parquet export")
+    }
+    #[cfg(not(feature = "link-main"))]
+    {
+        json_err("rebuild rdp_jvm_sys with --features link-main (or jvm_ffi / full)")
+    }
+}
+
+#[cfg(all(feature = "link-main", feature = "full"))]
+fn export_polars_parquet_temp_impl() -> Result<serde_json::Value, String> {
+    use rust_data_processing::ingestion::export_dataset_to_parquet;
+    use rust_data_processing::pipeline::DataFrame;
+    use rust_data_processing::sql;
+    use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let ds = DataSet::new(
+        Schema::new(vec![
+            Field::new("id", DataType::Int64),
+            Field::new("active", DataType::Bool),
+        ]),
+        vec![
+            vec![Value::Int64(1), Value::Bool(true)],
+            vec![Value::Int64(2), Value::Bool(false)],
+        ],
+    );
+    let df = DataFrame::from_dataset(&ds).map_err(|e| e.to_string())?;
+    let out = sql::query(&df, "SELECT id FROM df WHERE active = TRUE ORDER BY id")
+        .map_err(|e| e.to_string())?
+        .collect()
+        .map_err(|e| e.to_string())?;
+
+    let base = std::env::temp_dir().join("rdp_jvm_polars_parquet");
+    fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos();
+    let path = base.join(format!("rdp_polars_export_{stamp}.parquet"));
+
+    export_dataset_to_parquet(&path, &out).map_err(|e| e.to_string())?;
+
+    let schema_json = serde_json::to_value(&out.schema).map_err(|e| e.to_string())?;
+
+    Ok(serde_json::json!({
+        "kind": "polars_parquet_export_temp",
+        "path": path.to_string_lossy(),
+        "row_count": out.row_count(),
+        "schema": schema_json,
     }))
 }
 

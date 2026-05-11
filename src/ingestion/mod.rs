@@ -125,8 +125,8 @@ pub use partition::{
 };
 pub use unified::{
     ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest,
-    OrderedBatchIngestMetadata, infer_schema_from_path, ingest_from_ordered_paths,
-    ingest_from_path, ingest_from_path_infer,
+    OrderedBatchIngestMetadata, export_dataset_to_arrow_ipc, export_dataset_to_parquet,
+    infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path, ingest_from_path_infer,
 };
 pub use watermark::{
     apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column,

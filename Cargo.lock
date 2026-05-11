@@ -3959,6 +3959,7 @@ dependencies = [
  "rand 0.9.2",
  "rayon",
  "recursive",
+ "serde_json",
  "slotmap",
  "tokio",
  "version_check",

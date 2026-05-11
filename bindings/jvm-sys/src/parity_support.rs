@@ -33,7 +33,7 @@ pub fn json_ok(interchange: serde_json::Value) -> RdpJsonSlice {
         "notes": {
             "tabular_json": "Rust DataSet serde ↔ JVM JSONObject / List<Map<String,Object>>",
             "polars_engine": "Plans execute in Rust; JVM receives JSON snapshots only today.",
-            "arrow_ipc": "Future: IPC bytes for zero-copy into org.apache.arrow.vector",
+            "arrow_ipc": "rdp_export_arrow_ipc_temp writes a temp .arrow IPC file; Spark via rust-data-processing-jvm-spark reads it with Apache Arrow Java then createDataFrame.",
             "pytest_mirror": "Built to mirror python-wrapper/tests/*.py scenarios where feasible."
         }
     });

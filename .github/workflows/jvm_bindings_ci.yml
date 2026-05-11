@@ -66,7 +66,7 @@ jobs:
             ~/.m2/repository
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: jvm-${{ runner.os }}-${{ hashFiles('bindings/java/rust-data-processing-jvm/pom.xml', 'bindings/java/rust-data-processing-jvm-examples/pom.xml', 'bindings/java/rust-data-processing-jvm/build.gradle.kts', 'bindings/java/rust-data-processing-jvm/gradle/wrapper/gradle-wrapper.properties') }}
+          key: jvm-${{ runner.os }}-${{ hashFiles('bindings/java/rust-data-processing-jvm/pom.xml', 'bindings/java/rust-data-processing-jvm-examples/pom.xml', 'bindings/java/rust-data-processing-jvm-spark/pom.xml', 'bindings/java/rust-data-processing-jvm/build.gradle.kts', 'bindings/java/rust-data-processing-jvm/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             jvm-${{ runner.os }}-
 
@@ -100,6 +100,11 @@ jobs:
       - name: Java pytest-mirror examples module (Surefire smoke + packaged demos)
         working-directory: bindings/java/rust-data-processing-jvm-examples
         run: mvn -B verify
+
+      - name: Maven package (Spark materializer bridge, Linux only)
+        if: runner.os == 'Linux'
+        working-directory: bindings/java/rust-data-processing-jvm-spark
+        run: mvn -B -DskipTests package
 
       - name: Gradle check
         working-directory: bindings/java/rust-data-processing-jvm

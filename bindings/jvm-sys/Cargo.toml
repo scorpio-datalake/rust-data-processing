@@ -22,4 +22,10 @@ link-main = ["dep:rust-data-processing", "dep:csv"]
 # Phase 3 release-pipeline name — alias for `link-main` (wire full parity builds).
 jvm_ffi = ["link-main"]
 # Full linkage (Polars default stack) — use when validating parity-heavy builds locally.
-full = ["link-main", "rust-data-processing/default", "rust-data-processing/sql"]
+# Enable crate `excel` feature so FFI can exercise Excel ingestion paths (e.g. Excel tab parity).
+full = [
+    "link-main",
+    "rust-data-processing/default",
+    "rust-data-processing/sql",
+    "rust-data-processing/excel",
+]
