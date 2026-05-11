@@ -93,6 +93,8 @@ Python uses **`ingest_from_path`** and **`DataSet`** directly. On the JVM, see:
 
 Validate the envelope and `kind` the same way as **`FfiExportedSymbolsContractTest`** in `rust-data-processing-jvm`.
 
+Illustrative Java (schema JSON + `rdp_parity_ingestion`): [`JsonParquetExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/JsonParquetExcelSnippets.java).
+
 <h2 id="ordered-paths-and-directory-scans-incremental-batches">Ordered paths and directory scans (incremental batches)</h2>
 
 In Python, incremental batch patterns use **`paths_from_directory_scan`**, **`ingest_from_ordered_paths`**, watermark options, and Hive-style layout helpers — see [the same heading in the Python examples](../python/examples.html#ordered-paths-and-directory-scans-incremental-batches) on this site and [`docs/python/PHASE2_EXAMPLES.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/python/PHASE2_EXAMPLES.md) § 10.
