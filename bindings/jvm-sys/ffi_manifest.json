@@ -1,5 +1,5 @@
 {
-  "abi_version_constant": 404,
+  "abi_version_constant": 405,
   "exported_symbols": [
     "rdp_ffi_abi_version",
     "rdp_json_slice_free",
@@ -10,6 +10,7 @@
     "rdp_ingest_csv_path",
     "rdp_ingest_json_path",
     "rdp_ingest_ordered_paths_json",
+    "rdp_run_pipeline_json",
     "rdp_ingest_parquet_path",
     "rdp_parity_benchmark_smoke_mirror",
     "rdp_parity_bindings_mirror",

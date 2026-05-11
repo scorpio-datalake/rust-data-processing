@@ -18,7 +18,7 @@ unsafe fn cstr_to_str<'a>(ptr: *const c_char, label: &str) -> Result<&'a str, St
 }
 
 #[cfg(feature = "link-main")]
-pub(super) fn parse_ingestion_options(
+pub(crate) fn parse_ingestion_options(
     json: &str,
     format_override: Option<rust_data_processing::ingestion::IngestionFormat>,
 ) -> Result<rust_data_processing::ingestion::IngestionOptions, String> {

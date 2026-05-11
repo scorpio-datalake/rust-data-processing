@@ -206,6 +206,42 @@ public final class RdpNativeJson {
     return new JSONObject(json);
   }
 
+  /**
+   * Single-document pipeline: {@code rdp_run_pipeline_json}. {@code payloadJson} is UTF-8 JSON
+   * with {@code sources} (paths, schema, options), optional {@code transform.sql} on registered
+   * table {@code df}, and {@code sinks} (each optional per-sink {@code sql}). The JVM example
+   * {@code syntheticPipelineSpec()} shape ({@code json_source_paths}, {@code lake_sink}, …) is
+   * also accepted — Rust maps it to the same execution path.
+   */
+  public static JSONObject invokeRunPipelineJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment payloadUtf8 = arena.allocateUtf8String(payloadJson);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find("rdp_run_pipeline_json").orElseThrow(),
+            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, payloadUtf8);
+
+    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
+    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
+    if (ptrRaw == 0L) {
+      throw new IllegalStateException("rdp_run_pipeline_json: null JSON ptr");
+    }
+    MemorySegment utf8 =
+        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
+    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
+    String json = new String(rawJson, StandardCharsets.UTF_8);
+
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+
+    return new JSONObject(json);
+  }
+
   private static JSONObject invokePathIngest(
       Linker linker,
       SymbolLookup lookup,

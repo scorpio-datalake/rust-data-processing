@@ -44,6 +44,9 @@ void rdp_ingest_parquet_path(RdpJsonSlice *out, const char *path, const char *sc
 /** Multi-file ingest: NUL-terminated UTF-8 JSON payload (paths, schema, options, response). */
 void rdp_ingest_ordered_paths_json(RdpJsonSlice *out, const char *payload_json);
 
+/** Ordered ingest + Polars SQL + sinks from one UTF-8 JSON document (see docs/java examples). */
+void rdp_run_pipeline_json(RdpJsonSlice *out, const char *payload_json);
+
 void rdp_parity_benchmark_smoke_mirror(RdpJsonSlice *out);
 void rdp_parity_bindings_mirror(RdpJsonSlice *out);
 void rdp_parity_cdc(RdpJsonSlice *out);

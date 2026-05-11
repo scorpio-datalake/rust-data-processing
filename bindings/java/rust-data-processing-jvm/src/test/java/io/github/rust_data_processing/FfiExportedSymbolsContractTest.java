@@ -52,7 +52,7 @@ final class FfiExportedSymbolsContractTest {
           "Bundled ffi_manifest.json missing from classpath (expected under"
               + " src/main/resources/io/github/rust_data_processing/ in rust-data-processing-jvm).");
       JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-      assertEquals(404, o.getInt("abi_version_constant"));
+      assertEquals(405, o.getInt("abi_version_constant"));
       JSONArray syms = o.getJSONArray("exported_symbols");
       boolean hasAbi = false;
       for (int i = 0; i < syms.length(); i++) {
@@ -217,6 +217,9 @@ final class FfiExportedSymbolsContractTest {
       case "rdp_ingest_ordered_paths_json":
         ingestOrderedPathsContract(linker, lookup, arena);
         return;
+      case "rdp_run_pipeline_json":
+        runPipelineJsonContract(linker, lookup, arena);
+        return;
       default:
         if (name.startsWith("rdp_parity_")) {
           JSONObject root = RdpNativeJson.invokeParityExport(linker, lookup, arena, name);
@@ -301,6 +304,59 @@ final class FfiExportedSymbolsContractTest {
         break;
       default:
         break;
+    }
+  }
+
+  private static void runPipelineJsonContract(Linker linker, SymbolLookup lookup, Arena arena)
+      throws Throwable {
+    Path dir = Files.createTempDirectory("rdp_contract_run_pipeline_");
+    try {
+      Path p1 = dir.resolve("a.json");
+      Path p2 = dir.resolve("b.json");
+      Files.writeString(p1, "[{\"id\":1,\"name\":\"A\"}]");
+      Files.writeString(p2, "[{\"id\":2,\"name\":\"B\"}]");
+      String abspath1 = p1.toAbsolutePath().toString();
+      String abspath2 = p2.toAbsolutePath().toString();
+      Path outParquet = dir.resolve("out.parquet");
+      String schemaJson =
+          "{\"fields\":["
+              + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
+              + "{\"name\":\"name\",\"data_type\":\"Utf8\"}"
+              + "]}";
+      JSONObject payload =
+          new JSONObject()
+              .put("version", 1)
+              .put(
+                  "sources",
+                  new JSONObject()
+                      .put("paths", new JSONArray().put(abspath1).put(abspath2))
+                      .put("schema", new JSONObject(schemaJson))
+                      .put("options", new JSONObject().put("format", "json")))
+              .put("transform", new JSONObject().put("sql", "SELECT * FROM df ORDER BY id"))
+              .put(
+                  "sinks",
+                  new JSONArray()
+                      .put(
+                          new JSONObject()
+                              .put("kind", "parquet_file")
+                              .put("path", outParquet.toAbsolutePath().toString())));
+      JSONObject root =
+          RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, payload.toString());
+      PytestMirrorAssertions.assertEnvelopeOk(root);
+      JSONObject inter = root.getJSONObject("interchange");
+      assertEquals("run_pipeline_json", inter.getString("kind"));
+      assertEquals(2, inter.getInt("ingested_row_count"));
+      assertTrue(Files.exists(outParquet), "pipeline parquet sink missing: " + outParquet);
+      assertEquals(
+          "ok",
+          inter.getJSONArray("sink_results").getJSONObject(0).getString("status"));
+      Files.deleteIfExists(outParquet);
+    } finally {
+      try (var walk = Files.walk(dir)) {
+        for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
+          Files.deleteIfExists(p);
+        }
+      }
     }
   }
 

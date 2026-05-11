@@ -1,12 +1,16 @@
 //! Single-document pipeline orchestration: `rdp_run_pipeline_json`.
 //!
-//! JVM passes **control-plane JSON** (local source paths, schema, optional Polars SQL, sinks).
+//! JVM passes **control-plane JSON** (local source paths, schema, optional Polars SQL, sinks), or
+//! the legacy **student ETL** document (`json_source_paths`, `schema_student_json`, `lake_sink`,
+//! `relational_sink`) produced by the Java example builders — same envelope, Rust-only execution.
+//!
 //! Rust keeps the working frame in Polars; only **sink results** and summaries cross FFI — not
 //! bulk row JSON unless a sink explicitly requests it later.
 //!
-//! Object-store source URIs (`s3://`, …) are rejected with a clear error until wired.
-//! **Delta Lake / Iceberg** sinks return structured `status` (not wired in this build).
-//! **PostgreSQL** sink is available when `rdp-jvm-sys` is built with `--features sink_postgres`.
+//! Object-store source URIs (`s3://`, …) are rejected with a clear error until object-store wiring
+//! lands in this crate. **Delta Lake / Iceberg** sinks return structured `connector_pending` until
+//! native catalog writers are linked. **PostgreSQL** runs a `COPY` load when `rdp-jvm-sys` is built
+//! with `--features sink_postgres`; otherwise the sink is reported as `skipped` with a rebuild hint.
 
 use crate::ingest_path::parse_ingestion_options;
 use crate::parity_support::{json_err, json_ok, write_slice, RdpJsonSlice};
@@ -103,6 +107,101 @@ struct RunPipelineRequest {
     sinks: Vec<SinkSpec>,
 }
 
+/// Legacy control-plane shape from Java `syntheticPipelineSpec()` (docs example).
+#[derive(Debug, Deserialize)]
+struct LegacyStudentEtlSpec {
+    #[serde(default)]
+    engine: Option<String>,
+    json_source_paths: Vec<String>,
+    schema_student_json: rust_data_processing::types::Schema,
+    #[serde(default)]
+    schema_lake_grade_stats: Option<serde_json::Value>,
+    #[serde(default)]
+    schema_postgres_courses_teachers: Option<serde_json::Value>,
+    lake_sink: serde_json::Value,
+    relational_sink: serde_json::Value,
+    #[serde(default)]
+    notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyLakeSink {
+    #[serde(default)]
+    format: Option<String>,
+    catalog_uri: String,
+    #[serde(default)]
+    warehouse: Option<String>,
+    #[serde(default)]
+    namespace: Option<String>,
+    table_student_grades: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyRelationalSink {
+    postgresql_url: String,
+    courses_teachers_table: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum RunPipelineEnvelope {
+    V1(RunPipelineRequest),
+    Legacy(LegacyStudentEtlSpec),
+}
+
+fn legacy_student_etl_to_v1(spec: LegacyStudentEtlSpec) -> Result<(RunPipelineRequest, serde_json::Value), String> {
+    let lake: LegacyLakeSink =
+        serde_json::from_value(spec.lake_sink.clone()).map_err(|e| format!("lake_sink: {e}"))?;
+    let rel: LegacyRelationalSink =
+        serde_json::from_value(spec.relational_sink.clone()).map_err(|e| format!("relational_sink: {e}"))?;
+
+    let declared = serde_json::json!({
+        "engine": spec.engine,
+        "notes": spec.notes,
+        "schema_lake_grade_stats": spec.schema_lake_grade_stats,
+        "schema_postgres_courses_teachers": spec.schema_postgres_courses_teachers,
+        "lake_sink_format": lake.format,
+    });
+
+    let sinks = vec![
+        SinkSpec::DeltaLake {
+            warehouse: lake.warehouse.clone(),
+            catalog_uri: Some(lake.catalog_uri.clone()),
+            namespace: lake.namespace.clone(),
+            table: lake.table_student_grades.clone(),
+            sql: None,
+        },
+        SinkSpec::Iceberg {
+            catalog_uri: lake.catalog_uri,
+            warehouse: lake.warehouse,
+            namespace: lake.namespace,
+            table: lake.table_student_grades,
+            sql: None,
+        },
+        SinkSpec::Postgresql {
+            url: rel.postgresql_url,
+            table: rel.courses_teachers_table,
+            sql: None,
+            create_table_if_missing: true,
+            truncate_before_load: false,
+        },
+    ];
+
+    Ok((
+        RunPipelineRequest {
+            version: Some(1),
+            sources: SourcesSpec {
+                paths: spec.json_source_paths,
+                schema: spec.schema_student_json,
+                options: serde_json::json!({"format": "json"}),
+            },
+            transform: None,
+            sinks,
+        },
+        declared,
+    ))
+}
+
 fn object_store_path_error(p: &str) -> Option<String> {
     let lower = p.to_ascii_lowercase();
     if lower.starts_with("s3://")
@@ -126,13 +225,21 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, String> {
     use rust_data_processing::ingestion::{export_dataset_to_parquet, ingest_from_ordered_paths};
     use rust_data_processing::pipeline::DataFrame;
     use rust_data_processing::sql;
-    let RunPipelineRequest {
+
+    let (RunPipelineRequest {
         version: _,
         sources,
         transform,
         sinks,
-    } = serde_json::from_str::<RunPipelineRequest>(payload_json)
-        .map_err(|e| format!("payload JSON: {e}"))?;
+    }, legacy_declared) = match serde_json::from_str::<RunPipelineEnvelope>(payload_json)
+        .map_err(|e| format!("payload JSON: {e}"))?
+    {
+        RunPipelineEnvelope::V1(r) => (r, None),
+        RunPipelineEnvelope::Legacy(l) => {
+            let (r, d) = legacy_student_etl_to_v1(l)?;
+            (r, Some(d))
+        }
+    };
 
     for p in &sources.paths {
         if let Some(err) = object_store_path_error(p) {
@@ -289,7 +396,7 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, String> {
         }
     }
 
-    Ok(serde_json::json!({
+    let mut out = serde_json::json!({
         "kind": "run_pipeline_json",
         "engine": "ingest_ordered_paths_then_polars_sql_then_sinks",
         "paths": paths_for_json,
@@ -299,7 +406,11 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, String> {
             "last_path": meta.last_path.as_ref().map(|p| p.to_string_lossy().to_string()),
         },
         "sink_results": sink_results,
-    }))
+    });
+    if let Some(d) = legacy_declared {
+        out["declared_staging_schemas"] = d;
+    }
+    Ok(out)
 }
 
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]
@@ -435,6 +546,7 @@ fn pg_create_table_ddl(fq: &str, schema: &rust_data_processing::types::Schema) -
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]
 fn append_copy_text_field<W: std::io::Write>(w: &mut W, v: &rust_data_processing::types::Value) -> Result<(), String> {
     use rust_data_processing::types::Value;
+    use std::io::Write;
     match v {
         Value::Null => w.write_all(br"\N").map_err(|e| e.to_string()),
         Value::Int64(i) => write!(w, "{i}").map_err(|e| e.to_string()),
@@ -536,6 +648,61 @@ mod tests {
         assert!(out_parquet.exists());
         let sinks = v["sink_results"].as_array().unwrap();
         assert_eq!(sinks[0]["status"], "ok");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn run_pipeline_legacy_student_etl_envelope() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("rdp_pipeline_legacy_test_{stamp}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p1 = dir.join("part-0.json");
+        std::fs::write(
+            &p1,
+            r#"[{"student_id":1,"legal_name":"A","email":"a@x","homeroom":"1","gpa":3.5,"enrollment_year":2024}]"#,
+        )
+        .unwrap();
+
+        let payload = serde_json::json!({
+            "engine": "rdp_rust_only_etl",
+            "json_source_paths": [p1.to_str().unwrap()],
+            "schema_student_json": {
+                "fields": [
+                    {"name": "student_id", "data_type": "Int64"},
+                    {"name": "legal_name", "data_type": "Utf8"},
+                    {"name": "email", "data_type": "Utf8"},
+                    {"name": "homeroom", "data_type": "Utf8"},
+                    {"name": "gpa", "data_type": "Float64"},
+                    {"name": "enrollment_year", "data_type": "Int64"}
+                ]
+            },
+            "schema_lake_grade_stats": {"fields": []},
+            "schema_postgres_courses_teachers": {"fields": []},
+            "lake_sink": {
+                "format": "delta_or_iceberg_tbd",
+                "catalog_uri": "thrift://iceberg-catalog.example:9083",
+                "warehouse": "s3://school-warehouse/",
+                "namespace": "curated",
+                "table_student_grades": "student_grade_stats"
+            },
+            "relational_sink": {
+                "postgresql_url": "postgresql://app:CHANGE_ME@db.example:5432/school?sslmode=require",
+                "courses_teachers_table": "public.courses_teachers"
+            },
+            "notes": "unit test"
+        });
+
+        let v = run_pipeline_impl(&payload.to_string()).unwrap();
+        assert_eq!(v["ingested_row_count"].as_i64(), Some(1));
+        assert!(v.get("declared_staging_schemas").is_some());
+        let sinks = v["sink_results"].as_array().unwrap();
+        assert_eq!(sinks.len(), 3);
+        assert_eq!(sinks[0]["kind"].as_str(), Some("delta_lake"));
+        assert_eq!(sinks[1]["kind"].as_str(), Some("iceberg"));
+        assert_eq!(sinks[2]["kind"].as_str(), Some("postgresql"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

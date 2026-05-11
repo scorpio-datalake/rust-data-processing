@@ -3,59 +3,42 @@ import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
  * <p><b>Principle:</b> <strong>Rust does all heavy work.</strong> The JVM only supplies <em>pipeline
- * metadata</em> and <em>schemas</em> (and small control-plane JSON). Do <strong>not</strong> pull
- * large tables into Java objects only to push them back into Rust — that doubles serialization cost,
- * blows the heap, and makes GC worse. Prefer:
+ * metadata</em> and <em>schemas</em> (control-plane JSON). Do <strong>not</strong> pull large tables
+ * into Java only to push them back into Rust. The primary orchestration entry is {@code
+ * rdp_run_pipeline_json}: Polars plans and sink drivers run in Rust; the response is summaries and
+ * sink statuses — not bulk student rows.
  *
- * <ul>
- *   <li>FFI payloads where Rust reads paths and writes <strong>sinks inside Rust</strong> (future:
- *       Iceberg / Delta / database orchestration entrypoint), or
- *   <li>{@code rdp_ingest_ordered_paths_json} with {@code response.mode} = {@code parquet_temp} or
- *       {@code arrow_ipc_temp} so the JVM receives only <strong>path + row_count + schema</strong>,
- *       not every row as JSON.
- * </ul>
+ * <p><b>Other FFI modes (not used here):</b> {@code rdp_ingest_ordered_paths_json} can return a temp
+ * Parquet/Arrow <strong>file path</strong> so something <em>on the JVM</em> (e.g. Spark) reads bytes
+ * from disk. That is unrelated to {@code rdp_run_pipeline_json}, where sinks stay in Rust — see
+ * contract tests if you need that path.
  *
- * <p><b>Story (student / grades / lake / PostgreSQL):</b> many JSON files list students (names,
- * courses, grades, teachers). Rust ingests with a <strong>shared schema</strong>, normalizes to
- * <strong>one row per student</strong> (or your chosen grain — still decided in Rust). A data-lake
- * table stores <strong>base student fields plus per-grade statistics</strong> (e.g. std dev of
- * scores) computed in Rust. A final PostgreSQL load keeps <strong>courses and teachers</strong>;
- * <strong>student PII is dropped in Rust</strong> before the database write — Java never materializes those
- * rows for “cleanup”.
+ * <p><b>Story (student / grades / lake / PostgreSQL):</b> many JSON files list students. Rust
+ * ingests with a shared schema, keeps a Polars frame in process, reports Delta/Iceberg/PostgreSQL
+ * sink phases from the same JSON spec the JVM built (see {@link #syntheticPipelineSpec()}).
+ * PostgreSQL loads use a libpq-style URL (not JDBC). With {@code --features sink_postgres} on {@code
+ * rdp_jvm_sys}, the PostgreSQL sink performs a native {@code COPY}; otherwise it returns {@code
+ * skipped} with a rebuild hint. Delta and Iceberg return {@code connector_pending} until their
+ * native writers are enabled in the build.
  *
- * <ol>
- *   <li>Rust: read many JSON paths (list or glob resolved in Rust) using JVM-supplied schema.
- *   <li>Rust: union / validate → one logical table (Polars DataFrame stays in Rust).
- *   <li>Rust: write lake table(s) (Iceberg / Delta — placeholders below until wired in RDP).
- *   <li>Rust: aggregate grades (e.g. std) in Rust; land wide/narrow tables in the lake.
- *   <li>Rust: project to course/teacher columns, drop student fields, load PostgreSQL from Rust.
- * </ol>
+ * <p><b>What this class does when you run {@link #demonstrateSchemas}:</b> prints declared schemas,
+ * writes tiny on-disk JSON fixtures, calls {@link RdpNativeJson#invokeRunPipelineJson} with the
+ * legacy control-plane shape, calls {@link RdpNativeJson#invokeIngestOrderedPathsJson} in {@code
+ * dataset} mode (capped rows), and runs small parity exports for schema smoke tests.
  *
- * <p><b>What this class prints:</b> (1) <strong>Concrete {@code Schema} JSON</strong> for each
- * stage (student JSON lines, lake grade stats, PostgreSQL course/teacher) using serde field names
- * ({@code Int64}, {@code Utf8}, …). (2) A compact <strong>pipeline spec</strong> (paths + sink
- * placeholders). (3) A few <strong>tiny</strong> live FFI calls that only return <strong>schemas</strong>
- * or temp-file metadata — not bulk rows for the student story.
- *
- * <h2>Shortcomings (current implementation)</h2>
- *
- * <ul>
- *   <li><b>No single orchestration FFI</b> yet that runs the full student→lake→PG story from one JSON
- *       document; compose <strong>Rust</strong> jobs or call granular symbols ({@code
- *       rdp_ingest_ordered_paths_json}, future sink FFI) from Java.
- *   <li><b>Iceberg / Delta / PostgreSQL</b> are not implemented inside {@code rdp_jvm_sys}; URLs and
- *       table names are <strong>contracts Java would pass to Rust</strong>, not live drivers from
- *       Java.
- *   <li>For large N, avoid {@code response.mode} = {@code dataset} over FFI; use {@code parquet_temp}
- *       or {@code arrow_ipc_temp} (or keep sinks entirely in Rust).
- * </ul>
+ * <p><b>Paths:</b> {@link #exampleJsonSourcePaths()} lists {@code s3://} URIs as a production sketch.
+ * {@code rdp_run_pipeline_json} currently accepts <strong>local filesystem paths</strong> only for
+ * ingestion; object-store reads require additional Rust wiring. The live demo replaces those URIs
+ * with temp files.
  *
  * <p>Run with {@code RDP_JVM_SYS} (or {@code -Drdp.jvm.sys.library}) and {@code
  * --enable-native-access=ALL-UNNAMED}. Not built by the main Maven module — copy into {@code
@@ -124,8 +107,9 @@ public final class RDPOnlyETLExample {
   }
 
   /**
-   * Full <strong>control-plane</strong> document Java would register with Rust (or split across
-   * calls). No row arrays — only schemas, paths, sink hints.
+   * Full <strong>control-plane</strong> document the JVM passes to {@code rdp_run_pipeline_json}
+   * (Rust accepts this legacy shape and maps it to internal sinks). No row arrays — only schemas,
+   * paths, sink hints.
    */
   public static JSONObject syntheticPipelineSpec() {
     return new JSONObject()
@@ -145,8 +129,6 @@ public final class RDPOnlyETLExample {
         .put(
             "relational_sink",
             new JSONObject()
-                // Rust does not use JDBC. Native clients (e.g. tokio-postgres, sqlx, ConnectorX)
-                // expect a libpq-style URL such as postgresql://… — not jdbc:postgresql:…
                 .put(
                     "postgresql_url",
                     "postgresql://app:CHANGE_ME@db.example:5432/school?sslmode=require")
@@ -159,22 +141,28 @@ public final class RDPOnlyETLExample {
                 + "all without bulk row JSON crossing the JVM boundary.");
   }
 
+  /** One JSON array-of-objects line matching {@link #schemaStudentJsonSource()}. */
+  public static String minimalStudentJsonLine(long studentId, String name) {
+    return "[{\"student_id\":"
+        + studentId
+        + ",\"legal_name\":\""
+        + name
+        + "\",\"email\":\""
+        + name.toLowerCase()
+        + "@school.example\",\"homeroom\":\"10A\",\"gpa\":3.5,\"enrollment_year\":2024}]";
+  }
+
   /**
-   * Example payload for {@link RdpNativeJson#invokeIngestOrderedPathsJson} — Rust reads every path,
-   * applies one schema, returns <strong>only</strong> a temp Parquet path when {@code mode} is
-   * {@code parquet_temp} (no {@code dataset} rows on the JVM). Replace paths with real absolute
-   * filesystem paths for a local demo.
+   * Example payload for {@link RdpNativeJson#invokeIngestOrderedPathsJson} — {@code dataset} mode
+   * returns capped rows as JSON (fine for small demos). Replace paths with absolute filesystem
+   * paths.
    */
-  public static JSONObject exampleOrderedIngestParquetTempPayload() {
-    JSONArray paths =
-        new JSONArray()
-            .put("/data/students/part-00000.json")
-            .put("/data/students/part-00001.json");
+  public static JSONObject exampleOrderedIngestDatasetPayload(JSONArray absolutePaths) {
     return new JSONObject()
-        .put("paths", paths)
+        .put("paths", absolutePaths)
         .put("schema", schemaStudentJsonSource())
         .put("options", new JSONObject().put("format", "json"))
-        .put("response", new JSONObject().put("mode", "parquet_temp"));
+        .put("response", new JSONObject().put("mode", "dataset").put("max_rows", 50));
   }
 
   public static void printPipelineSpec(JSONObject spec) {
@@ -188,19 +176,10 @@ public final class RDPOnlyETLExample {
     System.out.println(schema.toString(2));
   }
 
-  public static void printInterchangeSchema(String label, JSONObject interchange) {
-    if (!interchange.has("schema")) {
-      System.out.println("--- " + label + " (no schema field on interchange) ---");
-      return;
-    }
-    System.out.println("--- " + label + " ---");
-    System.out.println(interchange.get("schema").toString());
-  }
-
   /**
-   * Prints <strong>declared</strong> student/lake/PostgreSQL schemas, the pipeline spec, an example
-   * {@code rdp_ingest_ordered_paths_json} payload (no call — paths are fake), then tiny FFI calls
-   * that only surface schemas or temp-file metadata.
+   * Prints declared schemas, the <strong>conceptual</strong> spec with {@code s3://} paths, runs
+   * {@code rdp_run_pipeline_json} on temp JSON fixtures, runs capped {@code rdp_ingest_ordered_paths_json},
+   * then small parity exports.
    */
   public static void demonstrateSchemas(Path nativeLibrary) throws Throwable {
     Linker linker = Linker.nativeLinker();
@@ -215,17 +194,58 @@ public final class RDPOnlyETLExample {
       System.out.println("PostgreSQL (courses/teachers, no student PII) schema:");
       System.out.println(schemaPostgresCoursesTeachers().toString(2));
 
+      System.out.println("=== Conceptual pipeline spec (S3 paths — ingest requires local paths today) ===");
       printPipelineSpec(syntheticPipelineSpec());
 
-      System.out.println(
-          "=== Example ordered ingest payload (parquet_temp = no row JSON on JVM) ===");
-      System.out.println(exampleOrderedIngestParquetTempPayload().toString(2));
+      Path demoDir = Files.createTempDirectory("rdp_student_etl_demo_");
+      try {
+        Path p0 = demoDir.resolve("part-00000.json");
+        Path p1 = demoDir.resolve("part-00001.json");
+        Path p2 = demoDir.resolve("part-00002.json");
+        Files.writeString(p0, minimalStudentJsonLine(1, "Ada"), StandardCharsets.UTF_8);
+        Files.writeString(p1, minimalStudentJsonLine(2, "Bob"), StandardCharsets.UTF_8);
+        Files.writeString(p2, minimalStudentJsonLine(3, "Chen"), StandardCharsets.UTF_8);
+        JSONArray localPaths =
+            new JSONArray()
+                .put(p0.toAbsolutePath().toString())
+                .put(p1.toAbsolutePath().toString())
+                .put(p2.toAbsolutePath().toString());
+
+        JSONObject livePipeline = syntheticPipelineSpec().put("json_source_paths", localPaths);
+        System.out.println("=== Live rdp_run_pipeline_json (legacy control-plane JSON) ===");
+        JSONObject pipelineRoot =
+            RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, livePipeline.toString());
+        System.out.println(pipelineRoot.toString(2));
+        PytestMirrorAssertions.assertEnvelopeOk(pipelineRoot);
+        JSONObject pInter = pipelineRoot.getJSONObject("interchange");
+        System.out.println(
+            "Ingested rows (Rust, ordered paths): " + pInter.getInt("ingested_row_count"));
+        System.out.println("Sink phases: " + pInter.getJSONArray("sink_results").toString(2));
+
+        JSONArray twoPaths =
+            new JSONArray()
+                .put(p0.toAbsolutePath().toString())
+                .put(p1.toAbsolutePath().toString());
+        JSONObject orderedDataset =
+            RdpNativeJson.invokeIngestOrderedPathsJson(
+                linker, lookup, arena, exampleOrderedIngestDatasetPayload(twoPaths).toString());
+        System.out.println(
+            "=== rdp_ingest_ordered_paths_json (dataset, capped) — granular ingest without sinks ===");
+        PytestMirrorAssertions.assertEnvelopeOk(orderedDataset);
+        System.out.println(orderedDataset.getJSONObject("interchange").toString(2));
+      } finally {
+        try (var walk = Files.walk(demoDir)) {
+          for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
+            Files.deleteIfExists(p);
+          }
+        }
+      }
 
       JSONObject typesRoot =
           RdpNativeJson.invokeParityExport(linker, lookup, arena, "rdp_parity_types_dataset");
       PytestMirrorAssertions.assertEnvelopeOk(typesRoot);
       printDatasetSchema(
-          "Illustrative: small Rust-built DataSet schema (not the student pipeline)",
+          "Illustrative: small Rust-built DataSet schema (parity, not the student pipeline)",
           typesRoot.getJSONObject("interchange").getJSONObject("dataset"));
 
       JSONObject sqlRoot =
@@ -240,20 +260,6 @@ public final class RDPOnlyETLExample {
             "--- rdp_parity_pipeline_sql: skipped (ok=false; rebuild rdp_jvm_sys with link-main?) ---");
         System.out.println(sqlRoot.toString(2));
       }
-
-      JSONObject parquetTempRoot = RdpNativeJson.invokeExportParquetTemp(linker, lookup, arena);
-      PytestMirrorAssertions.assertEnvelopeOk(parquetTempRoot);
-      JSONObject interchange = parquetTempRoot.getJSONObject("interchange");
-      printInterchangeSchema(
-          "Illustrative: temp Parquet handoff schema (path on disk; rows not in JSON)",
-          interchange);
-      Path parquetPath = Path.of(interchange.getString("path"));
-      System.out.println("Temp Parquet path (Rust wrote bytes; JVM deletes after readers): " + parquetPath);
-      Files.deleteIfExists(parquetPath);
-
-      System.out.println(
-          "--- Lake / PostgreSQL execution: stays in Rust (native URLs, not JDBC); "
-              + "Java never round-trips student rows ---");
     }
   }
 
