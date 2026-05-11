@@ -312,16 +312,12 @@ pub unsafe extern "C" fn rdp_export_polars_parquet_temp(out: *mut RdpJsonSlice) 
 }
 
 fn export_polars_parquet_temp() -> RdpJsonSlice {
-    #[cfg(all(feature = "link-main", feature = "full"))]
+    #[cfg(feature = "link-main")]
     {
         match export_polars_parquet_temp_impl() {
             Ok(v) => json_ok(v),
             Err(e) => json_err(e),
         }
-    }
-    #[cfg(all(feature = "link-main", not(feature = "full")))]
-    {
-        json_err("rebuild rdp_jvm_sys with --features full for Polars temp Parquet export")
     }
     #[cfg(not(feature = "link-main"))]
     {
@@ -329,7 +325,7 @@ fn export_polars_parquet_temp() -> RdpJsonSlice {
     }
 }
 
-#[cfg(all(feature = "link-main", feature = "full"))]
+#[cfg(feature = "link-main")]
 fn export_polars_parquet_temp_impl() -> Result<serde_json::Value, String> {
     use rust_data_processing::ingestion::export_dataset_to_parquet;
     use rust_data_processing::pipeline::DataFrame;
@@ -434,16 +430,12 @@ pub unsafe extern "C" fn rdp_parity_pipeline_sql(out: *mut RdpJsonSlice) {
 }
 
 fn parity_pipeline_sql() -> RdpJsonSlice {
-    #[cfg(all(feature = "link-main", feature = "full"))]
+    #[cfg(feature = "link-main")]
     {
         match pipeline_sql_impl() {
             Ok(v) => json_ok(v),
             Err(e) => json_err(e),
         }
-    }
-    #[cfg(all(feature = "link-main", not(feature = "full")))]
-    {
-        json_err("rebuild rdp_jvm_sys with --features full for Polars SQL parity")
     }
     #[cfg(not(feature = "link-main"))]
     {
@@ -451,7 +443,7 @@ fn parity_pipeline_sql() -> RdpJsonSlice {
     }
 }
 
-#[cfg(all(feature = "link-main", feature = "full"))]
+#[cfg(feature = "link-main")]
 fn pipeline_sql_impl() -> Result<serde_json::Value, String> {
     use rust_data_processing::pipeline::DataFrame;
     use rust_data_processing::sql;

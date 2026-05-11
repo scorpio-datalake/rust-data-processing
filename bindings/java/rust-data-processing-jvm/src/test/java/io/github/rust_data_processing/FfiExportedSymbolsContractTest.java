@@ -1,6 +1,7 @@
 package io.github.rust_data_processing;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -21,6 +22,7 @@ import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Optional;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -50,7 +52,7 @@ final class FfiExportedSymbolsContractTest {
           "Bundled ffi_manifest.json missing from classpath (expected under"
               + " src/main/resources/io/github/rust_data_processing/ in rust-data-processing-jvm).");
       JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-      assertEquals(403, o.getInt("abi_version_constant"));
+      assertEquals(404, o.getInt("abi_version_constant"));
       JSONArray syms = o.getJSONArray("exported_symbols");
       boolean hasAbi = false;
       for (int i = 0; i < syms.length(); i++) {
@@ -157,6 +159,64 @@ final class FfiExportedSymbolsContractTest {
           root.getJSONObject("interchange").getJSONObject("dataset");
           return;
         }
+      case "rdp_ingest_csv_path":
+        {
+          Path csv =
+              Path.of("tests").resolve("fixtures").resolve("people.csv").toAbsolutePath();
+          Assumptions.assumeTrue(
+              Files.exists(csv), "Skip when repo tests/fixtures/people.csv is not cwd-relative");
+          String schema =
+              "{\"fields\":["
+                  + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
+                  + "{\"name\":\"name\",\"data_type\":\"Utf8\"},"
+                  + "{\"name\":\"score\",\"data_type\":\"Float64\"},"
+                  + "{\"name\":\"active\",\"data_type\":\"Bool\"}"
+                  + "]}";
+          JSONObject root =
+              RdpNativeJson.invokeIngestCsvPath(linker, lookup, arena, csv.toString(), schema, "{}");
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          assertEquals(
+              "ingest_path_csv", root.getJSONObject("interchange").getString("kind"));
+          assertEquals(2, root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+          return;
+        }
+      case "rdp_ingest_json_path":
+        {
+          Path json =
+              Path.of("tests").resolve("fixtures").resolve("people.json").toAbsolutePath();
+          Assumptions.assumeTrue(
+              Files.exists(json), "Skip when repo tests/fixtures/people.json is not cwd-relative");
+          String schema =
+              "{\"fields\":["
+                  + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
+                  + "{\"name\":\"user.name\",\"data_type\":\"Utf8\"},"
+                  + "{\"name\":\"score\",\"data_type\":\"Float64\"},"
+                  + "{\"name\":\"active\",\"data_type\":\"Bool\"}"
+                  + "]}";
+          JSONObject root =
+              RdpNativeJson.invokeIngestJsonPath(
+                  linker, lookup, arena, json.toString(), schema, "{}");
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          assertEquals(
+              "ingest_path_json", root.getJSONObject("interchange").getString("kind"));
+          assertEquals(2, root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+          return;
+        }
+      case "rdp_ingest_parquet_path":
+        {
+          Path csv =
+              Path.of("tests").resolve("fixtures").resolve("people.csv").toAbsolutePath();
+          Assumptions.assumeTrue(Files.exists(csv), "Skip when tests/fixtures/people.csv missing");
+          String schema = "{\"fields\":[{\"name\":\"id\",\"data_type\":\"Int64\"}]}";
+          JSONObject root =
+              RdpNativeJson.invokeIngestParquetPath(
+                  linker, lookup, arena, csv.toString(), schema, "{}");
+          assertFalse(root.getBoolean("ok"), "CSV path with Parquet ingest should fail");
+          return;
+        }
+      case "rdp_ingest_ordered_paths_json":
+        ingestOrderedPathsContract(linker, lookup, arena);
+        return;
       default:
         if (name.startsWith("rdp_parity_")) {
           JSONObject root = RdpNativeJson.invokeParityExport(linker, lookup, arena, name);
@@ -241,6 +301,93 @@ final class FfiExportedSymbolsContractTest {
         break;
       default:
         break;
+    }
+  }
+
+  private static void ingestOrderedPathsContract(Linker linker, SymbolLookup lookup, Arena arena)
+      throws Throwable {
+    Path dir = Files.createTempDirectory("rdp_contract_ordered_");
+    try {
+      Path p1 = dir.resolve("a.csv");
+      Path p2 = dir.resolve("b.csv");
+      Files.writeString(p1, "id,name\n1,A\n");
+      Files.writeString(p2, "id,name\n2,B\n");
+      String abspath1 = p1.toAbsolutePath().toString();
+      String abspath2 = p2.toAbsolutePath().toString();
+      String schemaJson =
+          "{\"fields\":["
+              + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
+              + "{\"name\":\"name\",\"data_type\":\"Utf8\"}"
+              + "]}";
+
+      JSONObject payloadDataset =
+          new JSONObject()
+              .put("paths", new JSONArray().put(abspath1).put(abspath2))
+              .put("schema", new JSONObject(schemaJson))
+              .put("options", new JSONObject().put("format", "csv"))
+              .put("response", new JSONObject().put("mode", "dataset").put("max_rows", 50));
+      JSONObject rootDataset =
+          RdpNativeJson.invokeIngestOrderedPathsJson(
+              linker, lookup, arena, payloadDataset.toString());
+      PytestMirrorAssertions.assertEnvelopeOk(rootDataset);
+      JSONObject interD = rootDataset.getJSONObject("interchange");
+      assertEquals("ingest_ordered_paths_dataset", interD.getString("kind"));
+      assertEquals(2, interD.getInt("total_row_count"));
+      assertEquals(2, interD.getInt("returned_row_count"));
+      assertFalse(interD.getBoolean("truncated"));
+
+      JSONObject payloadTruncate =
+          new JSONObject()
+              .put("paths", new JSONArray().put(abspath1).put(abspath2))
+              .put("schema", new JSONObject(schemaJson))
+              .put("options", new JSONObject().put("format", "csv"))
+              .put("response", new JSONObject().put("mode", "dataset").put("max_rows", 1));
+      JSONObject rootTruncate =
+          RdpNativeJson.invokeIngestOrderedPathsJson(
+              linker, lookup, arena, payloadTruncate.toString());
+      PytestMirrorAssertions.assertEnvelopeOk(rootTruncate);
+      JSONObject interT = rootTruncate.getJSONObject("interchange");
+      assertTrue(interT.getBoolean("truncated"));
+      assertEquals(1, interT.getInt("returned_row_count"));
+      assertEquals(2, interT.getInt("total_row_count"));
+
+      JSONObject payloadParquet =
+          new JSONObject()
+              .put("paths", new JSONArray().put(abspath1).put(abspath2))
+              .put("schema", new JSONObject(schemaJson))
+              .put("options", new JSONObject().put("format", "csv"))
+              .put("response", new JSONObject().put("mode", "parquet_temp"));
+      JSONObject rootParquet =
+          RdpNativeJson.invokeIngestOrderedPathsJson(
+              linker, lookup, arena, payloadParquet.toString());
+      PytestMirrorAssertions.assertEnvelopeOk(rootParquet);
+      JSONObject interP = rootParquet.getJSONObject("interchange");
+      assertEquals("ingest_ordered_paths_parquet_temp", interP.getString("kind"));
+      Path parquetOut = Path.of(interP.getString("path"));
+      assertTrue(Files.exists(parquetOut));
+      Files.deleteIfExists(parquetOut);
+
+      JSONObject payloadArrow =
+          new JSONObject()
+              .put("paths", new JSONArray().put(abspath1).put(abspath2))
+              .put("schema", new JSONObject(schemaJson))
+              .put("options", new JSONObject().put("format", "csv"))
+              .put("response", new JSONObject().put("mode", "arrow_ipc_temp"));
+      JSONObject rootArrow =
+          RdpNativeJson.invokeIngestOrderedPathsJson(
+              linker, lookup, arena, payloadArrow.toString());
+      PytestMirrorAssertions.assertEnvelopeOk(rootArrow);
+      JSONObject interA = rootArrow.getJSONObject("interchange");
+      assertEquals("ingest_ordered_paths_arrow_ipc_temp", interA.getString("kind"));
+      Path arrowOut = Path.of(interA.getString("path"));
+      assertTrue(Files.exists(arrowOut));
+      Files.deleteIfExists(arrowOut);
+    } finally {
+      try (var walk = Files.walk(dir)) {
+        for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
+          Files.deleteIfExists(p);
+        }
+      }
     }
   }
 }

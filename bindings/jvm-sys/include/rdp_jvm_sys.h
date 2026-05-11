@@ -36,6 +36,14 @@ void rdp_export_polars_parquet_temp(RdpJsonSlice *out);
 /** Excel workbook path + UTF-8 sheet name → JSON {@code interchange.dataset}. */
 void rdp_excel_ingest_path_sheet(RdpJsonSlice *out, const char *path, const char *sheet_name);
 
+/** Single-file ingest: path + {@code Schema} JSON + {@code IngestionOptions} JSON → {@code interchange.dataset}. */
+void rdp_ingest_csv_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
+void rdp_ingest_json_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
+void rdp_ingest_parquet_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
+
+/** Multi-file ingest: NUL-terminated UTF-8 JSON payload (paths, schema, options, response). */
+void rdp_ingest_ordered_paths_json(RdpJsonSlice *out, const char *payload_json);
+
 void rdp_parity_benchmark_smoke_mirror(RdpJsonSlice *out);
 void rdp_parity_bindings_mirror(RdpJsonSlice *out);
 void rdp_parity_cdc(RdpJsonSlice *out);

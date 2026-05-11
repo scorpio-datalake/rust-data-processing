@@ -84,8 +84,7 @@ public final class RdpNativeJson {
 
   /**
    * Polars SQL on a small in-memory frame, result written to temp Parquet (no embedded {@code
-   * dataset} JSON); {@code interchange.kind} = {@code polars_parquet_export_temp}. Requires native
-   * {@code rdp_jvm_sys} built with {@code --features full}.
+   * dataset} JSON); {@code interchange.kind} = {@code polars_parquet_export_temp}.
    */
   public static JSONObject invokeExportPolarsParquetTemp(
       Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
@@ -118,6 +117,123 @@ public final class RdpNativeJson {
     long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
     if (ptrRaw == 0L) {
       throw new IllegalStateException("rdp_excel_ingest_path_sheet: null JSON ptr");
+    }
+    MemorySegment utf8 =
+        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
+    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
+    String json = new String(rawJson, StandardCharsets.UTF_8);
+
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+
+    return new JSONObject(json);
+  }
+
+  /**
+   * Ingest one CSV file: {@code rdp_ingest_csv_path}. {@code schemaJson} is serde {@code Schema}
+   * JSON; {@code optionsJson} is an object (use {@code "{}"} for defaults). Format is forced to
+   * CSV regardless of extension.
+   */
+  public static JSONObject invokeIngestCsvPath(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String path,
+      String schemaJson,
+      String optionsJson)
+      throws Throwable {
+    return invokePathIngest(linker, lookup, arena, "rdp_ingest_csv_path", path, schemaJson, optionsJson);
+  }
+
+  /** Ingest one JSON file (array-of-objects or NDJSON): {@code rdp_ingest_json_path}. */
+  public static JSONObject invokeIngestJsonPath(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String path,
+      String schemaJson,
+      String optionsJson)
+      throws Throwable {
+    return invokePathIngest(linker, lookup, arena, "rdp_ingest_json_path", path, schemaJson, optionsJson);
+  }
+
+  /** Ingest one Parquet file: {@code rdp_ingest_parquet_path}. */
+  public static JSONObject invokeIngestParquetPath(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String path,
+      String schemaJson,
+      String optionsJson)
+      throws Throwable {
+    return invokePathIngest(linker, lookup, arena, "rdp_ingest_parquet_path", path, schemaJson, optionsJson);
+  }
+
+  /**
+   * Ordered multi-path ingest: {@code rdp_ingest_ordered_paths_json}. {@code payloadJson} is UTF-8
+   * JSON with {@code paths}, {@code schema}, {@code options}, and {@code response} ({@code mode} =
+   * {@code dataset} | {@code parquet_temp} | {@code arrow_ipc_temp}).
+   */
+  public static JSONObject invokeIngestOrderedPathsJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment payloadUtf8 = arena.allocateUtf8String(payloadJson);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find("rdp_ingest_ordered_paths_json").orElseThrow(),
+            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, payloadUtf8);
+
+    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
+    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
+    if (ptrRaw == 0L) {
+      throw new IllegalStateException("rdp_ingest_ordered_paths_json: null JSON ptr");
+    }
+    MemorySegment utf8 =
+        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
+    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
+    String json = new String(rawJson, StandardCharsets.UTF_8);
+
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+
+    return new JSONObject(json);
+  }
+
+  private static JSONObject invokePathIngest(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String symbol,
+      String path,
+      String schemaJson,
+      String optionsJson)
+      throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment pathUtf8 = arena.allocateUtf8String(path);
+    MemorySegment schemaUtf8 = arena.allocateUtf8String(schemaJson);
+    MemorySegment optionsUtf8 = arena.allocateUtf8String(optionsJson);
+
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find(symbol).orElseThrow(),
+            FunctionDescriptor.ofVoid(
+                ValueLayout.ADDRESS,
+                ValueLayout.ADDRESS,
+                ValueLayout.ADDRESS,
+                ValueLayout.ADDRESS));
+    fn.invokeExact(out, pathUtf8, schemaUtf8, optionsUtf8);
+
+    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
+    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
+    if (ptrRaw == 0L) {
+      throw new IllegalStateException(symbol + ": null JSON ptr");
     }
     MemorySegment utf8 =
         MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
