@@ -64,7 +64,7 @@
         <version>3.13.0</version>
         <configuration>
           <release>${maven.compiler.release}</release>
-          <!-- JDK 21: FFM is final. JDK 23+ may need --enable-preview (see README + jdk-foreign-preview profile). -->
+          <!-- JDK 21: FFM is final. JDK 23+ may need the enable-preview JVM flag (see README + jdk-foreign-preview profile). -->
           <annotationProcessorPaths>
             <path>
               <groupId>org.openjdk.jmh</groupId>
