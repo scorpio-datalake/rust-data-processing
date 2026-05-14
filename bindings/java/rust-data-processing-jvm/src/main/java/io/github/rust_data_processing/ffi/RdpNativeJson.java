@@ -33,6 +33,21 @@ public final class RdpNativeJson {
 
   private RdpNativeJson() {}
 
+  /**
+   * Reads UTF-8 JSON from native {@code RdpJsonSlice} after Rust filled {@code sliceStruct} ({@code
+   * ptr}, {@code len}, {@code cap}).
+   */
+  private static String readJsonSliceUtf8(MemorySegment sliceStruct, Arena arena, String what) {
+    MemorySegment ptrSeg = sliceStruct.get(ValueLayout.ADDRESS, 0);
+    long len = sliceStruct.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
+    if (ptrSeg.address() == 0L) {
+      throw new IllegalStateException(what + ": null JSON ptr");
+    }
+    MemorySegment utf8 = ptrSeg.reinterpret(len, arena, null);
+    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
+    return new String(rawJson, StandardCharsets.UTF_8);
+  }
+
   /** Full JSON envelope: {@code ok}, {@code interchange}, {@code notes}. */
   public static JSONObject invokeParityExport(
       Linker linker, SymbolLookup lookup, Arena arena, String exportedSymbol) throws Throwable {
@@ -43,15 +58,7 @@ public final class RdpNativeJson {
             FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     fn.invokeExact(out);
 
-    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
-    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
-    if (ptrRaw == 0L) {
-      throw new IllegalStateException(exportedSymbol + ": null JSON ptr");
-    }
-    MemorySegment utf8 =
-        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
-    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
-    String json = new String(rawJson, StandardCharsets.UTF_8);
+    String json = readJsonSliceUtf8(out, arena, exportedSymbol);
 
     MethodHandle free =
         linker.downcallHandle(
@@ -113,15 +120,7 @@ public final class RdpNativeJson {
                 ));
     fn.invokeExact(out, pathUtf8, sheetUtf8);
 
-    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
-    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
-    if (ptrRaw == 0L) {
-      throw new IllegalStateException("rdp_excel_ingest_path_sheet: null JSON ptr");
-    }
-    MemorySegment utf8 =
-        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
-    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
-    String json = new String(rawJson, StandardCharsets.UTF_8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_excel_ingest_path_sheet");
 
     MethodHandle free =
         linker.downcallHandle(
@@ -187,15 +186,7 @@ public final class RdpNativeJson {
             FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     fn.invokeExact(out, payloadUtf8);
 
-    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
-    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
-    if (ptrRaw == 0L) {
-      throw new IllegalStateException("rdp_ingest_ordered_paths_json: null JSON ptr");
-    }
-    MemorySegment utf8 =
-        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
-    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
-    String json = new String(rawJson, StandardCharsets.UTF_8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_ingest_ordered_paths_json");
 
     MethodHandle free =
         linker.downcallHandle(
@@ -223,15 +214,7 @@ public final class RdpNativeJson {
             FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     fn.invokeExact(out, payloadUtf8);
 
-    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
-    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
-    if (ptrRaw == 0L) {
-      throw new IllegalStateException("rdp_run_pipeline_json: null JSON ptr");
-    }
-    MemorySegment utf8 =
-        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
-    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
-    String json = new String(rawJson, StandardCharsets.UTF_8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_run_pipeline_json");
 
     MethodHandle free =
         linker.downcallHandle(
@@ -266,15 +249,7 @@ public final class RdpNativeJson {
                 ValueLayout.ADDRESS));
     fn.invokeExact(out, pathUtf8, schemaUtf8, optionsUtf8);
 
-    long ptrRaw = out.get(ValueLayout.ADDRESS, 0);
-    long len = out.get(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS.byteSize());
-    if (ptrRaw == 0L) {
-      throw new IllegalStateException(symbol + ": null JSON ptr");
-    }
-    MemorySegment utf8 =
-        MemorySegment.ofAddress(ptrRaw).reinterpret(len, arena, null);
-    byte[] rawJson = utf8.toArray(ValueLayout.JAVA_BYTE);
-    String json = new String(rawJson, StandardCharsets.UTF_8);
+    String json = readJsonSliceUtf8(out, arena, symbol);
 
     MethodHandle free =
         linker.downcallHandle(

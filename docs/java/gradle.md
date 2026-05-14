@@ -29,9 +29,9 @@ cd bindings/java/rust-data-processing-jvm
 .\gradlew.bat check --no-daemon
 ```
 
-**JDK notes:** Gradle **9.2.1** wrapper runs on JDK **21+**. The build emits **`--release 21`** on JDK **21–23**; from **JDK 24** onward Gradle matches the bootstrapping JDK major and adds **`--enable-preview`** for lingering `java.lang.foreign` preview builds (**Linux CI fixes Temurin 21**, so no preview).
+**JDK notes:** Gradle **9.2.1** wrapper runs on JDK **21+**. The build uses **`--release 21`** on JDK **21–23** and adds **`--enable-preview`** so **`java.lang.foreign`** compiles on **JDK 21** (FFM preview there). From **JDK 24** onward the project matches the runtime JDK major for **`release`** and still passes **`--enable-preview`** (harmless when unused).
 
-Tests always append **`--enable-native-access=ALL-UNNAMED`**. JDK **≥24** Maven callers may still need **`mvn verify -Drdp.foreignPreview=true`** (see **`bindings/java/rust-data-processing-jvm/README.md`**).
+Tests always append **`--enable-preview`** and **`--enable-native-access=ALL-UNNAMED`**.
 
 ## Consume from Maven Local (**P3-E1-S3c**)
 

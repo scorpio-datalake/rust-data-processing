@@ -25,10 +25,11 @@ tasks.withType<JavaCompile>().configureEach {
     val major = Runtime.version().feature()
     if (major >= 24) {
         options.release.set(major)
-        options.compilerArgs.add("--enable-preview")
     } else {
         options.release.set(21)
     }
+    // Panama FFM: preview on JDK 21; JDK 22+ finalized FFM but harmless if kept until baseline bumps.
+    options.compilerArgs.add("--enable-preview")
 }
 
 repositories {
@@ -43,10 +44,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    val major = Runtime.version().feature()
-    if (major >= 24) {
-        jvmArgs("--enable-preview")
-    }
+    jvmArgs("--enable-preview")
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     val lib = providers.environmentVariable("RDP_JVM_SYS")
     environment("RDP_JVM_SYS", lib.orElse("").get())
@@ -72,7 +70,7 @@ jmh {
 
 afterEvaluate {
     tasks.named<JavaExec>("jmh") {
-        jvmArgs("--enable-native-access=ALL-UNNAMED")
+        jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
     }
 }
 

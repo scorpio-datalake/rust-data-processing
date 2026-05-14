@@ -59,6 +59,6 @@
 
 
 
-**`.github/workflows/jvm_bindings_ci.yml`** restores **`~/.m2/repository`** and **`~/.gradle/{caches,wrapper}`** via **`actions/cache`** keyed on POM / Gradle files. It sets **`JAVA_TOOL_OPTIONS=--enable-native-access=ALL-UNNAMED`**, runs **`mvn verify`** (Surefire + **JMH** at **`integration-test`**), then **`./gradlew jar check`** and **`./gradlew jmh`** on Linux / Windows / macOS. Progress is tracked only in **`Planning/PHASE3_EPICS.md`**.
+**`.github/workflows/jvm_bindings_ci.yml`** restores **`~/.m2/repository`** and **`~/.gradle/{caches,wrapper}`** via **`actions/cache`** keyed on POM / Gradle files. It sets **`JAVA_TOOL_OPTIONS=--enable-preview --enable-native-access=ALL-UNNAMED`**, runs **`mvn verify`** (Surefire + **JMH** at **`integration-test`**), then **`./gradlew jar check`** and **`./gradlew jmh`** on Linux / Windows / macOS. Progress is tracked only in **`Planning/PHASE3_EPICS.md`**.
 
 

@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 60
     env:
       # Panama downcalls + JMH (`src/jmh/java`) — required for `integration-test` / `./gradlew jmh`.
-      JAVA_TOOL_OPTIONS: --enable-native-access=ALL-UNNAMED
+      JAVA_TOOL_OPTIONS: --enable-preview --enable-native-access=ALL-UNNAMED
 
     steps:
       - uses: actions/checkout@v5

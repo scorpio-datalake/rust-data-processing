@@ -59,6 +59,9 @@
         <version>3.13.0</version>
         <configuration>
           <release>${maven.compiler.release}</release>
+          <compilerArgs>
+            <arg>--enable-preview</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
       <plugin>

@@ -10,7 +10,7 @@ Run tests (Unix):
 
 ```bash
 export RDP_JVM_SYS="$(pwd)/../../../jvm-sys/target/release/librdp_jvm_sys.so"
-export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
+export JAVA_TOOL_OPTIONS='--enable-preview --enable-native-access=ALL-UNNAMED'
 mvn -q verify
 ```
 
@@ -19,7 +19,7 @@ Windows PowerShell:
 ```powershell
 $m = Resolve-Path ../../../jvm-sys/target/release/rdp_jvm_sys.dll
 $env:RDP_JVM_SYS = $m.Path
-$env:JAVA_TOOL_OPTIONS = "--enable-native-access=ALL-UNNAMED"
+$env:JAVA_TOOL_OPTIONS = "--enable-preview --enable-native-access=ALL-UNNAMED"
 mvn -q verify
 ```
 
@@ -29,13 +29,13 @@ mvn -q verify
 
 **`ffi_manifest.json`:** bundled in the JAR at **`RdpNativeJson.FFI_MANIFEST_RESOURCE`**; usage (read manifest, call exports, classpath) is documented in **`docs/java/FFI_MANIFEST_JAVA_USAGE.md`**.
 
-**JDK:**
+**JDK:** **21** is the CI baseline. On JDK **21**, **Panama FFM** (`java.lang.foreign`) is still a **preview** language feature, so the POM enables **`--enable-preview`** for `javac` and Surefire, and you should set:
 
-- Prefer **JDK 21** (**FFM** final). JDK **24+ / 25**: if **`java.lang.foreign`** triggers “preview”, run:
-
-```bash
-mvn -q verify -Drdp.foreignPreview=true
+```text
+JAVA_TOOL_OPTIONS=--enable-preview --enable-native-access=ALL-UNNAMED
 ```
+
+when running **`java`** / **`mvn exec`** / ad-hoc mains that call native code. From **JDK 22** onward FFM is final and **`--enable-preview`** is not required for foreign access (the build keeps the flag for a uniform **`--release 21`** compile until the baseline moves).
 
 ## jextract
 
