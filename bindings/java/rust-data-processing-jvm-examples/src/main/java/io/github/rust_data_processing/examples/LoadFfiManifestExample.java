@@ -20,7 +20,16 @@ public final class LoadFfiManifestExample {
 
   private LoadFfiManifestExample() {}
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
+    try {
+      run();
+    } catch (Throwable t) {
+      t.printStackTrace(System.err);
+      System.exit(1);
+    }
+  }
+
+  private static void run() throws Throwable {
     JSONObject manifest = readBundledManifest();
     int abiFromManifest = manifest.getInt("abi_version_constant");
     JSONArray symbols = manifest.getJSONArray("exported_symbols");
