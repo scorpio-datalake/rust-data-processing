@@ -153,3 +153,33 @@ The same idea applies to **every** parity export that materializes a full **`dat
 - **Future non-parity APIs** — when new `extern "C"` entry points ship, they must be added to **`ffi_manifest.json`** and regenerated in the JAR; **`FfiExportedSymbolsContractTest`** catches drift for symbols listed in the manifest.
 
 For the high-level Phase 3 policy (semver, Panama), see **ADR [005](../adr/005-jvm-panama-production-policy.md)** and **[FFI_API_SLICE.md](FFI_API_SLICE.md)**.
+
+---
+
+## 9. Production path ingest and pipeline JSON (non-parity)
+
+These symbols are listed in **`exported_symbols`** and covered by **`FfiExportedSymbolsContractTest`** + **`DocsExampleNativeIntegrationTest`** / **`JvmNativeContractScenarios`**. They return the same `{ ok, interchange, notes }` envelope as parity exports.
+
+| Symbol | Role |
+| --- | --- |
+| `rdp_ingest_csv_path` | Path + schema JSON + options JSON → `ingest_path_csv` |
+| `rdp_ingest_json_path` | JSON / NDJSON path ingest |
+| `rdp_ingest_parquet_path` | Parquet path ingest |
+| `rdp_ingest_xml_path` | XML path ingest (`format: xml` in options or extension) |
+| `rdp_excel_ingest_path_sheet` | Excel sheet ingest (schema inferred in Rust; no schema on the wire) |
+| `rdp_ingest_ordered_paths_json` | Multi-path payload: `paths`, `schema` / `schema_ref`, `options`, `response.mode` (`dataset` \| `parquet_temp` \| `arrow_ipc_temp`) |
+| `rdp_run_pipeline_json` | Declarative pipeline: sources → optional `transform.sql` on `df` → sinks (`parquet_file`, `xml_file`, …) |
+| `rdp_export_parquet_temp` | Small Rust-built sample Parquet in OS temp dir (handoff) |
+| `rdp_export_arrow_ipc_temp` | Temp Arrow IPC file handoff |
+| `rdp_export_polars_parquet_temp` | Temp Parquet via Polars writer |
+
+**Fixture JSON** lives under `tests/fixtures/<bundle>/` (`schemas/`, `pipelines/`, `payloads/`). Java: **`io.github.rust_data_processing.fixture.PipelineJsonFixtures`**; resolve templates before calling native code. Tour: **[EXAMPLES.md](EXAMPLES.md)**; runnable sources: **`docs/java/examples/*.java`**.
+
+**Build / test locally:**
+
+```powershell
+pwsh -File scripts/build_all.ps1
+# or: python scripts/python_scripts/build_all.py
+```
+
+Requires `rdp_jvm_sys` built with **`--features full`** (Excel + linked core), `RDP_JVM_SYS` pointing at the release `cdylib`, and `--enable-native-access=ALL-UNNAMED`.

@@ -15,7 +15,7 @@
 | **[FFI_API_SLICE.md](FFI_API_SLICE.md)** | Rust-only vs FFI-projected surface |
 
 | **[EXAMPLES.md](EXAMPLES.md)** | **Java examples tour** (Panama, parity exports, watermarks / partition discovery, **[Rust-first ETL vs JVM](EXAMPLES.md#rust-first-etl-vs-jvm-consumption)** for all `dataset` outputs, links to Python `examples.html`) — published on Pages as **`java/examples.html`** |
-| **[FFI_MANIFEST_JAVA_USAGE.md](FFI_MANIFEST_JAVA_USAGE.md)** | **`ffi_manifest.json`**, Maven, native lib, **`RdpNativeJson`**, **`java -cp`** examples, **§7 large-result guidance** (files / Rust-side ETL) |
+| **[FFI_MANIFEST_JAVA_USAGE.md](FFI_MANIFEST_JAVA_USAGE.md)** | **`ffi_manifest.json`**, Maven, native lib, **`RdpNativeJson`**, production FFI (**§9**), **`java -cp`** examples, **§7 large-result guidance** (files / Rust-side ETL) |
 
 | **[ARROW_FFI_JVM.md](ARROW_FFI_JVM.md)** | Arrow IPC milestone (**S1d**) |
 

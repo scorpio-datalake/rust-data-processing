@@ -51,7 +51,7 @@ Bindings for the [`rust-data-processing`](../README.md) crate. Types stay in **c
 
 **Database data without the `db` feature:** You only need **`--features db`** if you want **`ingest_from_db` / `ingest_from_db_infer`** (ConnectorX inside the native extension). If you already use **psycopg2**, **SQLAlchemy**, **asyncpg**, or any other Python DB API, run your query in Python, convert rows to `list[list]` aligned to a [schema](#conventions), and use **`DataSet(schema, rows)`**. Profiling, validation, SQL-on-`DataSet`, and pipelines work the same; you are not required to enable `db`.
 
-**`options`**: optional `dict` — `format` (`"csv"`, `"json"`, `"parquet"`, `"excel"`, …), optional `excel_sheet_selection` (`mode`, `name`, `names` — see [README](README.md)), optional **incremental / watermark** keys (below), plus **observability** (below).
+**`options`**: optional `dict` — `format` (`"csv"`, `"json"`, `"parquet"`, `"xml"`, `"excel"`, …), optional `excel_sheet_selection` (`mode`, `name`, `names` — see [README](README.md)), optional **incremental / watermark** keys (below), plus **observability** (below).
 
 ### Incremental / watermark (`options` dict)
 
@@ -267,12 +267,30 @@ Submodule **`rust_data_processing.cdc`** exposes dataclasses aligned with `rust_
 
 ---
 
+## Fixture bundles (doc / test parity)
+
+Committed JSON under `tests/fixtures/<bundle>/` mirrors Java `PipelineJsonFixtures` and Rust `pipeline_spec::PipelineBundle`. Tests load templates with `tests.pipeline_fixture_support` (`resolve_pipeline_json`, `resolve_payload_json`, `pipeline_transform_sql`, `load_schema_fields`).
+
+| Python test module | Java example |
+| --- | --- |
+| `test_dataframe_centric_pipeline_fixtures.py` | `DataFrameCentricPipeline.java` |
+| `test_sql_queries_fixtures.py` | `SQLQueries.java` |
+| `test_ghcn_json_xml_parquet_pipeline_fixtures.py` | `GhcnJsonXmlParquetPipeline.java` |
+| `test_excel_snippets_fixtures.py` | `ExcelSnippets.java` |
+| `test_json_parquet_excel_snippets_fixtures.py` | `JsonParquetExcelSnippets.java` |
+| `test_parquet_snippets_fixtures.py` | `ParquetSnippets.java` |
+| `test_path_from_directory_scan_fixtures.py` | `PathFromDirectoryScan.java` |
+| `test_student_etl_fixtures.py` | `RDPOnlyETLExample.java` |
+
+Full JVM orchestration (`rdp_run_pipeline_json`, temp-file sinks) is exercised in Rust `bindings/jvm-sys` tests and JUnit — not every path is exposed on the Python wheel yet.
+
 ## Not wrapped in Phase 1a
 
-- **PyArrow / pandas** conversion (optional future extra).
+- **PyArrow / pandas** conversion (optional future extra; some tests use `pyarrow` optionally for Parquet round-trips).
 - **DB ingestion** works from Python only when the extension is built with `--features db` (ConnectorX + sources in the parent crate).
+- **`rdp_run_pipeline_json`** pipeline orchestration — use Rust/JVM; Python uses the same **SQL text** and **schemas** via fixture helpers above.
 
-See [PARITY.md](PARITY.md) (Python ↔ Rust). JVM parity rows live only in **`Planning/PHASE3_EPICS.md`**.
+See [PARITY.md](PARITY.md) (Python ↔ Rust). JVM production FFI: **`docs/java/FFI_MANIFEST_JAVA_USAGE.md`** §9.
 
 ---
 

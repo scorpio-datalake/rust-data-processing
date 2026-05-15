@@ -4,7 +4,9 @@ Status of Python (`rust_data_processing`) vs the main crate (`rust-data-processi
 
 | Rust module / API | Python surface | Notes |
 |-------------------|----------------|-------|
-| `ingestion::ingest_from_path` | `ingest_from_path` | |
+| `ingestion::ingest_from_path` | `ingest_from_path` | `format` includes `xml` |
+| `ingestion::export_dataset_to_xml` / `export_dataset_to_parquet` | Not on Python wheel | Use Rust/JVM file sinks or PyArrow in tests |
+| `pipeline_spec::PipelineBundle` | `tests.pipeline_fixture_support` only | Same JSON as Java `PipelineJsonFixtures` |
 | `ingestion::ingest_from_ordered_paths` | `ingest_from_ordered_paths` | Returns `(DataSet, dict)` with `paths`, `last_path`, `max_watermark_value` |
 | `ingestion::infer_schema_from_path` | `infer_schema_from_path` | |
 | `ingestion::ingest_from_path_infer` | `ingest_from_path_infer`, `ingest_with_inferred_schema` | |

@@ -76,6 +76,7 @@
 //! - [`outliers`]: outlier detection primitives + explainable outputs
 //! - [`cdc`]: CDC boundary types (Phase 1 spike)
 //! - [`error`]: error types used across ingestion
+//! - [`pipeline_spec`]: shared `tests/fixtures/<bundle>/` JSON for pipelines, payloads, and schemas
 //!
 //! ## Processing example (1.2 pipeline)
 //!

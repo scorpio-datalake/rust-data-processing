@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Orchestrate Rust / Python / JVM build, test, and doc generation.
+
+Thin coordinator over sibling modules in this directory. Run from repo root:
+
+    pwsh -File scripts/build_all.ps1
+    python scripts/python_scripts/build_all.py
+
+Individual steps (same directory):
+
+    rust_build.py, rust_test.py, python_build.py, python_test.py,
+    java_build.py, java_test.py, docs_rust.py, docs_python.py, docs_java.py
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from common import (  # noqa: E402
+    DEFAULT_RUST_BUILD_TEST_WAIT_SECONDS,
+    DEFAULT_WAIT_SECONDS,
+    REPO_ROOT,
+    banner,
+    pause,
+    setup_rust_toolchain_env,
+)
+from docs_java import main as docs_java_main  # noqa: E402
+from docs_python import main as docs_python_main  # noqa: E402
+from docs_rust import main as docs_rust_main  # noqa: E402
+from java_build import main as java_build_main  # noqa: E402
+from java_test import main as java_test_main  # noqa: E402
+from python_build import main as python_build_main  # noqa: E402
+from python_test import main as python_test_main  # noqa: E402
+from rust_build import main as rust_build_main  # noqa: E402
+from rust_test import main as rust_test_main  # noqa: E402
+
+
+def _run_module(main_fn, argv: list[str]) -> None:
+    code = main_fn(argv)
+    if code != 0:
+        raise SystemExit(code)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--clean", action="store_true", help="cargo clean before Rust build.")
+    parser.add_argument("--skip-rust", action="store_true")
+    parser.add_argument("--skip-python", action="store_true")
+    parser.add_argument("--skip-java", action="store_true")
+    parser.add_argument("--skip-docs", action="store_true")
+    parser.add_argument(
+        "--rust-expanded-only",
+        action="store_true",
+        help="Rust build/test: ci_expanded only (skip default features).",
+    )
+    parser.add_argument("--docs-only", action="store_true")
+    parser.add_argument(
+        "--wait-seconds",
+        type=float,
+        default=DEFAULT_WAIT_SECONDS,
+        help="Pause between major steps (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--rust-build-test-wait-seconds",
+        type=float,
+        default=DEFAULT_RUST_BUILD_TEST_WAIT_SECONDS,
+        help="Extra pause after Rust build before Rust tests (default: %(default)s).",
+    )
+    parser.add_argument("--offline", action="store_true")
+    args = parser.parse_args(argv)
+
+    os.chdir(REPO_ROOT)
+    setup_rust_toolchain_env(offline=args.offline)
+
+    wait = args.wait_seconds
+    rust_bt_wait = args.rust_build_test_wait_seconds
+    offline_flag = ["--offline"] if args.offline else []
+
+    if args.docs_only:
+        _run_module(docs_rust_main, offline_flag)
+        pause(wait, "before Python docs")
+        _run_module(docs_python_main, [])
+        pause(wait, "before Java docs")
+        _run_module(docs_java_main, ["--skip-if-no-pandoc"])
+        banner("Done (docs only)")
+        return 0
+
+    rust_flags: list[str] = []
+    if args.clean:
+        rust_flags.append("--clean")
+    if args.rust_expanded_only:
+        rust_flags.append("--expanded-only")
+    rust_flags.extend(offline_flag)
+
+    if not args.skip_rust:
+        _run_module(rust_build_main, rust_flags)
+        pause(
+            rust_bt_wait,
+            "after Rust compile — release disk/memory before Rust tests",
+        )
+        _run_module(rust_test_main, rust_flags)
+
+    if not args.skip_python:
+        pause(wait, "before Python build")
+        _run_module(python_build_main, [])
+        pause(wait, "before Python tests")
+        _run_module(python_test_main, [])
+
+    if not args.skip_java:
+        pause(wait, "before JVM build")
+        _run_module(java_build_main, [])
+        pause(wait, "before JVM tests")
+        _run_module(java_test_main, [])
+
+    if not args.skip_docs:
+        pause(wait, "before Rust docs")
+        _run_module(docs_rust_main, offline_flag)
+        pause(wait, "before Python docs")
+        _run_module(docs_python_main, [])
+        pause(wait, "before Java docs")
+        _run_module(docs_java_main, ["--skip-if-no-pandoc"])
+
+    banner("All requested steps completed successfully")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except subprocess.CalledProcessError as exc:
+        print(f"\nCommand failed with exit code {exc.returncode}", file=sys.stderr)
+        raise SystemExit(exc.returncode) from exc
