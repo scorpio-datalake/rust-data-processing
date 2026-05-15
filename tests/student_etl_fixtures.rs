@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use rust_data_processing::ingestion::{ingest_from_ordered_paths, IngestionOptions};
+use rust_data_processing::ingestion::{IngestionOptions, ingest_from_ordered_paths};
 use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::Value;
 
@@ -18,7 +18,9 @@ fn committed_part(name: &str) -> PathBuf {
 #[test]
 fn student_etl_schemas_load() {
     let bundle = student_bundle();
-    let student = bundle.load_schema("schemas/student_source.schema.json").unwrap();
+    let student = bundle
+        .load_schema("schemas/student_source.schema.json")
+        .unwrap();
     assert_eq!(student.fields[0].name, "student_id");
     let lake = bundle
         .load_schema("schemas/lake_grade_stats.schema.json")

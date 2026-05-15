@@ -2,6 +2,18 @@ plugins {
     java
     `maven-publish`
     id("me.champeau.jmh") version "0.7.2"
+    id("com.diffplug.spotless") version "7.0.4"
+}
+
+spotless {
+    java {
+        googleJavaFormat("1.23.0")
+        target(
+            "src/main/java/**/*.java",
+            "src/test/java/**/*.java",
+            "src/jmh/java/**/*.java",
+        )
+    }
 }
 
 val rdpVersion =
@@ -60,6 +72,8 @@ tasks.named<Jar>("jar") {
         )
     }
 }
+
+tasks.named("check") { dependsOn(tasks.named("spotlessCheck")) }
 
 jmh {
     jmhVersion.set("1.37")

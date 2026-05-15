@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use rust_data_processing::ingestion::parquet::ingest_parquet_from_path;
 use rust_data_processing::ingestion::{
-    export_dataset_to_parquet, ingest_from_path, IngestionFormat, IngestionOptions,
+    IngestionFormat, IngestionOptions, export_dataset_to_parquet, ingest_from_path,
 };
 use rust_data_processing::pipeline::DataFrame;
 use rust_data_processing::pipeline_spec::PipelineBundle;

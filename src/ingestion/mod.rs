@@ -76,8 +76,8 @@ pub mod excel {
 pub mod db;
 pub mod json;
 pub mod parquet;
-pub mod xml;
 pub mod partition;
+pub mod xml;
 #[cfg(not(feature = "db_connectorx"))]
 pub mod db {
     //! Direct DB ingestion stubs when `db_connectorx` is disabled.
@@ -128,8 +128,8 @@ pub use partition::{
 pub use unified::{
     ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest,
     OrderedBatchIngestMetadata, export_dataset_to_arrow_ipc, export_dataset_to_parquet,
-    export_dataset_to_xml,
-    infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path, ingest_from_path_infer,
+    export_dataset_to_xml, infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path,
+    ingest_from_path_infer,
 };
 pub use watermark::{
     apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column,

@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use rust_data_processing::ingestion::{
-    paths_from_directory_scan, IngestionFormat, IngestionOptions, ingest_from_ordered_paths,
+    IngestionFormat, IngestionOptions, ingest_from_ordered_paths, paths_from_directory_scan,
 };
 use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::Value;
@@ -73,10 +73,13 @@ fn directory_scan_then_batch_watermark_matches_path_from_directory_scan_java() {
 
     assert_eq!(ds.row_count(), 2);
     assert_eq!(
-        ds.rows.iter().map(|r| match r[0] {
-            Value::Int64(i) => i,
-            _ => panic!("id"),
-        }).collect::<Vec<_>>(),
+        ds.rows
+            .iter()
+            .map(|r| match r[0] {
+                Value::Int64(i) => i,
+                _ => panic!("id"),
+            })
+            .collect::<Vec<_>>(),
         vec![3, 4]
     );
     assert_eq!(meta.max_watermark_value, Some(Value::Int64(200)));

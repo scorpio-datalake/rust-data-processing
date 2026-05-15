@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rust_data_processing::ingestion::{
-    ingest_from_ordered_paths, ingest_from_path, ingest_from_path_infer, ExcelSheetSelection,
-    IngestionFormat, IngestionOptions,
+    ExcelSheetSelection, IngestionFormat, IngestionOptions, ingest_from_ordered_paths,
+    ingest_from_path, ingest_from_path_infer,
 };
 use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::{Schema, Value};
@@ -68,10 +68,7 @@ fn people_excel_sheet_dataset_payload_resolves() {
         .resolve_payload_json(
             "payloads/excel_sheet_dataset.payload.json",
             &HashMap::from([
-                (
-                    "SOURCE_PATH".into(),
-                    xlsx.to_string_lossy().into_owned(),
-                ),
+                ("SOURCE_PATH".into(), xlsx.to_string_lossy().into_owned()),
                 ("SHEET_NAME".into(), DEFAULT_SHEET.into()),
             ]),
         )
@@ -90,10 +87,7 @@ fn people_excel_ordered_ingest_via_resolved_payload() {
         .resolve_payload_json(
             "payloads/excel_sheet_dataset.payload.json",
             &HashMap::from([
-                (
-                    "SOURCE_PATH".into(),
-                    xlsx.to_string_lossy().into_owned(),
-                ),
+                ("SOURCE_PATH".into(), xlsx.to_string_lossy().into_owned()),
                 ("SHEET_NAME".into(), DEFAULT_SHEET.into()),
             ]),
         )

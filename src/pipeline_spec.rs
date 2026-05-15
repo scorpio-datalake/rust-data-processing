@@ -61,12 +61,8 @@ impl PipelineBundle {
 
     /// Like [`Self::load_schema`], but panics with bundle path context (integration tests).
     pub fn expect_schema(&self, rel: &str) -> Schema {
-        self.load_schema(rel).unwrap_or_else(|e| {
-            panic!(
-                "fixture schema {}: {e}",
-                self.root.join(rel).display()
-            )
-        })
+        self.load_schema(rel)
+            .unwrap_or_else(|e| panic!("fixture schema {}: {e}", self.root.join(rel).display()))
     }
 
     /// Load a pipeline template, expand `*_ref` schema pointers, substitute `{{KEY}}` placeholders.
@@ -143,7 +139,10 @@ impl PipelineBundle {
     }
 }
 
-fn resolve_schema_refs(value: &mut serde_json::Value, bundle: &PipelineBundle) -> IngestionResult<()> {
+fn resolve_schema_refs(
+    value: &mut serde_json::Value,
+    bundle: &PipelineBundle,
+) -> IngestionResult<()> {
     match value {
         serde_json::Value::Object(map) => {
             let ref_keys: Vec<String> = map
@@ -152,9 +151,11 @@ fn resolve_schema_refs(value: &mut serde_json::Value, bundle: &PipelineBundle) -
                 .cloned()
                 .collect();
             for old_key in ref_keys {
-                let rel = map.remove(&old_key).ok_or_else(|| IngestionError::SchemaMismatch {
-                    message: format!("missing key {old_key} while expanding schema refs"),
-                })?;
+                let rel = map
+                    .remove(&old_key)
+                    .ok_or_else(|| IngestionError::SchemaMismatch {
+                        message: format!("missing key {old_key} while expanding schema refs"),
+                    })?;
                 let rel_str = rel.as_str().ok_or_else(|| IngestionError::SchemaMismatch {
                     message: format!("{old_key} must be a string path relative to the bundle root"),
                 })?;
@@ -239,7 +240,9 @@ mod tests {
     #[test]
     fn ghcn_schemas_load() {
         let bundle = PipelineBundle::from_repo_fixture("ghcn");
-        let s = bundle.load_schema("schemas/parquet_lake.schema.json").unwrap();
+        let s = bundle
+            .load_schema("schemas/parquet_lake.schema.json")
+            .unwrap();
         assert_eq!(s.fields.len(), 6);
         assert_eq!(s.fields[0].name, "station_id");
     }
@@ -305,7 +308,12 @@ mod tests {
         assert_eq!(v["sinks"][0]["kind"], "parquet_file");
         assert!(v["sources"]["schema"]["fields"].is_array());
         assert!(v["sources"].get("schema_ref").is_none());
-        assert!(v["transform"]["sql"].as_str().unwrap().contains("score * 2.0"));
+        assert!(
+            v["transform"]["sql"]
+                .as_str()
+                .unwrap()
+                .contains("score * 2.0")
+        );
     }
 
     #[test]
@@ -419,15 +427,21 @@ mod tests {
                 &HashMap::from([
                     (
                         "PATH_A".into(),
-                        root.join("data/part-00000.json").to_string_lossy().into_owned(),
+                        root.join("data/part-00000.json")
+                            .to_string_lossy()
+                            .into_owned(),
                     ),
                     (
                         "PATH_B".into(),
-                        root.join("data/part-00001.json").to_string_lossy().into_owned(),
+                        root.join("data/part-00001.json")
+                            .to_string_lossy()
+                            .into_owned(),
                     ),
                     (
                         "PATH_C".into(),
-                        root.join("data/part-00002.json").to_string_lossy().into_owned(),
+                        root.join("data/part-00002.json")
+                            .to_string_lossy()
+                            .into_owned(),
                     ),
                 ]),
             )

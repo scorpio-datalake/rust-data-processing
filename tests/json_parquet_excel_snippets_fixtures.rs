@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rust_data_processing::ingestion::{
-    ingest_from_ordered_paths, ingest_from_path, IngestionFormat, IngestionOptions,
+    IngestionFormat, IngestionOptions, ingest_from_ordered_paths, ingest_from_path,
 };
 use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::{Schema, Value};
@@ -63,7 +63,10 @@ fn people_json_path_dataset_payload_resolves() {
         )
         .unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["paths"][0].as_str().unwrap(), people_json_path().to_str().unwrap());
+    assert_eq!(
+        v["paths"][0].as_str().unwrap(),
+        people_json_path().to_str().unwrap()
+    );
     assert!(v["schema"]["fields"].is_array());
     assert_eq!(v["options"]["format"], "json");
 }
@@ -81,7 +84,10 @@ fn people_csv_path_dataset_payload_resolves() {
         )
         .unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["paths"][0].as_str().unwrap(), people_csv_path().to_str().unwrap());
+    assert_eq!(
+        v["paths"][0].as_str().unwrap(),
+        people_csv_path().to_str().unwrap()
+    );
     assert!(v["schema"]["fields"].is_array());
     assert_eq!(v["options"]["format"], "csv");
 }

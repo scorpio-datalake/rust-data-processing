@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Build rdp_jvm_sys and run JVM consistency checks."""
+"""Build rdp_jvm_sys and run JVM consistency checks.
+
+Gradle: optional ``clean``, Spotless (Google Java Format), then native ``cargo`` build.
+Maven modules also run Spotless on ``validate`` (``mvn verify``).
+"""
 
 from __future__ import annotations
 
@@ -9,13 +13,31 @@ import sys
 from pathlib import Path
 
 from common import (
+    JVM_GRADLE_DIR,
     JVM_SYS_DIR,
     REPO_ROOT,
     banner,
+    gradlew_path,
     native_lib_release,
     require_tool,
     run,
 )
+
+
+def gradle_clean() -> None:
+    gw = gradlew_path()
+    if not gw.is_file():
+        raise SystemExit(f"Gradle wrapper not found: {gw}")
+    banner("Java: Gradle clean")
+    run([str(gw), "clean", "--no-daemon"], cwd=JVM_GRADLE_DIR)
+
+
+def spotless_check() -> None:
+    gw = gradlew_path()
+    if not gw.is_file():
+        raise SystemExit(f"Gradle wrapper not found: {gw}")
+    banner("Java: Spotless (Google Java Format check)")
+    run([str(gw), "spotlessCheck", "--no-daemon"], cwd=JVM_GRADLE_DIR)
 
 
 def check_manifests() -> None:
@@ -65,10 +87,35 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Debug build instead of release.",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Run ./gradlew clean in bindings/java/rust-data-processing-jvm.",
+    )
+    parser.add_argument(
+        "--skip-fmt",
+        action="store_true",
+        help="Skip Spotless check (Gradle).",
+    )
+    parser.add_argument(
+        "--fmt-only",
+        action="store_true",
+        help="Spotless + ffi/version checks only (no Cargo jvm-sys build).",
+    )
     args = parser.parse_args(argv)
+
+    if args.clean:
+        gradle_clean()
+
+    if not args.skip_fmt:
+        spotless_check()
 
     if not args.skip_checks:
         check_manifests()
+
+    if args.fmt_only:
+        return 0
+
     build_native(release=not args.debug)
     return 0
 

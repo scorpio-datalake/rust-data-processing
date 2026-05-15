@@ -7,8 +7,8 @@ use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::Path;
 
-use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 
 use crate::error::{IngestionError, IngestionResult};
 use crate::types::{DataSet, DataType, Schema, Value};
@@ -38,12 +38,14 @@ fn parse_text_to_value(raw: &str, dt: &DataType) -> IngestionResult<Value> {
         return Ok(Value::Null);
     }
     match dt {
-        DataType::Int64 => trimmed.parse::<i64>().map(Value::Int64).map_err(|_| {
-            xml_err(format!("invalid Int64 in XML: {trimmed:?}"))
-        }),
-        DataType::Float64 => trimmed.parse::<f64>().map(Value::Float64).map_err(|_| {
-            xml_err(format!("invalid Float64 in XML: {trimmed:?}"))
-        }),
+        DataType::Int64 => trimmed
+            .parse::<i64>()
+            .map(Value::Int64)
+            .map_err(|_| xml_err(format!("invalid Int64 in XML: {trimmed:?}"))),
+        DataType::Float64 => trimmed
+            .parse::<f64>()
+            .map(Value::Float64)
+            .map_err(|_| xml_err(format!("invalid Float64 in XML: {trimmed:?}"))),
         DataType::Bool => match trimmed.to_ascii_lowercase().as_str() {
             "true" | "1" | "yes" => Ok(Value::Bool(true)),
             "false" | "0" | "no" => Ok(Value::Bool(false)),
@@ -53,7 +55,10 @@ fn parse_text_to_value(raw: &str, dt: &DataType) -> IngestionResult<Value> {
     }
 }
 
-fn row_from_field_map(schema: &Schema, fields: &HashMap<String, String>) -> IngestionResult<Vec<Value>> {
+fn row_from_field_map(
+    schema: &Schema,
+    fields: &HashMap<String, String>,
+) -> IngestionResult<Vec<Value>> {
     let mut row = Vec::with_capacity(schema.fields.len());
     for field in &schema.fields {
         let raw = fields.get(&field.name).map(String::as_str).unwrap_or("");
@@ -133,7 +138,9 @@ pub fn ingest_xml_from_path(path: impl AsRef<Path>, schema: &Schema) -> Ingestio
             }
             Ok(Event::Text(e)) => {
                 if let Some(ref field) = active_field {
-                    let text = e.unescape().map_err(|err| xml_err(format!("xml text: {err}")))?;
+                    let text = e
+                        .unescape()
+                        .map_err(|err| xml_err(format!("xml text: {err}")))?;
                     field_values
                         .entry(field.clone())
                         .and_modify(|v| {

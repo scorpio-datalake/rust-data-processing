@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use rust_data_processing::ingestion::parquet::ingest_parquet_from_path;
 use rust_data_processing::ingestion::{
-    export_dataset_to_parquet, ingest_from_path, IngestionFormat, IngestionOptions,
+    IngestionFormat, IngestionOptions, export_dataset_to_parquet, ingest_from_path,
 };
 use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::Value;
@@ -15,8 +15,7 @@ fn people_bundle() -> PipelineBundle {
 }
 
 fn people_csv_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/people.csv")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/people.csv")
 }
 
 fn tmp_parquet(name: &str) -> PathBuf {
@@ -35,7 +34,10 @@ fn people_csv_to_parquet_pipeline_template_resolves() {
         .resolve_pipeline_json(
             "pipelines/csv_to_parquet.pipeline.json",
             &HashMap::from([
-                ("SOURCE_PATH".into(), people_csv_path().to_string_lossy().into_owned()),
+                (
+                    "SOURCE_PATH".into(),
+                    people_csv_path().to_string_lossy().into_owned(),
+                ),
                 ("SINK_PATH".into(), out.to_string_lossy().into_owned()),
             ]),
         )
@@ -50,8 +52,12 @@ fn people_csv_to_parquet_pipeline_template_resolves() {
 #[test]
 fn people_csv_parquet_round_trip_matches_parquet_snippets() {
     let bundle = people_bundle();
-    let csv_schema = bundle.load_schema("schemas/people_csv.schema.json").unwrap();
-    let flat_schema = bundle.load_schema("schemas/people_flat.schema.json").unwrap();
+    let csv_schema = bundle
+        .load_schema("schemas/people_csv.schema.json")
+        .unwrap();
+    let flat_schema = bundle
+        .load_schema("schemas/people_flat.schema.json")
+        .unwrap();
     let csv = people_csv_path();
     let opts = IngestionOptions {
         format: Some(IngestionFormat::Csv),

@@ -1,60 +1,39 @@
 <#
 .SYNOPSIS
-  Clean, build, test, and generate API docs for Rust, Python, and JVM.
+  Clean Rust and Python-wrapper artifacts, then run the full CI-style pipeline (Python orchestrator).
 
-.DESCRIPTION
-  Wrapper around scripts/python_scripts/build_all.py (orchestrates rust_build,
-  rust_test, python_build, python_test, java_build, java_test, docs_*).
+.NOTES
+  Run from any directory:
 
-.EXAMPLE
-  pwsh -File scripts/build_all.ps1
+    pwsh -File scripts/build_all.ps1
+    pwsh -File scripts/build_all.ps1 --offline
+    pwsh -File scripts/build_all.ps1 --skip-java --skip-docs
 
-.EXAMPLE
-  pwsh -File scripts/build_all.ps1 -Clean -RustBuildTestWaitSeconds 45
-
-.EXAMPLE
-  pwsh -File scripts/build_all.ps1 -SkipDocs
-
-.EXAMPLE
-  python scripts/python_scripts/rust_build.py
-  python scripts/python_scripts/rust_test.py
+  Extra arguments are forwarded to `scripts/python_scripts/build_all.py` (see that file for flags).
+  This script does not pass `--clean` to the orchestrator: `cargo clean` and `python_clean.py`
+  already ran; use `--clean` explicitly if you also need Gradle clean inside the Java steps.
 #>
-[CmdletBinding()]
 param(
-  [switch]$Clean,
-  [switch]$SkipRust,
-  [switch]$SkipPython,
-  [switch]$SkipJava,
-  [switch]$SkipDocs,
-  [switch]$RustExpandedOnly,
-  [switch]$DocsOnly,
-  [int]$WaitSeconds = 10,
-  [int]$RustBuildTestWaitSeconds = 30,
-  [switch]$Offline
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$ExtraArgs
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$py = Join-Path $repoRoot 'scripts/python_scripts/build_all.py'
+Set-Location $repoRoot
 
-if (-not (Test-Path $py)) {
-  throw "Missing $py"
-}
+Write-Host "== Rust: cargo clean =="
+& cargo clean
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$pyArgs = @(
-  '--wait-seconds', $WaitSeconds
-  '--rust-build-test-wait-seconds', $RustBuildTestWaitSeconds
-)
-if ($Clean) { $pyArgs += '--clean' }
-if ($SkipRust) { $pyArgs += '--skip-rust' }
-if ($SkipPython) { $pyArgs += '--skip-python' }
-if ($SkipJava) { $pyArgs += '--skip-java' }
-if ($SkipDocs) { $pyArgs += '--skip-docs' }
-if ($RustExpandedOnly) { $pyArgs += '--rust-expanded-only' }
-if ($DocsOnly) { $pyArgs += '--docs-only' }
-if ($Offline) { $pyArgs += '--offline' }
+Write-Host "== Python wrapper: python_clean.py =="
+$pyClean = Join-Path $repoRoot 'scripts\python_scripts\python_clean.py'
+& python $pyClean
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-& python $py @pyArgs
+Write-Host "== Full build / test / docs: build_all.py =="
+$buildAll = Join-Path $repoRoot 'scripts\python_scripts\build_all.py'
+& python $buildAll @ExtraArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

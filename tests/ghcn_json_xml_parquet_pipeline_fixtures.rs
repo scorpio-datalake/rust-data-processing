@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use rust_data_processing::ingestion::parquet::ingest_parquet_from_path;
 use rust_data_processing::ingestion::xml::ingest_xml_from_path;
 use rust_data_processing::ingestion::{
-    export_dataset_to_parquet, export_dataset_to_xml, ingest_from_path, IngestionFormat,
-    IngestionOptions,
+    IngestionFormat, IngestionOptions, export_dataset_to_parquet, export_dataset_to_xml,
+    ingest_from_path,
 };
 use rust_data_processing::pipeline::DataFrame;
 use rust_data_processing::pipeline_spec::PipelineBundle;
@@ -40,7 +40,10 @@ fn ghcn_json_to_xml_pipeline_template_resolves() {
         .resolve_pipeline_json(
             "pipelines/json_to_xml.pipeline.json",
             &HashMap::from([
-                ("SOURCE_PATH".into(), ghcn_json_sample().to_string_lossy().into_owned()),
+                (
+                    "SOURCE_PATH".into(),
+                    ghcn_json_sample().to_string_lossy().into_owned(),
+                ),
                 ("SINK_PATH".into(), "/tmp/out.xml".into()),
             ]),
         )
@@ -48,7 +51,12 @@ fn ghcn_json_to_xml_pipeline_template_resolves() {
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["sinks"][0]["kind"], "xml_file");
     assert!(v["sources"]["schema"]["fields"].is_array());
-    assert!(v["transform"]["sql"].as_str().unwrap().contains("stationCode"));
+    assert!(
+        v["transform"]["sql"]
+            .as_str()
+            .unwrap()
+            .contains("stationCode")
+    );
 }
 
 #[test]
@@ -66,7 +74,12 @@ fn ghcn_xml_to_parquet_pipeline_template_resolves() {
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(v["sinks"][0]["kind"], "parquet_file");
     assert!(v["sources"]["schema"]["fields"].is_array());
-    assert!(v["transform"]["sql"].as_str().unwrap().contains("station_id"));
+    assert!(
+        v["transform"]["sql"]
+            .as_str()
+            .unwrap()
+            .contains("station_id")
+    );
 }
 
 #[test]
@@ -115,10 +128,13 @@ fn ghcn_json_xml_parquet_pipeline_matches_doc_example() {
     let sql_xml_to_parquet = bundle
         .pipeline_transform_sql("pipelines/xml_to_parquet.pipeline.json")
         .unwrap();
-    let lake = sql::query(&DataFrame::from_dataset(&xml_ds).unwrap(), &sql_xml_to_parquet)
-        .unwrap()
-        .collect()
-        .unwrap();
+    let lake = sql::query(
+        &DataFrame::from_dataset(&xml_ds).unwrap(),
+        &sql_xml_to_parquet,
+    )
+    .unwrap()
+    .collect()
+    .unwrap();
     assert_eq!(lake.schema.fields[0].name, "station_id");
 
     let parquet_path = tmp_sink("parquet");

@@ -5,13 +5,13 @@ use std::collections::HashSet;
 use rust_data_processing::ingestion::{IngestionOptions, ingest_from_path};
 use rust_data_processing::outliers::{OutlierMethod, OutlierOptions, detect_outliers_dataset};
 use rust_data_processing::pipeline::{Agg, DataFrame};
+use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::processing::{
     ReduceOp, VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce,
     top_k_by_frequency,
 };
 use rust_data_processing::profiling::{ProfileOptions, SamplingMode, profile_dataset};
 use rust_data_processing::transform::{TransformSpec, TransformStep};
-use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
 use rust_data_processing::validation::{Check, Severity, ValidationSpec, validate_dataset};
 

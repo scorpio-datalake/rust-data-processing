@@ -6,8 +6,8 @@ use rust_data_processing::sql;
 use rust_data_processing::types::{DataSet, Value};
 
 fn people_dataset() -> DataSet {
-    let schema =
-        PipelineBundle::from_repo_fixture("people").expect_schema("schemas/tabular_5col.schema.json");
+    let schema = PipelineBundle::from_repo_fixture("people")
+        .expect_schema("schemas/tabular_5col.schema.json");
 
     let rows = vec![
         vec![
@@ -112,11 +112,11 @@ fn sql_group_by_aggregates_and_having_work() {
 fn sql_context_join_matches_sql_parity_fixtures() {
     let bundle = PipelineBundle::from_repo_fixture("sql_parity");
     let left_schema = bundle.load_schema("schemas/join_left.schema.json").unwrap();
-    let right_schema = bundle.load_schema("schemas/join_right.schema.json").unwrap();
-    let left_json =
-        std::fs::read_to_string(bundle.root().join("data/join_left.json")).unwrap();
-    let right_json =
-        std::fs::read_to_string(bundle.root().join("data/join_right.json")).unwrap();
+    let right_schema = bundle
+        .load_schema("schemas/join_right.schema.json")
+        .unwrap();
+    let left_json = std::fs::read_to_string(bundle.root().join("data/join_left.json")).unwrap();
+    let right_json = std::fs::read_to_string(bundle.root().join("data/join_right.json")).unwrap();
     let left = ingest_json_from_str(&left_json, &left_schema).unwrap();
     let right = ingest_json_from_str(&right_json, &right_schema).unwrap();
     let sql = bundle
@@ -150,7 +150,9 @@ fn sql_context_join_matches_sql_parity_fixtures() {
 #[test]
 fn sql_query_dataset_pipeline_sql_matches_jvm_contract_fixture() {
     let bundle = PipelineBundle::from_repo_fixture("jvm_contract");
-    let schema = bundle.load_schema("schemas/three_rows.schema.json").unwrap();
+    let schema = bundle
+        .load_schema("schemas/three_rows.schema.json")
+        .unwrap();
     let path = bundle.root().join("data/three_rows.json");
     let ds = ingest_json_from_path(path.to_str().unwrap(), &schema).unwrap();
     assert_eq!(ds.row_count(), 3);

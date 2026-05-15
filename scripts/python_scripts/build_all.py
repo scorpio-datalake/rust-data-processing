@@ -3,13 +3,13 @@
 
 Thin coordinator over sibling modules in this directory. Run from repo root:
 
-    pwsh -File scripts/build_all.ps1
+    pwsh -File scripts/build_all.ps1   # cargo clean + python clean, then this module
     python scripts/python_scripts/build_all.py
 
 Individual steps (same directory):
 
-    rust_build.py, rust_test.py, python_build.py, python_test.py,
-    java_build.py, java_test.py, docs_rust.py, docs_python.py, docs_java.py
+    rust_build.py, rust_test.py, python_clean.py, python_build.py, python_test.py,
+    java_clean.py, java_build.py, docs_rust.py, docs_python.py, docs_java.py
 """
 
 from __future__ import annotations
@@ -51,7 +51,12 @@ def _run_module(main_fn, argv: list[str]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--clean", action="store_true", help="cargo clean before Rust build.")
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Rust cargo clean, Python wrapper artifact clean, Gradle clean.",
+    )
+    parser.add_argument("--skip-fmt", action="store_true", help="Skip Rust/Python/Java format checks.")
     parser.add_argument("--skip-rust", action="store_true")
     parser.add_argument("--skip-python", action="store_true")
     parser.add_argument("--skip-java", action="store_true")
@@ -94,11 +99,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     rust_flags: list[str] = []
-    if args.clean:
-        rust_flags.append("--clean")
     if args.rust_expanded_only:
         rust_flags.append("--expanded-only")
     rust_flags.extend(offline_flag)
+
+    python_args: list[str] = []
+    java_args: list[str] = []
+    if args.clean:
+        rust_flags.append("--clean")
+        python_args.append("--clean")
+        java_args.append("--clean")
+    if args.skip_fmt:
+        rust_flags.append("--skip-fmt")
+        python_args.append("--skip-fmt")
+        java_args.append("--skip-fmt")
 
     if not args.skip_rust:
         _run_module(rust_build_main, rust_flags)
@@ -110,13 +124,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.skip_python:
         pause(wait, "before Python build")
-        _run_module(python_build_main, [])
+        _run_module(python_build_main, python_args)
         pause(wait, "before Python tests")
         _run_module(python_test_main, [])
 
     if not args.skip_java:
         pause(wait, "before JVM build")
-        _run_module(java_build_main, [])
+        _run_module(java_build_main, java_args)
         pause(wait, "before JVM tests")
         _run_module(java_test_main, [])
 
