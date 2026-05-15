@@ -59,7 +59,39 @@ pub(crate) fn parse_ingestion_options(
         opts.format = Some(fmt);
     }
 
+    if let Some(col) = obj.get("watermark_column").and_then(|x| x.as_str()) {
+        opts.watermark_column = Some(col.to_string());
+    }
+    if let Some(w) = obj.get("watermark_exclusive_above") {
+        opts.watermark_exclusive_above = Some(json_scalar_to_value(w)?);
+    }
+
     Ok(opts)
+}
+
+#[cfg(feature = "link-main")]
+fn json_scalar_to_value(v: &serde_json::Value) -> Result<rust_data_processing::types::Value, String> {
+    use rust_data_processing::types::Value;
+    match v {
+        serde_json::Value::Null => Ok(Value::Null),
+        serde_json::Value::Bool(b) => Ok(Value::Bool(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(Value::Int64(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(Value::Float64(f))
+            } else {
+                Err(format!("unsupported JSON number for watermark value: {n}"))
+            }
+        }
+        serde_json::Value::String(s) => Ok(Value::Utf8(s.clone())),
+        serde_json::Value::Object(map) => {
+            // Accept serde externally-tagged Value, e.g. {"Int64": 100}
+            serde_json::from_value(serde_json::Value::Object(map.clone()))
+                .map_err(|e| format!("watermark_exclusive_above object: {e}"))
+        }
+        _ => Err("watermark_exclusive_above must be a scalar or serde Value object".into()),
+    }
 }
 
 #[cfg(feature = "link-main")]
@@ -397,4 +429,54 @@ pub unsafe extern "C" fn rdp_ingest_ordered_paths_json(
         }
     };
     unsafe { write_slice(out, slice) }
+}
+
+#[cfg(all(test, feature = "link-main"))]
+mod people_payload_tests {
+    use super::ordered_paths_impl;
+    use rust_data_processing::pipeline_spec::PipelineBundle;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    fn people_json() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/people.json")
+    }
+
+    fn people_csv() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/people.csv")
+    }
+
+    #[test]
+    fn people_json_path_dataset_payload_ordered_ingest() {
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let payload = bundle
+            .resolve_payload_json(
+                "payloads/json_path_dataset.payload.json",
+                &HashMap::from([(
+                    "SOURCE_PATH".into(),
+                    people_json().to_string_lossy().into_owned(),
+                )]),
+            )
+            .unwrap();
+        let v = ordered_paths_impl(&payload).unwrap();
+        assert_eq!(v["kind"], "ingest_ordered_paths_dataset");
+        assert_eq!(v["returned_row_count"].as_i64(), Some(2));
+    }
+
+    #[test]
+    fn people_csv_path_dataset_payload_ordered_ingest() {
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let payload = bundle
+            .resolve_payload_json(
+                "payloads/csv_path_dataset.payload.json",
+                &HashMap::from([(
+                    "SOURCE_PATH".into(),
+                    people_csv().to_string_lossy().into_owned(),
+                )]),
+            )
+            .unwrap();
+        let v = ordered_paths_impl(&payload).unwrap();
+        assert_eq!(v["kind"], "ingest_ordered_paths_dataset");
+        assert_eq!(v["returned_row_count"].as_i64(), Some(2));
+    }
 }

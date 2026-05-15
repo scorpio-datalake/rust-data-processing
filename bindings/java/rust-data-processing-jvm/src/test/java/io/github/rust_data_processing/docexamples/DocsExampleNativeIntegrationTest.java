@@ -154,4 +154,105 @@ final class DocsExampleNativeIntegrationTest {
       JvmNativeContractScenarios.runGhcnJsonXmlParquetPipelineContract(linker, lookup, arena);
     }
   }
+
+  /**
+   * Keeps {@code docs/java/examples/RDPOnlyETLExample.java} legacy three-path pipeline honest:
+   * {@code student_etl/data/part-*.json} → {@code rdp_run_pipeline_json}.
+   */
+  @Test
+  void studentEtlLegacyThreePathsMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runStudentEtlLegacyThreePathsContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Keeps {@code docs/java/examples/RDPOnlyETLExample.java} ordered ingest sketch honest:
+   * {@code ordered_ingest_dataset_2paths.payload.json} on two committed parts.
+   */
+  @Test
+  void studentEtlOrderedIngestTwoPartsMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runStudentEtlOrderedIngestTwoPartsContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Keeps {@code docs/java/examples/PathFromDirectoryScan.java} honest: directory glob + watermark
+   * payload from {@code tests/fixtures/watermark/}.
+   */
+  @Test
+  void pathFromDirectoryScanWatermarkMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPathFromDirectoryScanWatermarkContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Keeps {@code docs/java/examples/JsonParquetExcelSnippets.java} honest: people JSON/CSV payloads,
+   * path ingest, and Parquet pipeline round-trip.
+   */
+  @Test
+  void jsonParquetExcelSnippetsPeopleMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runJsonParquetExcelSnippetsPeopleContract(
+          linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Keeps {@code docs/java/examples/ParquetSnippets.java} honest: {@code csv_to_parquet.pipeline.json}
+   * + {@code people_flat} path ingest.
+   */
+  @Test
+  void parquetSnippetsCsvToParquetRoundTripMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runParquetSnippetsCsvToParquetRoundTripContract(
+          linker, lookup, arena);
+    }
+  }
+
+  /** {@code ParquetSnippets#exportParquetTempEnvelope} ({@code rdp_export_parquet_temp}). */
+  @Test
+  void parquetSnippetsExportTempMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runParquetSnippetsExportTempContract(linker, lookup, arena);
+    }
+  }
 }

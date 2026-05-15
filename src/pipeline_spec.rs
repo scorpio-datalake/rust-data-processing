@@ -294,4 +294,89 @@ mod tests {
         assert!(v["schema_student_json"]["fields"].is_array());
         assert!(v.get("schema_student_json_ref").is_none());
     }
+
+    #[test]
+    fn people_json_path_dataset_payload_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let json = bundle
+            .resolve_payload_json(
+                "payloads/json_path_dataset.payload.json",
+                &HashMap::from([("SOURCE_PATH".into(), "/in.json".into())]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["paths"][0], "/in.json");
+        assert!(v["schema"]["fields"].is_array());
+        assert_eq!(v["options"]["format"], "json");
+    }
+
+    #[test]
+    fn people_csv_path_dataset_payload_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let json = bundle
+            .resolve_payload_json(
+                "payloads/csv_path_dataset.payload.json",
+                &HashMap::from([("SOURCE_PATH".into(), "/in.csv".into())]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["paths"][0], "/in.csv");
+        assert!(v["schema"]["fields"].is_array());
+        assert_eq!(v["options"]["format"], "csv");
+    }
+
+    #[test]
+    fn people_csv_to_parquet_pipeline_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let json = bundle
+            .resolve_pipeline_json(
+                "pipelines/csv_to_parquet.pipeline.json",
+                &HashMap::from([
+                    ("SOURCE_PATH".into(), "/in.csv".into()),
+                    ("SINK_PATH".into(), "/out.parquet".into()),
+                ]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["sinks"][0]["kind"], "parquet_file");
+        assert!(v["sources"]["schema"]["fields"].is_array());
+    }
+
+    #[test]
+    fn watermark_csv_watermark_ingest_body_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("watermark");
+        let json = bundle
+            .resolve_payload_json("payloads/csv_watermark_ingest.body.json", &HashMap::new())
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(v["schema"]["fields"].is_array());
+        assert_eq!(v["options"]["watermark_exclusive_above"], 100);
+    }
+
+    #[test]
+    fn student_etl_legacy_three_paths_binds_committed_parts() {
+        let bundle = PipelineBundle::from_repo_fixture("student_etl");
+        let root = bundle.root();
+        let json = bundle
+            .resolve_pipeline_json(
+                "pipelines/legacy_student_etl_three_paths.pipeline.json",
+                &HashMap::from([
+                    (
+                        "PATH_A".into(),
+                        root.join("data/part-00000.json").to_string_lossy().into_owned(),
+                    ),
+                    (
+                        "PATH_B".into(),
+                        root.join("data/part-00001.json").to_string_lossy().into_owned(),
+                    ),
+                    (
+                        "PATH_C".into(),
+                        root.join("data/part-00002.json").to_string_lossy().into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["json_source_paths"].as_array().unwrap().len(), 3);
+    }
 }

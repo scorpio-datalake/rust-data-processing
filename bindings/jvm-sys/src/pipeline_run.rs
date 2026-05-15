@@ -918,6 +918,89 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// Same committed parts as `docs/java/examples/RDPOnlyETLExample.java` (`student_etl/data/part-*.json`).
+    #[test]
+    fn run_pipeline_legacy_student_etl_three_committed_parts() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
+        let bundle = PipelineBundle::from_repo_fixture("student_etl");
+        let root = bundle.root();
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/legacy_student_etl_three_paths.pipeline.json",
+                &HashMap::from([
+                    (
+                        "PATH_A".into(),
+                        root.join("data/part-00000.json")
+                            .to_string_lossy()
+                            .into_owned(),
+                    ),
+                    (
+                        "PATH_B".into(),
+                        root.join("data/part-00001.json")
+                            .to_string_lossy()
+                            .into_owned(),
+                    ),
+                    (
+                        "PATH_C".into(),
+                        root.join("data/part-00002.json")
+                            .to_string_lossy()
+                            .into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
+
+        let v = run_pipeline_impl(&payload).unwrap();
+        assert_eq!(v["ingested_row_count"].as_i64(), Some(3));
+        assert!(v.get("declared_staging_schemas").is_some());
+        let sinks = v["sink_results"].as_array().unwrap();
+        assert_eq!(sinks.len(), 3);
+        assert_eq!(sinks[0]["error_code"].as_str(), Some("DELTA_LAKE_CONNECTOR_PENDING"));
+    }
+
+    /// Same pipeline as `docs/java/examples/ParquetSnippets.java` (`people/pipelines/csv_to_parquet.pipeline.json`).
+    #[test]
+    fn run_pipeline_people_csv_to_parquet_committed_fixture() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
+        let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let csv = repo.join("tests/fixtures/people.csv");
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let out = std::env::temp_dir().join(format!("rdp_people_parquet_{stamp}.parquet"));
+
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/csv_to_parquet.pipeline.json",
+                &HashMap::from([
+                    (
+                        "SOURCE_PATH".into(),
+                        csv.to_string_lossy().into_owned(),
+                    ),
+                    (
+                        "SINK_PATH".into(),
+                        out.to_string_lossy().into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
+
+        let v = run_pipeline_impl(&payload).unwrap();
+        let sinks = v["sink_results"].as_array().unwrap();
+        assert_eq!(sinks.len(), 1);
+        assert_eq!(sinks[0]["kind"].as_str(), Some("parquet_file"));
+        assert_eq!(sinks[0]["status"].as_str(), Some("ok"));
+        assert_eq!(sinks[0]["row_count"].as_i64(), Some(2));
+        assert!(out.is_file());
+        let _ = std::fs::remove_file(out);
+    }
+
     #[test]
     fn run_pipeline_invalid_json_returns_structured_error() {
         let err = run_pipeline_impl("{not json").unwrap_err();

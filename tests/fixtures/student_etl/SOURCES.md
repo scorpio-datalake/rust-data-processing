@@ -8,3 +8,5 @@
 | Data | `data/part-0000*.json`, `data/example_s3_json_source_paths.json` |
 
 Used by `docs/java/examples/RDPOnlyETLExample.java` and `bindings/jvm-sys` `run_pipeline_legacy_student_etl_envelope`.
+
+**Tests:** `tests/student_etl_fixtures.rs`, `python-wrapper/tests/test_student_etl_fixtures.py`, JVM `DocsExampleNativeIntegrationTest` (`studentEtlLegacyThreePaths…`, `studentEtlOrderedIngestTwoParts…`), `bindings/jvm-sys` `run_pipeline_legacy_student_etl_three_committed_parts`.

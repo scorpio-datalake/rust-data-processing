@@ -19,6 +19,10 @@ import org.json.JSONObject;
  * <p>Legacy control plane: {@code pipelines/legacy_student_etl.pipeline.json} (conceptual {@code s3://}
  * path) and {@code pipelines/legacy_student_etl_three_paths.pipeline.json} (local demo). Ordered ingest:
  * {@code payloads/ordered_ingest_dataset*.payload.json} with {@code schema_ref}.
+ *
+ * <p>Cross-language tests: {@code tests/student_etl_fixtures.rs}, {@code
+ * python-wrapper/tests/test_student_etl_fixtures.py}, {@code bindings/jvm-sys} {@code
+ * pipeline_run} tests, {@code DocsExampleNativeIntegrationTest}.
  */
 public final class RDPOnlyETLExample {
 

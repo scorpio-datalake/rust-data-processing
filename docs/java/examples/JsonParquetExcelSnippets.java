@@ -32,6 +32,10 @@ import org.json.JSONObject;
  *
  * <p>Excel: {@code ExcelSnippets}. Temp Parquet export: {@code ParquetSnippets}. Optional parity
  * smoke: {@link #parityCsvDataset}.
+ *
+ * <p><strong>Tests</strong> — Rust {@code tests/json_parquet_excel_snippets_fixtures.rs}, Python
+ * {@code test_json_parquet_excel_snippets_fixtures.py}, JUnit
+ * {@code DocsExampleNativeIntegrationTest#jsonParquetExcelSnippetsPeopleMatchesDocsExample}.
  */
 public final class JsonParquetExcelSnippets {
 
@@ -86,10 +90,6 @@ public final class JsonParquetExcelSnippets {
   /** {@code payloads/csv_path_ingest.options.json}. */
   public static String csvIngestOptionsJson(Path fixturesDir) throws Exception {
     return PipelineJsonFixtures.readUtf8(peopleBundle(fixturesDir), OPTIONS_CSV);
-  }
-
-  public static String pathIngestOptionsJson(Path fixturesDir) throws Exception {
-    return PipelineJsonFixtures.readUtf8(peopleBundle(fixturesDir), OPTIONS_PATH);
   }
 
   public static String resolveJsonDatasetPayload(Path fixturesDir, Path jsonPath) throws Exception {

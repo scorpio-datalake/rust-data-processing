@@ -20,6 +20,10 @@ import org.json.JSONObject;
  * JVM equivalent of Python {@code paths_from_directory_scan} + {@code ingest_from_ordered_paths}
  * with watermark options. Schema, options, and response come from {@code tests/fixtures/watermark/}
  * JSON; Java only scans directories and supplies the {@code paths} array.
+ *
+ * <p>Cross-language tests: {@code tests/path_from_directory_scan_fixtures.rs}, {@code
+ * python-wrapper/tests/test_path_from_directory_scan_fixtures.py}, {@code
+ * tests/ordered_batch_ingestion.rs}, {@code DocsExampleNativeIntegrationTest}.
  */
 public final class PathFromDirectoryScan {
 

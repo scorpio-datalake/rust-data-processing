@@ -22,6 +22,10 @@ import org.json.JSONObject;
  * <p><strong>Temp export FFI</strong> — {@link #exportParquetTempEnvelope} ({@code rdp_export_parquet_temp}) writes a
  * small Rust-built sample to the OS temp dir for Spark {@code local[*]} handoff ({@link RdpParquetTemp}); no pipeline
  * JSON on that symbol.
+ *
+ * <p><strong>Tests</strong> — Rust {@code tests/parquet_snippets_fixtures.rs}, {@code jvm-sys}
+ * {@code run_pipeline_people_csv_to_parquet_committed_fixture}, Python {@code test_parquet_snippets_fixtures.py}, JUnit
+ * {@code DocsExampleNativeIntegrationTest#parquetSnippetsCsvToParquetRoundTripMatchesDocsExample}.
  */
 public final class ParquetSnippets {
 
