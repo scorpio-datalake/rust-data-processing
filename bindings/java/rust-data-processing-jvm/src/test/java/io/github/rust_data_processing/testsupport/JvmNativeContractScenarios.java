@@ -182,18 +182,14 @@ public final class JvmNativeContractScenarios {
    */
   public static void excelIngestPathSheetContract(Linker linker, SymbolLookup lookup, Arena arena)
       throws Throwable {
-    Optional<Path> fixtures = RdpJvmSysTestSupport.resolveTestsFixturesDir();
+    Optional<Path> excelPath = RdpJvmSysTestSupport.resolveFixtureFile("people.xlsx");
     Assumptions.assumeTrue(
-        fixtures.isPresent(),
-        "Skip Excel FFI when repo tests/fixtures is not discoverable (set GITHUB_WORKSPACE or run from repo).");
-    Path excelPath = fixtures.get().resolve("people.xlsx");
-    Assumptions.assumeTrue(
-        Files.isRegularFile(excelPath),
-        "Skip when tests/fixtures/people.xlsx is missing; generate: cargo run --features"
-            + " excel_test_writer --bin generate_people_xlsx_fixture");
+        excelPath.isPresent(),
+        "Missing tests/fixtures/people.xlsx — from repo root: python scripts/write_people_xlsx_stdlib.py"
+            + " or: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture");
     JSONObject root =
         RdpNativeJson.excelIngestPathSheet(
-            linker, lookup, arena, excelPath.toString(), "Sheet1");
+            linker, lookup, arena, excelPath.get().toString(), "Sheet1");
     PytestMirrorAssertions.assertEnvelopeOk(root);
     JSONObject interchange = root.getJSONObject("interchange");
     assertEquals("excel_ingest_sheet", interchange.getString("kind"));

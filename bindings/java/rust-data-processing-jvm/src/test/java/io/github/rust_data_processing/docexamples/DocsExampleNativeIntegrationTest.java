@@ -19,6 +19,13 @@ import org.junit.jupiter.api.Test;
  * Integration tests aligned with {@code docs/java/examples/*.java}: same fixtures and assertions as
  * the doc snippets, run under JUnit when {@code rdp_jvm_sys} is discoverable. FFI manifest drift and
  * per-symbol smoke checks live in {@code io.github.rust_data_processing.FfiExportedSymbolsContractTest}.
+ *
+ * <p><strong>RDP vs “plain Java”</strong> — these tests never parse CSV/JSON/Excel in Java. They load
+ * the native library from {@code RDP_JVM_SYS} / {@code rdp.jvm.sys.library}, then call {@link
+ * RdpNativeJson} helpers that use Panama {@link Linker#downcallHandle} on symbols exported by Rust
+ * (for example {@code rdp_excel_ingest_path_sheet}, {@code rdp_run_pipeline_json}). Java builds UTF-8
+ * path strings and parses the returned JSON envelope; ingestion, Polars SQL, and Excel reading run
+ * inside {@code rdp_jvm_sys}.
  */
 final class DocsExampleNativeIntegrationTest {
 
@@ -45,11 +52,21 @@ final class DocsExampleNativeIntegrationTest {
 
   /**
    * Keeps {@code docs/java/examples/ExcelSnippets.java} honest: {@code rdp_excel_ingest_path_sheet}
-   * on {@code tests/fixtures/people.xlsx} when the fixture exists (CI generates it before {@code mvn
-   * verify}).
+   * on {@code tests/fixtures/people.xlsx} (sheet {@value #PEOPLE_SHEET}), aligned with
+   * {@code people.csv}. Generate if missing: {@code python scripts/write_people_xlsx_stdlib.py} or
+   * {@code cargo run --features excel_test_writer --bin generate_people_xlsx_fixture}.
    */
   @Test
   void excelIngestPathSheetMatchesDocsExampleWhenFixturePresent() throws Throwable {
+    Optional<Path> peopleXlsx =
+        RdpJvmSysTestSupport.resolveFixtureFile(PEOPLE_XLSX_FIXTURE);
+    Assumptions.assumeTrue(
+        peopleXlsx.isPresent(),
+        "Missing tests/fixtures/"
+            + PEOPLE_XLSX_FIXTURE
+            + " — from repo root: python scripts/write_people_xlsx_stdlib.py"
+            + " or: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture");
+
     Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
     Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
 
@@ -57,7 +74,13 @@ final class DocsExampleNativeIntegrationTest {
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
       RdpNativeJson.invokeAbiVersion(linker, lookup);
-      JvmNativeContractScenarios.excelIngestPathSheetContract(linker, lookup, arena);
+      JSONObject root =
+          RdpNativeJson.excelIngestPathSheet(
+              linker, lookup, arena, peopleXlsx.get().toString(), PEOPLE_SHEET);
+      PytestMirrorAssertions.assertEnvelopeOk(root);
+      JSONObject interchange = root.getJSONObject("interchange");
+      assertEquals("excel_ingest_sheet", interchange.getString("kind"));
+      assertEquals(2, interchange.getJSONObject("dataset").getJSONArray("rows").length());
     }
   }
 
