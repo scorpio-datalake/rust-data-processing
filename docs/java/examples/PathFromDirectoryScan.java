@@ -1,3 +1,4 @@
+import io.github.rust_data_processing.fixture.PipelineJsonFixtures;
 import io.github.rust_data_processing.ffi.RdpNativeJson;
 import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
 import java.lang.foreign.Arena;
@@ -11,32 +12,30 @@ import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
  * JVM equivalent of Python {@code paths_from_directory_scan} + {@code ingest_from_ordered_paths}
- * with watermark options (see {@code docs/python/README.md}).
- *
- * <p>Rust exposes ordered multi-file ingest as {@code rdp_ingest_ordered_paths_json}; there is no
- * separate FFI for directory listing today, so this example lists files on the JVM in the same way
- * as {@code rust_data_processing::ingestion::paths_from_directory_scan}: walk under a root,
- * optional glob on paths <strong>relative to the root</strong> (forward slashes in the pattern,
- * e.g. {@code **/*.csv}), sort for stable ordering, then pass absolute paths to Rust.
- *
- * <p>Run with {@code RDP_JVM_SYS} (or {@code -Drdp.jvm.sys.library}) and {@code
- * --enable-native-access=ALL-UNNAMED}. Not built by the main Maven module — copy into {@code
- * rust-data-processing-jvm-examples} if you want {@code mvn} to compile it.
+ * with watermark options. Schema, options, and response come from {@code tests/fixtures/watermark/}
+ * JSON; Java only scans directories and supplies the {@code paths} array.
  */
 public final class PathFromDirectoryScan {
 
+  private static final String BUNDLE = "watermark";
+  private static final String SCHEMA_EVENTS = "schemas/events.schema.json";
+  private static final String PAYLOAD_BODY = "payloads/csv_watermark_ingest.body.json";
+  private static final String PAYLOAD_TWO_CSV = "payloads/directory_scan_two_csv.payload.json";
+
   private PathFromDirectoryScan() {}
 
-  /**
-   * Lists regular files under {@code root} whose path relative to {@code root} matches {@code
-   * relativeGlob} (same string you would pass to Python {@code paths_from_directory_scan} as the
-   * second argument), sorted lexicographically by full path.
-   */
+  public static Path watermarkBundle(Path fixturesDir) {
+    return PipelineJsonFixtures.resolveBundleRoot(fixturesDir, BUNDLE)
+        .orElseThrow(
+            () -> new IllegalStateException("tests/fixtures/" + BUNDLE + " not found"));
+  }
+
   public static List<Path> pathsFromDirectoryScan(Path root, String relativeGlob) throws Exception {
     if (!Files.isDirectory(root)) {
       throw new IllegalArgumentException("directory scan root must be an existing directory: " + root);
@@ -56,19 +55,39 @@ public final class PathFromDirectoryScan {
     return out;
   }
 
-  /** Minimal CSV schema with a {@code ts} column for watermark demos. */
-  public static JSONObject exampleEventSchema() {
-    JSONArray fields =
-        new JSONArray()
-            .put(new JSONObject().put("name", "id").put("data_type", "Int64"))
-            .put(new JSONObject().put("name", "ts").put("data_type", "Int64"));
-    return new JSONObject().put("fields", fields);
+  /** {@code tests/fixtures/watermark/schemas/events.schema.json}. */
+  public static JSONObject exampleEventSchema(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.loadSchemaObject(watermarkBundle(fixturesDir), SCHEMA_EVENTS);
   }
 
   /**
-   * Max of column {@code ts} in the returned tabular JSON dataset (mirrors Python {@code
-   * meta["max_watermark_value"]} for Int64 watermarks when you only have the FFI dataset body).
+   * Build {@code rdp_ingest_ordered_paths_json} payload: expand {@link #PAYLOAD_BODY} (schema_ref +
+   * options + response), then attach scanned {@code paths}.
    */
+  public static String resolveWatermarkIngestPayload(Path fixturesDir, JSONArray absolutePaths)
+      throws Exception {
+    JSONObject body =
+        new JSONObject(
+            PipelineJsonFixtures.resolvePayloadJson(
+                watermarkBundle(fixturesDir), PAYLOAD_BODY, Map.of()));
+    body.put("paths", absolutePaths);
+    return body.toString();
+  }
+
+  /**
+   * Fixed two-path template ({@link #PAYLOAD_TWO_CSV}) when the demo creates exactly {@code a.csv}
+   * and {@code nested/b.csv}.
+   */
+  public static String resolveTwoCsvWatermarkPayload(
+      Path fixturesDir, Path pathA, Path pathB) throws Exception {
+    return PipelineJsonFixtures.resolvePayloadJson(
+        watermarkBundle(fixturesDir),
+        PAYLOAD_TWO_CSV,
+        Map.of(
+            "PATH_A", pathA.toAbsolutePath().normalize().toString(),
+            "PATH_B", pathB.toAbsolutePath().normalize().toString()));
+  }
+
   public static Long maxInt64InColumn(JSONObject dataset, String column) throws Exception {
     JSONArray fieldDefs = dataset.getJSONObject("schema").getJSONArray("fields");
     int col = -1;
@@ -93,10 +112,28 @@ public final class PathFromDirectoryScan {
     return max == Long.MIN_VALUE ? null : max;
   }
 
+  public static JSONObject ingestScannedCsvWithWatermark(
+      Linker linker, SymbolLookup lookup, Arena arena, Path fixturesDir, JSONArray absolutePaths)
+      throws Throwable {
+    String payload = resolveWatermarkIngestPayload(fixturesDir, absolutePaths);
+    JSONObject root =
+        RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload);
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    return root;
+  }
+
   public static void demonstrate(Path nativeLibrary) throws Throwable {
     Linker linker = Linker.nativeLinker();
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(nativeLibrary, arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+
+      Path fixtures =
+          PipelineJsonFixtures.resolveTestsFixturesDir()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "tests/fixtures not found — run from repository checkout"));
 
       Path incoming = Files.createTempDirectory("rdp_path_from_directory_scan_");
       try {
@@ -119,25 +156,14 @@ public final class PathFromDirectoryScan {
           pathJson.put(p.toAbsolutePath().normalize().toString());
         }
 
-        JSONObject payload =
-            new JSONObject()
-                .put("paths", pathJson)
-                .put("schema", exampleEventSchema())
-                .put(
-                    "options",
-                    new JSONObject()
-                        .put("format", "csv")
-                        .put("watermark_column", "ts")
-                        .put("watermark_exclusive_above", 100))
-                .put("response", new JSONObject().put("mode", "dataset").put("max_rows", 10_000));
-
-        JSONObject root =
-            RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload.toString());
-        PytestMirrorAssertions.assertEnvelopeOk(root);
+        JSONObject root = ingestScannedCsvWithWatermark(linker, lookup, arena, fixtures, pathJson);
         JSONObject interchange = root.getJSONObject("interchange");
         JSONObject batch = interchange.getJSONObject("ordered_batch");
 
-        System.out.println("last_path: " + batch.opt("last_path"));
+        System.out.println("Directory scan + watermark ingest (JSON schema + payload): ok");
+        System.out.println("  schema: " + watermarkBundle(fixtures).resolve(SCHEMA_EVENTS));
+        System.out.println("  payload body: " + watermarkBundle(fixtures).resolve(PAYLOAD_BODY));
+        System.out.println("  last_path: " + batch.opt("last_path"));
         JSONObject dataset = interchange.getJSONObject("dataset");
         System.out.println("max_watermark_value (from returned rows): " + maxInt64InColumn(dataset, "ts"));
         System.out.println("returned_row_count: " + interchange.getInt("returned_row_count"));
@@ -152,25 +178,25 @@ public final class PathFromDirectoryScan {
   }
 
   public static void main(String[] args) throws Throwable {
-    String env = System.getenv("RDP_JVM_SYS");
-    String prop = System.getProperty("rdp.jvm.sys.library");
-    Path lib = null;
-    if (env != null && !env.isBlank()) {
-      Path p = Path.of(env.strip()).toAbsolutePath();
-      if (Files.exists(p)) {
-        lib = p;
-      }
-    }
-    if (lib == null && prop != null && !prop.isBlank()) {
-      Path p = Path.of(prop.strip()).toAbsolutePath();
-      if (Files.exists(p)) {
-        lib = p;
-      }
-    }
+    Path lib = RdpNativeJson.resolveNativeLibraryFromEnvOrProperty();
     if (lib == null) {
-      System.err.println("Set RDP_JVM_SYS or -Drdp.jvm.sys.library to a built rdp_jvm_sys library.");
+      System.err.println(
+          "Set RDP_JVM_SYS or -Drdp.jvm.sys.library to an existing file path of a built rdp_jvm_sys library.");
       System.exit(2);
     }
-    demonstrate(lib);
+    try {
+      demonstrate(lib);
+    } catch (Throwable t) {
+      for (Throwable c = t; c != null; c = c.getCause()) {
+        String m = String.valueOf(c.getMessage());
+        if (m.contains("native access") || m.contains("Restricted method")) {
+          System.err.println(
+              "JVM blocked Panama native access; rerun with VM flag: --enable-native-access=ALL-UNNAMED");
+          System.exit(2);
+          return;
+        }
+      }
+      throw t;
+    }
   }
 }

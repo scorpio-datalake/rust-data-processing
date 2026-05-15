@@ -1,0 +1,14 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["{{SOURCE_PATH_A}}", "{{SOURCE_PATH_B}}"],
+    "schema_ref": "schemas/id_name.schema.json",
+    "options": { "format": "json" }
+  },
+  "transform": {
+    "sql": "SELECT * FROM df ORDER BY id"
+  },
+  "sinks": [
+    { "kind": "parquet_file", "path": "{{SINK_PATH}}" }
+  ]
+}

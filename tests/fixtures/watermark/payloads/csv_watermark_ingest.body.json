@@ -1,0 +1,9 @@
+{
+  "schema_ref": "schemas/events.schema.json",
+  "options": {
+    "format": "csv",
+    "watermark_column": "ts",
+    "watermark_exclusive_above": 100
+  },
+  "response": { "mode": "dataset", "max_rows": 10000 }
+}

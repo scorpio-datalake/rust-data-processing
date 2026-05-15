@@ -49,35 +49,10 @@ def test_sql_group_by_aggregates_and_having_work() -> None:
 
 
 def test_sql_context_supports_joins_across_registered_tables() -> None:
-    left_schema = [
-        {"name": "id", "data_type": "int64"},
-        {"name": "name", "data_type": "utf8"},
-    ]
-    left_rows = [[1, "Ada"], [2, "Grace"], [3, "Linus"]]
-    right_schema = [
-        {"name": "id", "data_type": "int64"},
-        {"name": "score", "data_type": "float64"},
-    ]
-    right_rows = [[1, 98.5], [3, 77.0]]
-    left = rdp.DataSet(left_schema, left_rows)
-    right = rdp.DataSet(right_schema, right_rows)
-    df_left = rdp.DataFrame.from_dataset(left)
-    df_right = rdp.DataFrame.from_dataset(right)
-    ctx = rdp.SqlContext()
-    ctx.register("people", df_left)
-    ctx.register("scores", df_right)
-    out = ctx.execute(
-        """
-        SELECT p.id, p.name, s.score
-        FROM people p
-        JOIN scores s ON p.id = s.id
-        ORDER BY p.id ASC
-        """,
-    ).collect()
-    assert out.column_names() == ["id", "name", "score"]
-    assert out.row_count() == 2
-    assert out.to_rows()[0] == [1, "Ada", 98.5]
-    assert out.to_rows()[1] == [3, "Linus", 77.0]
+    """Delegates to fixture-backed test; kept for name parity with ``tests/sql.rs``."""
+    from tests.test_sql_queries_fixtures import test_sql_parity_join_matches_committed_fixtures
+
+    test_sql_parity_join_matches_committed_fixtures()
 
 
 def test_sql_missing_table_returns_engine_error() -> None:

@@ -1,0 +1,10 @@
+{
+  "fields": [
+    { "name": "course_id", "data_type": "Int64" },
+    { "name": "course_code", "data_type": "Utf8" },
+    { "name": "course_title", "data_type": "Utf8" },
+    { "name": "teacher_id", "data_type": "Int64" },
+    { "name": "teacher_name", "data_type": "Utf8" },
+    { "name": "teacher_department", "data_type": "Utf8" }
+  ]
+}

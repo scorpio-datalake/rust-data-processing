@@ -42,6 +42,7 @@ pub(crate) fn parse_ingestion_options(
             "json" => IngestionFormat::Json,
             "parquet" | "pq" => IngestionFormat::Parquet,
             "excel" | "xlsx" | "xls" | "xlsm" | "xlsb" | "ods" => IngestionFormat::Excel,
+            "xml" => IngestionFormat::Xml,
             other => return Err(format!("unknown format: {other}")),
         });
     }
@@ -197,6 +198,32 @@ pub unsafe extern "C" fn rdp_ingest_parquet_path(
                 options_json_ptr,
                 Some(rust_data_processing::ingestion::IngestionFormat::Parquet),
                 "ingest_path_parquet",
+            )
+        }
+        #[cfg(not(feature = "link-main"))]
+        {
+            json_err("rebuild rdp_jvm_sys with --features link-main (or jvm_ffi / full)")
+        }
+    };
+    unsafe { write_slice(out, slice) }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rdp_ingest_xml_path(
+    out: *mut RdpJsonSlice,
+    path_ptr: *const c_char,
+    schema_json_ptr: *const c_char,
+    options_json_ptr: *const c_char,
+) {
+    let slice = {
+        #[cfg(feature = "link-main")]
+        {
+            ingest_path_impl(
+                path_ptr,
+                schema_json_ptr,
+                options_json_ptr,
+                Some(rust_data_processing::ingestion::IngestionFormat::Xml),
+                "ingest_path_xml",
             )
         }
         #[cfg(not(feature = "link-main"))]

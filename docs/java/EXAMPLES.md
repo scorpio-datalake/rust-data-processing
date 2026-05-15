@@ -30,6 +30,196 @@ Use this as a **tour of how Java integrates today** (parity JSON over FFI), not 
 | **Multi-scenario walkthrough** | [Runnable walkthrough class](#runnable-walkthrough-class) |
 | **Large results / production layout** | [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption) |
 | **Temp Parquet → local Spark `DataFrame`** | [`rdp_export_parquet_temp`](#temp-parquet-handoff-rdp_export_parquet_temp) |
+| **JSON-first doc examples** (`docs/java/examples/`) | [Why this library](#why-rust-data-processing-on-the-jvm), [Shared fixtures](#shared-json-fixtures-testsfixtures), [Doc examples tour](#json-first-doc-examples) |
+| **CI for doc examples** | [JUnit alignment](#junit-tests-for-doc-examples) |
+
+## Why rust-data-processing on the JVM {#why-rust-data-processing-on-the-jvm}
+
+The JVM module is deliberately **thin**: Java does not re-implement CSV parsing, Polars SQL, Excel readers, or pipeline orchestration. You load **`rdp_jvm_sys`** once, pass **UTF-8 JSON** (schemas, pipeline specs, ingest payloads) over **Panama downcalls**, and read back a small **JSON envelope** (`ok`, `interchange`, optional `error`). That design buys you:
+
+- **One engine, three languages** — the same `tests/fixtures/<bundle>/` trees are exercised by Rust (`PipelineBundle`), Python (`tests.pipeline_fixture_support`), and Java (`PipelineJsonFixtures`). Doc examples and CI prove cross-language parity without copy-pasted SQL or schemas in each binding.
+- **Production-shaped control plane** — orchestration (paths, watermarks, idempotency keys) can live in Java/Kotlin while **heavy transforms stay in Rust**, with sinks writing **Parquet / XML / CSV** to disk instead of shipping millions of rows as JSON (see [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption)).
+- **Typed contracts** — serde `Schema` JSON (`data_type`: `Int64`, `Utf8`, …) is validated at ingest time in Rust; JVM tests assert row counts and sample cells via `PytestMirrorAssertions` and `SerdeDatasetRows`.
+- **Inspectable failures** — pipeline failures return structured `error.code` / `error.stage` (ADR 006) in the same envelope shape tests already assert.
+
+**When to reach for which FFI:**
+
+| Goal | Prefer |
+| --- | --- |
+| Declarative multi-step ETL (sources → SQL on `df` → sinks) | `rdp_run_pipeline_json` + bundle `pipelines/*.pipeline.json` |
+| Single-shot multi-file ingest (dataset / temp Parquet / Arrow IPC) | `rdp_ingest_ordered_paths_json` + bundle `payloads/*.payload.json` |
+| One file + explicit schema (CSV / JSON / Parquet / XML / Excel sheet) | `rdp_ingest_*_path` or `rdp_excel_ingest_path_sheet` |
+| Pytest-shaped regression without crafting payloads | `rdp_parity_*` via `RdpNativeJson.invokeParityExport` |
+
+## Shared JSON fixtures (`tests/fixtures/`) {#shared-json-fixtures-testsfixtures}
+
+Every runnable class under [`docs/java/examples/`](examples/) loads committed JSON from the repo — **not** strings embedded in Java source. Layout (see also [`tests/fixtures/README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/tests/fixtures/README.md)):
+
+| Bundle | Schemas | Pipelines / payloads | Data files |
+| --- | --- | --- | --- |
+| `jvm_contract/` | `schemas/three_rows.schema.json`, `id_name.schema.json` | `pipelines/dataframe_centric_sql.pipeline.json`, `sql_query_dataset.pipeline.json`, `ordered_json_to_parquet.pipeline.json`, `payloads/ordered_paths_*.payload.json` | `data/three_rows.json`; also `../jvm_contract_three_rows.json` at fixtures root |
+| `ghcn/` | `json_source`, `xml_intermediate`, `parquet_lake` under `schemas/` | `pipelines/json_to_xml.pipeline.json`, `xml_to_parquet.pipeline.json` | `ghcn_stations_sample.json` (5 NOAA stations, committed sample) |
+| `people/` | `people_csv`, `people_json`, `people_flat`, … | `pipelines/csv_to_parquet.pipeline.json`, `payloads/*_path_*.json` | `../people.csv`, `../people.json`, `../people.xlsx` |
+| `student_etl/` | `student_source`, `lake_grade_stats`, `postgres_courses` | `legacy_student_etl*.pipeline.json`, `payloads/ordered_ingest_*.payload.json` | `data/part-0000*.json` |
+| `watermark/` | `schemas/events.schema.json` | `payloads/csv_watermark_ingest.body.json`, `directory_scan_two_csv.payload.json` | `../watermark_events.csv` / `.json` |
+| `sql_parity/` | `join_left`, `join_right` | `queries/join_people_scores.sql.json` | `data/join_left.json`, `join_right.json` |
+
+**Schema shape** (shared with Rust/Python):
+
+```json
+{
+  "fields": [
+    { "name": "id", "data_type": "Int64" },
+    { "name": "active", "data_type": "Bool" },
+    { "name": "score", "data_type": "Float64" }
+  ]
+}
+```
+
+**Pipeline shape** — placeholders `{{SOURCE_PATH}}`, `{{SINK_PATH}}`, … are substituted in Java before calling Rust (`tests/fixtures/jvm_contract/pipelines/dataframe_centric_sql.pipeline.json`):
+
+```json
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["{{SOURCE_PATH}}"],
+    "schema_ref": "schemas/three_rows.schema.json",
+    "options": { "format": "json" }
+  },
+  "transform": {
+    "sql": "SELECT id, active, (score * 2.0) AS score FROM df WHERE active = TRUE ORDER BY id"
+  },
+  "sinks": [{ "kind": "parquet_file", "path": "{{SINK_PATH}}" }]
+}
+```
+
+**Sample input data** (`tests/fixtures/jvm_contract_three_rows.json` — three rows, one inactive):
+
+```json
+[
+  {"id": 1, "active": true, "score": 10.0},
+  {"id": 2, "active": true, "score": 20.0},
+  {"id": 3, "active": false, "score": 30.0}
+]
+```
+
+**Ordered-ingest payload** (`people/payloads/excel_sheet_dataset.payload.json` — `schema_ref` expanded in Rust/Java):
+
+```json
+{
+  "paths": ["{{SOURCE_PATH}}"],
+  "schema_ref": "schemas/people_flat.schema.json",
+  "options": { "format": "excel", "sheet_name": "{{SHEET_NAME}}" },
+  "response": { "mode": "dataset", "max_rows": 1000 }
+}
+```
+
+**Path ingest with no extra options** — pass `PipelineJsonFixtures.defaultPathIngestOptionsJson()` (`"{}"`) to `rdp_ingest_*_path`; do not add empty per-bundle `*.options.json` files.
+
+### Loading fixtures from Java
+
+[`PipelineJsonFixtures`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/main/java/io/github/rust_data_processing/fixture/PipelineJsonFixtures.java) resolves `tests/fixtures` by walking up from the working directory until `people.csv` exists (or uses `GITHUB_WORKSPACE` in CI):
+
+```java
+Path fixtures = PipelineJsonFixtures.resolveTestsFixturesDir().orElseThrow();
+Path bundle = PipelineJsonFixtures.resolveBundleRoot(fixtures, "jvm_contract").orElseThrow();
+String pipeline =
+    PipelineJsonFixtures.resolvePipelineJson(
+        bundle,
+        "pipelines/dataframe_centric_sql.pipeline.json",
+        Map.of(
+            "SOURCE_PATH", inputJson.toAbsolutePath().normalize().toString(),
+            "SINK_PATH", parquetOut.toAbsolutePath().normalize().toString()));
+JSONObject root =
+    RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipeline);
+```
+
+`schema_ref` inside pipelines and payloads is expanded to an inline `schema` object before the native call. **`SerdeDatasetRows`** decodes `interchange.dataset.rows` cells (serde `Value` tags like `{"Utf8":"Ada"}`).
+
+## JSON-first doc examples {#json-first-doc-examples}
+
+Source: [`docs/java/examples/*.java`](examples/). Each class has a `main` that expects `RDP_JVM_SYS` (or `-Drdp.jvm.sys.library`) and `--enable-native-access=ALL-UNNAMED`. Copy the class into a module that depends on `rust-data-processing-jvm`.
+
+| Java class | Native entry point(s) | Primary bundle | JUnit (when native lib present) |
+| --- | --- | --- | --- |
+| [`DataFrameCentricPipeline.java`](examples/DataFrameCentricPipeline.java) | `rdp_run_pipeline_json` | `jvm_contract` | `DocsExampleNativeIntegrationTest#runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample` |
+| [`SQLQueries.java`](examples/SQLQueries.java) | `rdp_run_pipeline_json` + `rdp_parity_sql_suite_mirror` | `jvm_contract`, `sql_parity` | `runPipelineJsonSingleTableSql…`, `rdpParitySqlSuiteMirrorJoin…` |
+| [`GhcnJsonXmlParquetPipeline.java`](examples/GhcnJsonXmlParquetPipeline.java) | `rdp_run_pipeline_json`, `rdp_ingest_xml_path`, `rdp_ingest_parquet_path` | `ghcn` | `ghcnJsonXmlParquetPipelineMatchesDocsExample`, `XmlGhcnPipelineContractTest` |
+| [`ExcelSnippets.java`](examples/ExcelSnippets.java) | `rdp_ingest_ordered_paths_json` | `people` | `excelIngestPathSheetMatchesDocsExampleWhenFixturePresent` |
+| [`JsonParquetExcelSnippets.java`](examples/JsonParquetExcelSnippets.java) | `rdp_ingest_ordered_paths_json`, `rdp_ingest_*_path`, `rdp_run_pipeline_json` | `people` | (parity smoke optional; patterns covered by `FfiExportedSymbolsContractTest`) |
+| [`ParquetSnippets.java`](examples/ParquetSnippets.java) | `rdp_run_pipeline_json`, `rdp_export_parquet_temp`, path ingest | `people` | export path in examples module |
+| [`PathFromDirectoryScan.java`](examples/PathFromDirectoryScan.java) | `rdp_ingest_ordered_paths_json` | `watermark` | watermark parity + payload pattern |
+| [`RDPOnlyETLExample.java`](examples/RDPOnlyETLExample.java) | `rdp_ingest_ordered_paths_json`, legacy pipeline JSON | `student_etl` | legacy control-plane fixture |
+
+### DataFrame-centric Polars SQL (`DataFrameCentricPipeline`)
+
+Python’s lazy `DataFrame.filter_eq(…).multiply_f64(…)` maps to **Polars SQL** on table `df` inside a pipeline. Fixture SQL filters `active = TRUE` and doubles `score`; the Parquet sink should have **2 rows**.
+
+- **Schema:** `jvm_contract/schemas/three_rows.schema.json`
+- **Pipeline:** `jvm_contract/pipelines/dataframe_centric_sql.pipeline.json`
+- **Input:** `tests/fixtures/jvm_contract_three_rows.json`
+
+### SQL queries (`SQLQueries`)
+
+- **Single-table:** `sql_query_dataset.pipeline.json` with the same `three_rows` schema; SQL selects active rows ordered by `id DESC`.
+- **JOIN:** SQL text in `sql_parity/queries/join_people_scores.sql.json`; side tables `sql_parity/data/join_left.json` and `join_right.json`. Multi-table `rdp_run_pipeline_json` is not on the JVM yet — the doc example runs the join via **`rdp_parity_sql_suite_mirror`** (same workload as Python `SqlContext` tests).
+
+### GHCN JSON → XML → Parquet (`GhcnJsonXmlParquetPipeline`)
+
+Demonstrates **three distinct schemas** on one small NOAA station sample (`ghcn/ghcn_stations_sample.json`):
+
+1. **`json_to_xml.pipeline.json`** — renames columns (`id` → `stationCode`, …) and writes `xml_file`.
+2. **`rdp_ingest_xml_path`** — verifies intermediate XML against `xml_intermediate.schema.json`.
+3. **`xml_to_parquet.pipeline.json`** — maps to lake column names (`station_id`, `geo_lat`, …) and writes `parquet_file`.
+4. **`rdp_ingest_parquet_path`** — verifies lake Parquet (5 rows; first `station_id` = `ACW00011604`).
+
+No runtime download: the sample is committed under `tests/fixtures/ghcn/`.
+
+### People CSV / JSON / Parquet / Excel (`JsonParquetExcelSnippets`, `ExcelSnippets`, `ParquetSnippets`)
+
+- **Payload ingest:** `people/payloads/json_path_dataset.payload.json`, `csv_path_dataset.payload.json` → `rdp_ingest_ordered_paths_json`.
+- **Path ingest:** `rdp_ingest_json_path` / `rdp_ingest_csv_path` with `people/schemas/*.schema.json` and `defaultPathIngestOptionsJson()`.
+- **CSV → Parquet pipeline:** `people/pipelines/csv_to_parquet.pipeline.json` then verify with `people_flat.schema.json`.
+- **Excel:** `excel_sheet_dataset.payload.json` with `{{SOURCE_PATH}}` → `tests/fixtures/people.xlsx` (generate via `python scripts/write_people_xlsx_stdlib.py` if missing).
+
+### Watermark + directory scan (`PathFromDirectoryScan`)
+
+Java lists files (glob) like Python `paths_from_directory_scan`; Rust ingests with watermark options from `watermark/payloads/csv_watermark_ingest.body.json`:
+
+```json
+{
+  "schema_ref": "schemas/events.schema.json",
+  "options": {
+    "format": "csv",
+    "watermark_column": "ts",
+    "watermark_exclusive_above": 100
+  },
+  "response": { "mode": "dataset", "max_rows": 10000 }
+}
+```
+
+Attach the scanned absolute paths as the `paths` array in the payload JSON before calling `rdp_ingest_ordered_paths_json`. Semantics are also covered by **`rdp_parity_watermark_mirror`**.
+
+### Rust-only student ETL (`RDPOnlyETLExample`)
+
+Loads **legacy control-plane** JSON (`student_etl/pipelines/legacy_student_etl.pipeline.json` — catalog URIs, sink metadata) and runs **ordered JSON ingest** over `data/part-0000*.json` via `ordered_ingest_dataset.payload.json`. Execution stays in Rust; Java supplies paths and schemas only.
+
+## JUnit tests for doc examples {#junit-tests-for-doc-examples}
+
+[`DocsExampleNativeIntegrationTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) and [`XmlGhcnPipelineContractTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/rust_data_processing/XmlGhcnPipelineContractTest.java) call the same helpers as the doc classes (`JvmNativeContractScenarios`). They **assume** a built native library:
+
+```bash
+# From repository root (Linux/macOS; adjust extension on Windows)
+cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
+export RDP_JVM_SYS=$PWD/bindings/jvm-sys/target/release/librdp_jvm_sys.so
+export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
+cd bindings/java/rust-data-processing-jvm
+./gradlew test --tests 'io.github.rust_data_processing.docexamples.*' \
+  --tests 'io.github.rust_data_processing.XmlGhcnPipelineContractTest'
+# or: mvn -q test -Dtest=DocsExampleNativeIntegrationTest,XmlGhcnPipelineContractTest
+```
+
+Manifest-wide symbol smoke remains in **`FfiExportedSymbolsContractTest`** (separate from the doc-example suite).
 
 ## Rust-first ETL vs JVM consumption {#rust-first-etl-vs-jvm-consumption}
 
@@ -80,7 +270,7 @@ The crate also exposes **`rust_data_processing::ingestion::export_dataset_to_par
 
 - **JDK 21+** (Panama FFM). Some builds use preview features on newer JDKs; see the module `pom.xml`.
 - **Artifact:** `io.github.rust_data_processing:rust-data-processing-jvm` (same version as [`bindings/java/VERSION`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/VERSION)).
-- **Native library:** build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/rust-data-processing/rust-data-processing/tree/main/bindings/jvm-sys) (CI uses `cargo build --release -p rdp-jvm-sys` with JVM features). Point Java at the absolute path:
+- **Native library:** build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/rust-data-processing/rust-data-processing/tree/main/bindings/jvm-sys) (CI: `cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full`). Point Java at the absolute path:
   - Environment variable **`RDP_JVM_SYS`**, or
   - System property **`-Drdp.jvm.sys.library=…`**
 - **JVM flag:** `--enable-native-access=ALL-UNNAMED` (or a tighter module policy if you wire one).
@@ -142,7 +332,7 @@ Python uses **`ingest_from_path`** and **`DataSet`** directly. On the JVM, see:
 
 Validate the envelope and `kind` the same way as **`FfiExportedSymbolsContractTest`** and **`DocsExampleNativeIntegrationTest`** in `rust-data-processing-jvm`.
 
-Illustrative Java snippets (copy into a module that depends on `rust-data-processing-jvm`): [`JsonParquetExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/JsonParquetExcelSnippets.java) (CSV / JSON metrics), [`ExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ExcelSnippets.java) (`rdp_excel_ingest_path_sheet`), [`ParquetSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ParquetSnippets.java) (`rdp_export_parquet_temp`).
+For copy-pasteable classes with committed fixtures, see [JSON-first doc examples](#json-first-doc-examples). Parity-only sketches: [`rdp_parity_ingestion`](#file-etl-ingestion-and-tabular-json), [`rdp_parity_types_dataset`](#file-etl-ingestion-and-tabular-json).
 
 <h2 id="ordered-paths-and-directory-scans-incremental-batches">Ordered paths and directory scans (incremental batches)</h2>
 

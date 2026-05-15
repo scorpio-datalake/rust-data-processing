@@ -1,0 +1,42 @@
+[
+  {
+    "id": "ACW00011604",
+    "latitude": 17.1167,
+    "longitude": -61.7833,
+    "elevation": 10.1,
+    "name": "ST JOHNS COOLIDGE FLD",
+    "state": ""
+  },
+  {
+    "id": "ACW00011647",
+    "latitude": 17.1333,
+    "longitude": -61.7833,
+    "elevation": 19.2,
+    "name": "ST JOHNS",
+    "state": ""
+  },
+  {
+    "id": "AE000041196",
+    "latitude": 25.333,
+    "longitude": 55.517,
+    "elevation": 34.0,
+    "name": "SHARJAH INTER. AIRP",
+    "state": ""
+  },
+  {
+    "id": "AEM00041194",
+    "latitude": 25.255,
+    "longitude": 55.364,
+    "elevation": 10.4,
+    "name": "DUBAI INTL",
+    "state": ""
+  },
+  {
+    "id": "AF000040930",
+    "latitude": 35.317,
+    "longitude": 69.017,
+    "elevation": 3366.0,
+    "name": "NORTH-SALANG",
+    "state": ""
+  }
+]

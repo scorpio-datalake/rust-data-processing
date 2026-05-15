@@ -18,6 +18,7 @@
 //! - [`excel`]
 //! - [`json`]
 //! - [`parquet`]
+//! - [`xml`]
 
 pub mod builder;
 pub mod csv;
@@ -75,6 +76,7 @@ pub mod excel {
 pub mod db;
 pub mod json;
 pub mod parquet;
+pub mod xml;
 pub mod partition;
 #[cfg(not(feature = "db_connectorx"))]
 pub mod db {
@@ -126,6 +128,7 @@ pub use partition::{
 pub use unified::{
     ExcelSheetSelection, IngestionFormat, IngestionOptions, IngestionRequest,
     OrderedBatchIngestMetadata, export_dataset_to_arrow_ipc, export_dataset_to_parquet,
+    export_dataset_to_xml,
     infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path, ingest_from_path_infer,
 };
 pub use watermark::{

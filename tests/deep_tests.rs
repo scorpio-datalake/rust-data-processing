@@ -11,8 +11,21 @@ use rust_data_processing::processing::{
 };
 use rust_data_processing::profiling::{ProfileOptions, SamplingMode, profile_dataset};
 use rust_data_processing::transform::{TransformSpec, TransformStep};
+use rust_data_processing::pipeline_spec::PipelineBundle;
 use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
 use rust_data_processing::validation::{Check, Severity, ValidationSpec, validate_dataset};
+
+fn seattle_schema() -> Schema {
+    PipelineBundle::from_repo_fixture("deep").expect_schema("schemas/seattle.schema.json")
+}
+
+fn job_runs_schema() -> Schema {
+    PipelineBundle::from_repo_fixture("deep").expect_schema("schemas/job_runs.schema.json")
+}
+
+fn people_flat_schema() -> Schema {
+    PipelineBundle::from_repo_fixture("people").expect_schema("schemas/people_flat.schema.json")
+}
 
 fn assert_value_close_mem_polars(mem: Value, polars: Value, eps_abs: f64) {
     match (mem, polars) {
@@ -64,14 +77,7 @@ fn assert_reduce_parity(ds: &DataSet, column: &str, op: ReduceOp) {
 
 #[test]
 fn deep_csv_seattle_weather_ingests_and_casts() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -89,14 +95,7 @@ fn deep_csv_seattle_weather_ingests_and_casts() {
 
 #[test]
 fn deep_reduce_new_ops_parity_in_memory_vs_polars_on_seattle_weather() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -147,14 +146,7 @@ fn deep_reduce_new_ops_parity_in_memory_vs_polars_on_seattle_weather() {
 
 #[test]
 fn deep_feature_wise_mean_std_parity_on_seattle_numeric_columns() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -177,14 +169,7 @@ fn deep_feature_wise_mean_std_parity_on_seattle_numeric_columns() {
 
 #[test]
 fn deep_group_by_mean_max_count_distinct_on_seattle_weather() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -242,14 +227,7 @@ fn deep_group_by_mean_max_count_distinct_on_seattle_weather() {
 
 #[test]
 fn deep_arg_extrema_and_topk_weather_on_seattle() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -276,18 +254,7 @@ fn deep_arg_extrema_and_topk_weather_on_seattle() {
 
 #[test]
 fn deep_reduce_new_ops_parity_on_job_runs_json_fixture() {
-    let schema = Schema::new(vec![
-        Field::new("job_id", DataType::Int64),
-        Field::new("creator_user_name", DataType::Utf8),
-        Field::new("created_time", DataType::Int64),
-        Field::new("settings.name", DataType::Utf8),
-        Field::new("settings.tags.team", DataType::Utf8),
-        Field::new("settings.tags.env", DataType::Utf8),
-        Field::new("cluster.num_workers", DataType::Int64),
-        Field::new("metrics.duration_ms", DataType::Float64),
-        Field::new("metrics.success", DataType::Bool),
-        Field::new("metrics.bytes_written", DataType::Int64),
-    ]);
+    let schema = job_runs_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/job_runs_sample.json",
@@ -346,18 +313,7 @@ fn deep_reduce_new_ops_parity_on_job_runs_json_fixture() {
 
 #[test]
 fn deep_json_nested_job_runs_extracts_dot_paths_and_handles_nulls() {
-    let schema = Schema::new(vec![
-        Field::new("job_id", DataType::Int64),
-        Field::new("creator_user_name", DataType::Utf8),
-        Field::new("created_time", DataType::Int64),
-        Field::new("settings.name", DataType::Utf8),
-        Field::new("settings.tags.team", DataType::Utf8),
-        Field::new("settings.tags.env", DataType::Utf8),
-        Field::new("cluster.num_workers", DataType::Int64),
-        Field::new("metrics.duration_ms", DataType::Float64),
-        Field::new("metrics.success", DataType::Bool),
-        Field::new("metrics.bytes_written", DataType::Int64),
-    ]);
+    let schema = job_runs_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/job_runs_sample.json",
@@ -383,14 +339,7 @@ fn deep_json_nested_job_runs_extracts_dot_paths_and_handles_nulls() {
 #[test]
 fn deep_transform_spec_and_sql_work_on_real_fixture() {
     // Use the Seattle weather CSV fixture as a realistic dataset.
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -449,14 +398,7 @@ fn deep_transform_spec_and_sql_work_on_real_fixture() {
 
 #[test]
 fn deep_profiling_head_sampling_is_deterministic() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -482,14 +424,7 @@ fn deep_profiling_head_sampling_is_deterministic() {
 
 #[test]
 fn deep_validation_and_outliers_smoke_on_real_fixture() {
-    let schema = Schema::new(vec![
-        Field::new("date", DataType::Utf8),
-        Field::new("precipitation", DataType::Float64),
-        Field::new("temp_max", DataType::Float64),
-        Field::new("temp_min", DataType::Float64),
-        Field::new("wind", DataType::Float64),
-        Field::new("weather", DataType::Utf8),
-    ]);
+    let schema = seattle_schema();
 
     let ds = ingest_from_path(
         "tests/fixtures/deep/seattle-weather.csv",
@@ -720,12 +655,7 @@ fn deep_excel_multisheet_formulas_and_nulls() {
 
     wb.save(&path).unwrap();
 
-    let schema = Schema::new(vec![
-        Field::new("id", DataType::Int64),
-        Field::new("name", DataType::Utf8),
-        Field::new("score", DataType::Float64),
-        Field::new("active", DataType::Bool),
-    ]);
+    let schema = people_flat_schema();
 
     // Only select Summary sheet, ensure other sheets don't break parsing.
     let sheets = vec!["Summary"];

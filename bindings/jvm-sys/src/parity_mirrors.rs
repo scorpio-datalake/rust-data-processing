@@ -431,41 +431,32 @@ fn mirror_sql_suite_impl() -> Result<serde_json::Value, String> {
     .collect()
     .map_err(|e| e.to_string())?;
 
-    let left = DataSet::new(
-        Schema::new(vec![
-            Field::new("id", DataType::Int64),
-            Field::new("name", DataType::Utf8),
-        ]),
-        vec![
-            vec![Value::Int64(1), Value::Utf8("Ada".into())],
-            vec![Value::Int64(2), Value::Utf8("Grace".into())],
-            vec![Value::Int64(3), Value::Utf8("Linus".into())],
-        ],
-    );
-    let right = DataSet::new(
-        Schema::new(vec![
-            Field::new("id", DataType::Int64),
-            Field::new("score", DataType::Float64),
-        ]),
-        vec![
-            vec![Value::Int64(1), Value::Float64(98.5)],
-            vec![Value::Int64(3), Value::Float64(77.0)],
-        ],
-    );
+    use rust_data_processing::ingestion::json::ingest_json_from_str;
+    use rust_data_processing::pipeline_spec::PipelineBundle;
+
+    let join_bundle = PipelineBundle::from_repo_fixture("sql_parity");
+    let left_schema = join_bundle
+        .load_schema("schemas/join_left.schema.json")
+        .map_err(|e| e.to_string())?;
+    let right_schema = join_bundle
+        .load_schema("schemas/join_right.schema.json")
+        .map_err(|e| e.to_string())?;
+    let left_json = std::fs::read_to_string(join_bundle.root().join("data/join_left.json"))
+        .map_err(|e| e.to_string())?;
+    let right_json = std::fs::read_to_string(join_bundle.root().join("data/join_right.json"))
+        .map_err(|e| e.to_string())?;
+    let left = ingest_json_from_str(&left_json, &left_schema).map_err(|e| e.to_string())?;
+    let right = ingest_json_from_str(&right_json, &right_schema).map_err(|e| e.to_string())?;
+    let join_sql = join_bundle
+        .load_query_sql("queries/join_people_scores.sql.json")
+        .map_err(|e| e.to_string())?;
     let df_left = DataFrame::from_dataset(&left).map_err(|e| e.to_string())?;
     let df_right = DataFrame::from_dataset(&right).map_err(|e| e.to_string())?;
     let mut ctx = sql::Context::new();
     ctx.register("people", &df_left).map_err(|e| e.to_string())?;
     ctx.register("scores", &df_right).map_err(|e| e.to_string())?;
     let joined = ctx
-        .execute(
-            r#"
-            SELECT p.id, p.name, s.score
-            FROM people p
-            JOIN scores s ON p.id = s.id
-            ORDER BY p.id ASC
-            "#,
-        )
+        .execute(&join_sql)
         .map_err(|e| e.to_string())?
         .collect()
         .map_err(|e| e.to_string())?;

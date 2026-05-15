@@ -1,0 +1,9 @@
+{
+  "paths": ["{{SOURCE_PATH}}"],
+  "schema_ref": "schemas/people_flat.schema.json",
+  "options": {
+    "format": "excel",
+    "sheet_name": "{{SHEET_NAME}}"
+  },
+  "response": { "mode": "dataset", "max_rows": 1000 }
+}

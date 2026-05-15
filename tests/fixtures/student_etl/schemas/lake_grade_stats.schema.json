@@ -1,0 +1,10 @@
+{
+  "fields": [
+    { "name": "student_id", "data_type": "Int64" },
+    { "name": "legal_name", "data_type": "Utf8" },
+    { "name": "course_count", "data_type": "Int64" },
+    { "name": "gpa", "data_type": "Float64" },
+    { "name": "score_mean", "data_type": "Float64" },
+    { "name": "score_std", "data_type": "Float64" }
+  ]
+}

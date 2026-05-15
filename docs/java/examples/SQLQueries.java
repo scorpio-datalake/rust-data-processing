@@ -1,3 +1,4 @@
+import io.github.rust_data_processing.fixture.PipelineJsonFixtures;
 import io.github.rust_data_processing.ffi.RdpNativeJson;
 import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
 import java.lang.foreign.Arena;
@@ -7,135 +8,171 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * JVM analogues of Python {@code sql_query_dataset} and {@code SqlContext} JOINs (see {@code
- * docs/python/README.md}).
+ * JVM SQL examples using committed JSON under {@code tests/fixtures/}.
  *
- * <p><strong>Single-table SQL</strong> — Python registers the in-memory frame as {@code df}. On
- * the JVM, ingest local JSON into Rust, then run Polars SQL on {@code df} via {@code
- * rdp_run_pipeline_json} ({@code transform.sql} → sinks). Same engine as {@code
- * rust_data_processing::sql::query}.
+ * <p><strong>Single-table</strong> — {@code jvm_contract/pipelines/sql_query_dataset.pipeline.json}
+ * with {@code schema_ref} → {@code three_rows.schema.json} and input {@code data/three_rows.json};
+ * executed via {@code rdp_run_pipeline_json}.
  *
- * <p><strong>Multi-table JOIN</strong> — There is no JNI for {@code SqlContext} yet. The parity
- * export {@code rdp_parity_sql_suite_mirror} runs the same Rust JOIN / group / error checks the
- * Python suite mirrors; call it to validate JOIN-style results land in the JSON envelope.
+ * <p><strong>JOIN</strong> — SQL text and table schemas/data from {@code sql_parity/}; Rust runs the
+ * suite via {@code rdp_parity_sql_suite_mirror} until multi-source pipeline JSON exists on the JVM.
  *
- * <p>Prerequisites: native {@code rdp_jvm_sys} with {@code link-main} / {@code full}, {@link
- * RdpNativeJson#resolveNativeLibraryFromEnvOrProperty()}, {@code --enable-native-access=ALL-UNNAMED}.
- * CI exercises this file via {@code
- * io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest} (method names
- * mirror the sketches here) and via {@code FfiExportedSymbolsContractTest} for manifest-driven
- * symbol checks. Not built by the main Maven module — copy into {@code rust-data-processing-jvm-examples}
- * to compile with {@code mvn}.
+ * <p>Cross-language tests: {@code tests/sql.rs}, {@code python-wrapper/tests/test_sql_queries_fixtures.py},
+ * {@code DocsExampleNativeIntegrationTest}.
  */
 public final class SQLQueries {
 
+  private static final String JVM_BUNDLE = "jvm_contract";
+  private static final String SQL_BUNDLE = "sql_parity";
+
+  private static final String INPUT_JSON = "data/three_rows.json";
+  private static final String PIPELINE_SINGLE = "pipelines/sql_query_dataset.pipeline.json";
+  private static final String SCHEMA_THREE_ROWS = "schemas/three_rows.schema.json";
+
+  private static final String JOIN_SQL = "queries/join_people_scores.sql.json";
+  private static final String SCHEMA_JOIN_LEFT = "schemas/join_left.schema.json";
+  private static final String SCHEMA_JOIN_RIGHT = "schemas/join_right.schema.json";
+  private static final String DATA_JOIN_LEFT = "data/join_left.json";
+  private static final String DATA_JOIN_RIGHT = "data/join_right.json";
+
+  private static final String PARITY_SQL_SUITE = "rdp_parity_sql_suite_mirror";
+
   private SQLQueries() {}
 
-  public static JSONObject exampleSchema() {
-    JSONArray fields =
-        new JSONArray()
-            .put(new JSONObject().put("name", "id").put("data_type", "Int64"))
-            .put(new JSONObject().put("name", "active").put("data_type", "Bool"))
-            .put(new JSONObject().put("name", "score").put("data_type", "Float64"));
-    return new JSONObject().put("fields", fields);
+  public static Path jvmContractBundle(Path fixturesDir) {
+    return PipelineJsonFixtures.resolveBundleRoot(fixturesDir, JVM_BUNDLE)
+        .orElseThrow(
+            () -> new IllegalStateException("tests/fixtures/" + JVM_BUNDLE + " not found"));
   }
 
-  public static JSONArray exampleRowsJson() {
-    return new JSONArray()
-        .put(new JSONObject().put("id", 1).put("active", true).put("score", 10.0))
-        .put(new JSONObject().put("id", 2).put("active", true).put("score", 20.0))
-        .put(new JSONObject().put("id", 3).put("active", false).put("score", 30.0));
+  public static Path sqlParityBundle(Path fixturesDir) {
+    return PipelineJsonFixtures.resolveBundleRoot(fixturesDir, SQL_BUNDLE)
+        .orElseThrow(
+            () -> new IllegalStateException("tests/fixtures/" + SQL_BUNDLE + " not found"));
   }
 
-  /** Same SQL string as Python {@code sql_query_dataset(...)} in the README sketch. */
-  public static String singleTableSqlOnDf() {
-    return "SELECT id, score FROM df WHERE active = TRUE ORDER BY id DESC LIMIT 10";
+  public static JSONObject exampleSchema(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.loadSchemaObject(jvmContractBundle(fixturesDir), SCHEMA_THREE_ROWS);
   }
 
-  /**
-   * {@code rdp_run_pipeline_json}: ingest → {@code transform.sql} on {@code df} → Parquet sink
-   * (row count matches materialized query).
-   */
-  public static void demonstrateSingleTableSql(Path nativeLibrary) throws Throwable {
-    Linker linker = Linker.nativeLinker();
-    try (Arena arena = Arena.ofConfined()) {
-      SymbolLookup lookup = SymbolLookup.libraryLookup(nativeLibrary, arena);
-      RdpNativeJson.invokeAbiVersion(linker, lookup);
+  public static JSONArray exampleRowsJson(Path fixturesDir) throws Exception {
+    Path file = jvmContractBundle(fixturesDir).resolve(INPUT_JSON);
+    return new JSONArray(Files.readString(file, StandardCharsets.UTF_8));
+  }
 
-      Path work = Files.createTempDirectory("rdp_sql_queries_single_");
-      try {
-        Path jsonPath = work.resolve("rows.json");
-        Path parquetPath = work.resolve("out.parquet");
-        Files.writeString(jsonPath, exampleRowsJson().toString(), StandardCharsets.UTF_8);
+  public static String singleTableSqlOnDf(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.pipelineTransformSql(
+        jvmContractBundle(fixturesDir), PIPELINE_SINGLE);
+  }
 
-        JSONObject payload =
-            new JSONObject()
-                .put("pipeline_spec_version", 1)
-                .put(
-                    "sources",
-                    new JSONObject()
-                        .put(
-                            "paths",
-                            new JSONArray().put(jsonPath.toAbsolutePath().normalize().toString()))
-                        .put("schema", exampleSchema())
-                        .put("options", new JSONObject().put("format", "json")))
-                .put("transform", new JSONObject().put("sql", singleTableSqlOnDf()))
-                .put(
-                    "sinks",
-                    new JSONArray()
-                        .put(
-                            new JSONObject()
-                                .put("kind", "parquet_file")
-                                .put("path", parquetPath.toAbsolutePath().normalize().toString())));
+  public static String resolveSingleTablePipeline(
+      Path fixturesDir, Path sourceJson, Path parquetSink) throws Exception {
+    return PipelineJsonFixtures.resolvePipelineJson(
+        jvmContractBundle(fixturesDir),
+        PIPELINE_SINGLE,
+        Map.of(
+            "SOURCE_PATH", sourceJson.toAbsolutePath().normalize().toString(),
+            "SINK_PATH", parquetSink.toAbsolutePath().normalize().toString()));
+  }
 
-        JSONObject root =
-            RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, payload.toString());
-        PytestMirrorAssertions.assertEnvelopeOk(root);
-        JSONObject interchange = root.getJSONObject("interchange");
-        if (!"run_pipeline_json".equals(interchange.getString("kind"))) {
-          throw new IllegalStateException("unexpected kind: " + interchange.getString("kind"));
-        }
-        JSONObject sink = interchange.getJSONArray("sink_results").getJSONObject(0);
-        if (!"ok".equals(sink.getString("status"))) {
-          throw new AssertionError("sink not ok: " + sink);
-        }
-        int rows = sink.getInt("row_count");
-        if (rows != 2) {
-          throw new AssertionError("expected 2 rows (active=TRUE), got " + rows);
-        }
-        System.out.println("single-table SQL on df: ok, sink row_count=" + rows);
-      } finally {
-        try (var walk = Files.walk(work)) {
-          for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
-            Files.deleteIfExists(p);
-          }
+  public static JSONObject joinLeftSchema(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.loadSchemaObject(sqlParityBundle(fixturesDir), SCHEMA_JOIN_LEFT);
+  }
+
+  public static JSONObject joinRightSchema(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.loadSchemaObject(sqlParityBundle(fixturesDir), SCHEMA_JOIN_RIGHT);
+  }
+
+  public static String joinSql(Path fixturesDir) throws Exception {
+    return new JSONObject(
+            PipelineJsonFixtures.readUtf8(sqlParityBundle(fixturesDir), JOIN_SQL))
+        .getString("sql");
+  }
+
+  public static JSONArray joinLeftRows(Path fixturesDir) throws Exception {
+    return new JSONArray(
+        Files.readString(
+            sqlParityBundle(fixturesDir).resolve(DATA_JOIN_LEFT), StandardCharsets.UTF_8));
+  }
+
+  public static JSONArray joinRightRows(Path fixturesDir) throws Exception {
+    return new JSONArray(
+        Files.readString(
+            sqlParityBundle(fixturesDir).resolve(DATA_JOIN_RIGHT), StandardCharsets.UTF_8));
+  }
+
+  public static JSONObject runSingleTableSqlPipeline(
+      Linker linker, SymbolLookup lookup, Arena arena, Path fixturesDir) throws Throwable {
+    Path jsonPath = jvmContractBundle(fixturesDir).resolve(INPUT_JSON);
+    if (!Files.isRegularFile(jsonPath)) {
+      throw new IllegalStateException("Missing " + jsonPath);
+    }
+    Path work = Files.createTempDirectory("rdp_sql_queries_single_");
+    try {
+      Path parquetPath = work.resolve("out.parquet");
+      String pipeline = resolveSingleTablePipeline(fixturesDir, jsonPath, parquetPath);
+      JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipeline);
+      PytestMirrorAssertions.assertEnvelopeOk(root);
+      JSONObject sink = root.getJSONObject("interchange").getJSONArray("sink_results").getJSONObject(0);
+      if (!"ok".equals(sink.getString("status"))) {
+        throw new AssertionError("sink not ok: " + sink);
+      }
+      if (sink.getInt("row_count") != 2) {
+        throw new AssertionError("expected 2 rows (active=TRUE), got " + sink.getInt("row_count"));
+      }
+      return root;
+    } finally {
+      try (var walk = Files.walk(work)) {
+        for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
+          Files.deleteIfExists(p);
         }
       }
     }
   }
 
   /**
-   * {@code rdp_parity_sql_suite_mirror}: Rust-built JOIN payload (people × scores) for pytest /
-   * JVM parity — closest JVM path to Python {@code SqlContext} until a dedicated multi-table
-   * orchestration JSON exists.
+   * JOIN: fixture SQL + schemas + data from {@code sql_parity/}; execution via parity mirror (same
+   * Rust {@code SqlContext} checks as Python {@code test_sql_parity.py}).
    */
-  public static JSONObject demonstrateJoinSketchViaParity(Path nativeLibrary) throws Throwable {
+  public static JSONObject runJoinSketchViaParity(
+      Linker linker, SymbolLookup lookup, Arena arena, Path fixturesDir) throws Throwable {
+    String sql = joinSql(fixturesDir);
+    JSONObject root =
+        RdpNativeJson.invokeParityExport(linker, lookup, arena, PARITY_SQL_SUITE);
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    PytestMirrorAssertions.assertSqlSuiteMirror(root.getJSONObject("interchange"));
+    System.out.println("JOIN SQL (from fixture): " + sql.trim().replace('\n', ' '));
+    return root;
+  }
+
+  public static void demonstrate(Path nativeLibrary) throws Throwable {
     Linker linker = Linker.nativeLinker();
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(nativeLibrary, arena);
       RdpNativeJson.invokeAbiVersion(linker, lookup);
-      JSONObject root =
-          RdpNativeJson.invokeParityExport(linker, lookup, arena, "rdp_parity_sql_suite_mirror");
-      PytestMirrorAssertions.assertEnvelopeOk(root);
-      JSONObject interchange = root.getJSONObject("interchange");
-      PytestMirrorAssertions.assertSqlSuiteMirror(interchange);
-      JSONArray joinRows = interchange.getJSONObject("join").getJSONArray("rows");
-      System.out.println("JOIN sketch (parity sql_suite): " + joinRows.length() + " row(s)");
-      return root;
+
+      Path fixtures =
+          PipelineJsonFixtures.resolveTestsFixturesDir()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "tests/fixtures not found — run from repository checkout"));
+
+      runSingleTableSqlPipeline(linker, lookup, arena, fixtures);
+      System.out.println("single-table SQL pipeline: ok");
+      System.out.println("  pipeline: " + jvmContractBundle(fixtures).resolve(PIPELINE_SINGLE));
+      System.out.println("  transform.sql: " + singleTableSqlOnDf(fixtures));
+
+      runJoinSketchViaParity(linker, lookup, arena, fixtures);
+      System.out.println("JOIN sketch: ok (parity executes; fixtures define SQL + schemas)");
+      System.out.println("  join SQL file: " + sqlParityBundle(fixtures).resolve(JOIN_SQL));
+      System.out.println(
+          "  left schema: " + sqlParityBundle(fixtures).resolve(SCHEMA_JOIN_LEFT));
     }
   }
 
@@ -147,8 +184,7 @@ public final class SQLQueries {
       System.exit(2);
     }
     try {
-      demonstrateSingleTableSql(lib);
-      demonstrateJoinSketchViaParity(lib);
+      demonstrate(lib);
     } catch (Throwable t) {
       for (Throwable c = t; c != null; c = c.getCause()) {
         String m = String.valueOf(c.getMessage());

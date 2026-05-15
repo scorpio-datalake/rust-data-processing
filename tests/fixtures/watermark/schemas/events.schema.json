@@ -1,0 +1,6 @@
+{
+  "fields": [
+    { "name": "id", "data_type": "Int64" },
+    { "name": "ts", "data_type": "Int64" }
+  ]
+}

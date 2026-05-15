@@ -7,13 +7,11 @@ import pytest
 import rust_data_processing as rdp
 
 from tests.conftest import fixture_path
+from tests.pipeline_fixture_support import load_schema_fields
 
 
 def _events_schema() -> list[dict[str, str]]:
-    return [
-        {"name": "id", "data_type": "int64"},
-        {"name": "ts", "data_type": "int64"},
-    ]
+    return load_schema_fields("schemas", "events.schema.json", bundle="watermark")
 
 
 def test_watermark_csv_keeps_rows_strictly_above() -> None:

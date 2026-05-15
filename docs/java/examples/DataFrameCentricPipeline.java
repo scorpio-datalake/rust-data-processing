@@ -1,3 +1,4 @@
+import io.github.rust_data_processing.fixture.PipelineJsonFixtures;
 import io.github.rust_data_processing.ffi.RdpNativeJson;
 import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
 import java.lang.foreign.Arena;
@@ -7,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -16,48 +18,45 @@ import org.json.JSONObject;
  * <p>The Python {@code DataFrame} API is Polars-backed in Rust; on the JVM there is no lazy
  * wrapper — you express the same work as <strong>Polars SQL</strong> on registered table {@code df}
  * inside {@code rdp_run_pipeline_json} (ingest ordered paths → optional {@code transform.sql} →
- * sinks). This matches {@code rust_data_processing::sql::query} on {@code
- * pipeline::DataFrame::from_dataset} (see {@code docs/python/README.md} and {@code docs/adr/006-*.md}).
+ * sinks). Pipeline and schema JSON live under {@code tests/fixtures/jvm_contract/} (shared with Rust
+ * and Python tests).
  *
  * <p>Prerequisites: a native {@code rdp_jvm_sys} built with {@code link-main} (or {@code jvm_ffi}
  * / {@code full}), {@link RdpNativeJson#resolveNativeLibraryFromEnvOrProperty()} must resolve to
- * that file, and the JVM needs {@code --enable-native-access=ALL-UNNAMED}. {@link
- * RdpNativeJson#invokeAbiVersion} runs first as a load/smoke check; stubbed libraries fail with an
- * explicit rebuild hint via {@link PytestMirrorAssertions#assertEnvelopeOk(JSONObject)}.
+ * that file, and the JVM needs {@code --enable-native-access=ALL-UNNAMED}.
  *
- * <p>Not built by the main Maven module — copy into {@code rust-data-processing-jvm-examples} if
- * you want {@code mvn} to compile it. The same Polars SQL + assertions are exercised in CI by
- * {@code io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest#runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample}
- * (see {@code rust-data-processing-jvm} tests) when {@code rdp_jvm_sys} is present.
+ * <p>CI: {@code
+ * io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest#runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample}.
  */
 public final class DataFrameCentricPipeline {
 
+  private static final String BUNDLE = "jvm_contract";
+  private static final String INPUT_JSON = "jvm_contract_three_rows.json";
+  private static final String PIPELINE = "pipelines/dataframe_centric_sql.pipeline.json";
+  private static final String SCHEMA = "schemas/three_rows.schema.json";
+
   private DataFrameCentricPipeline() {}
 
-  /** Same logical schema as the Python snippet; serde uses Pascal-case type names. */
-  public static JSONObject exampleSchema() {
-    JSONArray fields =
-        new JSONArray()
-            .put(new JSONObject().put("name", "id").put("data_type", "Int64"))
-            .put(new JSONObject().put("name", "active").put("data_type", "Bool"))
-            .put(new JSONObject().put("name", "score").put("data_type", "Float64"));
-    return new JSONObject().put("fields", fields);
+  public static Path jvmContractBundle(Path fixturesDir) {
+    return PipelineJsonFixtures.resolveBundleRoot(fixturesDir, BUNDLE)
+        .orElseThrow(
+            () -> new IllegalStateException("tests/fixtures/" + BUNDLE + " not found"));
   }
 
-  /** JSON array-of-objects matching {@link #exampleSchema()} — same rows as the Python example. */
-  public static JSONArray exampleRowsJson() {
-    return new JSONArray()
-        .put(new JSONObject().put("id", 1).put("active", true).put("score", 10.0))
-        .put(new JSONObject().put("id", 2).put("active", true).put("score", 20.0))
-        .put(new JSONObject().put("id", 3).put("active", false).put("score", 30.0));
+  /** {@code tests/fixtures/jvm_contract/schemas/three_rows.schema.json}. */
+  public static JSONObject exampleSchema(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.loadSchemaObject(jvmContractBundle(fixturesDir), SCHEMA);
   }
 
-  /**
-   * Equivalent to {@code filter_eq("active", True).multiply_f64("score", 2.0).collect()} on the
-   * ingested frame (two rows: ids 1 and 2 with doubled scores).
-   */
-  public static String transformSql() {
-    return "SELECT id, active, (score * 2.0) AS score FROM df WHERE active = TRUE ORDER BY id";
+  /** Committed input rows: {@code tests/fixtures/jvm_contract_three_rows.json}. */
+  public static JSONArray exampleRowsJson(Path fixturesDir) throws Exception {
+    return new JSONArray(
+        Files.readString(fixturesDir.resolve(INPUT_JSON), StandardCharsets.UTF_8));
+  }
+
+  /** SQL from {@code tests/fixtures/jvm_contract/pipelines/dataframe_centric_sql.pipeline.json}. */
+  public static String transformSql(Path fixturesDir) throws Exception {
+    return PipelineJsonFixtures.pipelineTransformSql(jvmContractBundle(fixturesDir), PIPELINE);
   }
 
   public static void demonstrate(Path nativeLibrary) throws Throwable {
@@ -66,32 +65,26 @@ public final class DataFrameCentricPipeline {
       SymbolLookup lookup = SymbolLookup.libraryLookup(nativeLibrary, arena);
       RdpNativeJson.invokeAbiVersion(linker, lookup);
 
+      Path fixtures =
+          PipelineJsonFixtures.resolveTestsFixturesDir()
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "tests/fixtures not found — run from repository checkout"));
+      Path bundle = jvmContractBundle(fixtures);
+      Path jsonPath = fixtures.resolve(INPUT_JSON);
       Path work = Files.createTempDirectory("rdp_dataframe_centric_demo_");
       try {
-        Path jsonPath = work.resolve("events.json");
         Path parquetPath = work.resolve("out.parquet");
-        Files.writeString(jsonPath, exampleRowsJson().toString(), StandardCharsets.UTF_8);
+        String payload =
+            PipelineJsonFixtures.resolvePipelineJson(
+                bundle,
+                PIPELINE,
+                Map.of(
+                    "SOURCE_PATH", jsonPath.toAbsolutePath().normalize().toString(),
+                    "SINK_PATH", parquetPath.toAbsolutePath().normalize().toString()));
 
-        JSONObject payload =
-            new JSONObject()
-                .put("pipeline_spec_version", 1)
-                .put(
-                    "sources",
-                    new JSONObject()
-                        .put("paths", new JSONArray().put(jsonPath.toAbsolutePath().normalize().toString()))
-                        .put("schema", exampleSchema())
-                        .put("options", new JSONObject().put("format", "json")))
-                .put("transform", new JSONObject().put("sql", transformSql()))
-                .put(
-                    "sinks",
-                    new JSONArray()
-                        .put(
-                            new JSONObject()
-                                .put("kind", "parquet_file")
-                                .put("path", parquetPath.toAbsolutePath().normalize().toString())));
-
-        JSONObject root =
-            RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, payload.toString());
+        JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, payload);
         PytestMirrorAssertions.assertEnvelopeOk(root);
         JSONObject interchange = root.getJSONObject("interchange");
         if (!"run_pipeline_json".equals(interchange.getString("kind"))) {
@@ -104,9 +97,12 @@ public final class DataFrameCentricPipeline {
         }
         int rowCount = parquetSink.getInt("row_count");
         if (rowCount != 2) {
-          throw new AssertionError("expected row_count == 2 (Python assert out.row_count() == 2), got " + rowCount);
+          throw new AssertionError(
+              "expected row_count == 2 (Python assert out.row_count() == 2), got " + rowCount);
         }
         System.out.println("DataFrame-centric pipeline (Polars SQL via rdp_run_pipeline_json): ok");
+        System.out.println("schema bundle: " + bundle.resolve(SCHEMA));
+        System.out.println("transform.sql: " + transformSql(fixtures));
         System.out.println("sink parquet row_count=" + rowCount + " path=" + parquetSink.getString("path"));
       } finally {
         try (var walk = Files.walk(work)) {

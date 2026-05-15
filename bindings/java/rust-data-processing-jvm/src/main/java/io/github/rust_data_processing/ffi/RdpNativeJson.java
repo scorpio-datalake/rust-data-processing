@@ -132,8 +132,8 @@ public final class RdpNativeJson {
       Linker linker, SymbolLookup lookup, Arena arena, String path, String sheetName)
       throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment pathUtf8 = arena.allocateUtf8String(path);
-    MemorySegment sheetUtf8 = arena.allocateUtf8String(sheetName);
+    MemorySegment pathUtf8 = arena.allocateFrom(path);
+    MemorySegment sheetUtf8 = arena.allocateFrom(sheetName);
 
     MethodHandle fn =
         linker.downcallHandle(
@@ -196,6 +196,18 @@ public final class RdpNativeJson {
     return invokePathIngest(linker, lookup, arena, "rdp_ingest_parquet_path", path, schemaJson, optionsJson);
   }
 
+  /** Ingest row-oriented {@code <rdp_records>} XML: {@code rdp_ingest_xml_path}. */
+  public static JSONObject invokeIngestXmlPath(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String path,
+      String schemaJson,
+      String optionsJson)
+      throws Throwable {
+    return invokePathIngest(linker, lookup, arena, "rdp_ingest_xml_path", path, schemaJson, optionsJson);
+  }
+
   /**
    * Ordered multi-path ingest: {@code rdp_ingest_ordered_paths_json}. {@code payloadJson} is UTF-8
    * JSON with {@code paths}, {@code schema}, {@code options}, and {@code response} ({@code mode} =
@@ -204,7 +216,7 @@ public final class RdpNativeJson {
   public static JSONObject invokeIngestOrderedPathsJson(
       Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment payloadUtf8 = arena.allocateUtf8String(payloadJson);
+    MemorySegment payloadUtf8 = arena.allocateFrom(payloadJson);
     MethodHandle fn =
         linker.downcallHandle(
             lookup.find("rdp_ingest_ordered_paths_json").orElseThrow(),
@@ -234,7 +246,7 @@ public final class RdpNativeJson {
   public static JSONObject invokeRunPipelineJson(
       Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment payloadUtf8 = arena.allocateUtf8String(payloadJson);
+    MemorySegment payloadUtf8 = arena.allocateFrom(payloadJson);
     MethodHandle fn =
         linker.downcallHandle(
             lookup.find("rdp_run_pipeline_json").orElseThrow(),
@@ -262,9 +274,9 @@ public final class RdpNativeJson {
       String optionsJson)
       throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment pathUtf8 = arena.allocateUtf8String(path);
-    MemorySegment schemaUtf8 = arena.allocateUtf8String(schemaJson);
-    MemorySegment optionsUtf8 = arena.allocateUtf8String(optionsJson);
+    MemorySegment pathUtf8 = arena.allocateFrom(path);
+    MemorySegment schemaUtf8 = arena.allocateFrom(schemaJson);
+    MemorySegment optionsUtf8 = arena.allocateFrom(optionsJson);
 
     MethodHandle fn =
         linker.downcallHandle(

@@ -1,0 +1,19 @@
+{
+  "engine": "rdp_rust_only_etl",
+  "json_source_paths": ["{{SOURCE_PATH}}"],
+  "schema_student_json_ref": "schemas/student_source.schema.json",
+  "schema_lake_grade_stats_ref": "schemas/lake_grade_stats.schema.json",
+  "schema_postgres_courses_teachers_ref": "schemas/postgres_courses.schema.json",
+  "lake_sink": {
+    "format": "delta_or_iceberg_tbd",
+    "catalog_uri": "thrift://iceberg-catalog.example:9083",
+    "warehouse": "s3://school-warehouse/",
+    "namespace": "curated",
+    "table_student_grades": "student_grade_stats"
+  },
+  "relational_sink": {
+    "postgresql_url": "postgresql://app:CHANGE_ME@db.example:5432/school?sslmode=require",
+    "courses_teachers_table": "public.courses_teachers"
+  },
+  "notes": "Shared legacy control-plane fixture (see docs/java/examples/RDPOnlyETLExample.java)"
+}

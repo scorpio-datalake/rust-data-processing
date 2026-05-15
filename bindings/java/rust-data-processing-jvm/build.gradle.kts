@@ -37,8 +37,8 @@ repositories {
 }
 
 dependencies {
+    implementation("org.json:json:20250107")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
-    testImplementation("org.json:json:20250107")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
 }
 
@@ -69,8 +69,10 @@ jmh {
 }
 
 afterEvaluate {
-    tasks.named<JavaExec>("jmh") {
-        jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+    tasks.findByName("jmh")?.let { task ->
+        if (task is JavaExec) {
+            task.jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+        }
     }
 }
 

@@ -155,12 +155,8 @@ final class FfiExportedSymbolsContractTest {
           Path csv = fixtures.get().resolve("people.csv");
           Assumptions.assumeTrue(Files.exists(csv), "Skip when tests/fixtures/people.csv missing");
           String schema =
-              "{\"fields\":["
-                  + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
-                  + "{\"name\":\"name\",\"data_type\":\"Utf8\"},"
-                  + "{\"name\":\"score\",\"data_type\":\"Float64\"},"
-                  + "{\"name\":\"active\",\"data_type\":\"Bool\"}"
-                  + "]}";
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.loadPeopleSchemaJson(
+                  "schemas/people_csv.schema.json");
           JSONObject root =
               RdpNativeJson.invokeIngestCsvPath(linker, lookup, arena, csv.toString(), schema, "{}");
           PytestMirrorAssertions.assertEnvelopeOk(root);
@@ -177,12 +173,8 @@ final class FfiExportedSymbolsContractTest {
           Path json = fixtures.get().resolve("people.json");
           Assumptions.assumeTrue(Files.exists(json), "Skip when tests/fixtures/people.json missing");
           String schema =
-              "{\"fields\":["
-                  + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
-                  + "{\"name\":\"user.name\",\"data_type\":\"Utf8\"},"
-                  + "{\"name\":\"score\",\"data_type\":\"Float64\"},"
-                  + "{\"name\":\"active\",\"data_type\":\"Bool\"}"
-                  + "]}";
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.loadPeopleSchemaJson(
+                  "schemas/people_json.schema.json");
           JSONObject root =
               RdpNativeJson.invokeIngestJsonPath(
                   linker, lookup, arena, json.toString(), schema, "{}");
@@ -204,6 +196,24 @@ final class FfiExportedSymbolsContractTest {
               RdpNativeJson.invokeIngestParquetPath(
                   linker, lookup, arena, csv.toString(), schema, "{}");
           assertFalse(root.getBoolean("ok"), "CSV path with Parquet ingest should fail");
+          return;
+        }
+      case "rdp_ingest_xml_path":
+        {
+          Path xml = JvmNativeContractScenarios.requireJvmContractFixture("ghcn/ghcn_stations_intermediate.xml");
+          Path bundle =
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.resolveBundleRoot("ghcn")
+                  .orElseThrow();
+          String schema =
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.loadSchemaJson(
+                  bundle, "schemas/xml_intermediate.schema.json");
+          JSONObject root =
+              RdpNativeJson.invokeIngestXmlPath(
+                  linker, lookup, arena, xml.toString(), schema, "{}");
+          PytestMirrorAssertions.assertEnvelopeOk(root);
+          assertEquals(
+              "ingest_path_xml", root.getJSONObject("interchange").getString("kind"));
+          assertEquals(5, root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
           return;
         }
       case "rdp_ingest_ordered_paths_json":

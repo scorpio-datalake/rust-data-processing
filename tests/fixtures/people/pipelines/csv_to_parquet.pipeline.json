@@ -1,0 +1,11 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["{{SOURCE_PATH}}"],
+    "schema_ref": "schemas/people_csv.schema.json",
+    "options": { "format": "csv" }
+  },
+  "sinks": [
+    { "kind": "parquet_file", "path": "{{SINK_PATH}}" }
+  ]
+}

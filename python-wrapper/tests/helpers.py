@@ -58,13 +58,9 @@ def feature_wise_parity(ds: rdp.DataSet, columns: Sequence[str], std_kind: str |
 
 def people_dataset() -> rdp.DataSet:
     """Mirror `tests/sql.rs` `people_dataset`."""
-    schema = [
-        {"name": "id", "data_type": "int64"},
-        {"name": "active", "data_type": "bool"},
-        {"name": "score", "data_type": "float64"},
-        {"name": "name", "data_type": "utf8"},
-        {"name": "grp", "data_type": "utf8"},
-    ]
+    from tests.pipeline_fixture_support import load_schema_fields
+
+    schema = load_schema_fields("schemas", "tabular_5col.schema.json", bundle="people")
     rows = [
         [1, True, 10.0, "Ada", "A"],
         [2, False, 20.0, "Grace", "A"],

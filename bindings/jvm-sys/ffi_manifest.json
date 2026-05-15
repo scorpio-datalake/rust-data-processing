@@ -12,6 +12,7 @@
     "rdp_ingest_ordered_paths_json",
     "rdp_run_pipeline_json",
     "rdp_ingest_parquet_path",
+    "rdp_ingest_xml_path",
     "rdp_parity_benchmark_smoke_mirror",
     "rdp_parity_bindings_mirror",
     "rdp_parity_cdc",

@@ -7,27 +7,18 @@ import pytest
 import rust_data_processing as rdp
 
 from tests.conftest import fixture_path
+from tests.pipeline_fixture_support import load_schema_fields
 
 
 def test_ingest_csv_people_happy_path() -> None:
-    schema = [
-        {"name": "id", "data_type": "int64"},
-        {"name": "name", "data_type": "utf8"},
-        {"name": "score", "data_type": "float64"},
-        {"name": "active", "data_type": "bool"},
-    ]
+    schema = load_schema_fields("schemas", "people_csv.schema.json", bundle="people")
     ds = rdp.ingest_from_path(fixture_path("people.csv"), schema, {"format": "csv"})
     assert ds.row_count() == 2
     assert ds.to_rows()[0] == [1, "Ada", 98.5, True]
 
 
 def test_ingest_json_people_nested_happy_path() -> None:
-    schema = [
-        {"name": "id", "data_type": "int64"},
-        {"name": "user.name", "data_type": "utf8"},
-        {"name": "score", "data_type": "float64"},
-        {"name": "active", "data_type": "bool"},
-    ]
+    schema = load_schema_fields("schemas", "people_json.schema.json", bundle="people")
     ds = rdp.ingest_from_path(fixture_path("people.json"), schema, {"format": "json"})
     assert ds.row_count() == 2
     rows = ds.to_rows()

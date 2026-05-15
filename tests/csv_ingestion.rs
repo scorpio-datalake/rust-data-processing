@@ -1,13 +1,9 @@
 use rust_data_processing::ingestion::csv::{ingest_csv_from_path, ingest_csv_from_reader};
-use rust_data_processing::types::{DataType, Field, Schema, Value};
+use rust_data_processing::pipeline_spec::PipelineBundle;
+use rust_data_processing::types::{Schema, Value};
 
 fn people_schema() -> Schema {
-    Schema::new(vec![
-        Field::new("id", DataType::Int64),
-        Field::new("name", DataType::Utf8),
-        Field::new("score", DataType::Float64),
-        Field::new("active", DataType::Bool),
-    ])
+    PipelineBundle::from_repo_fixture("people").expect_schema("schemas/people_csv.schema.json")
 }
 
 #[test]

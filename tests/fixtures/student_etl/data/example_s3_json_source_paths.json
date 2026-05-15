@@ -1,0 +1,5 @@
+[
+  "s3://school-rdp/students/year=2024/part-00000.json",
+  "s3://school-rdp/students/year=2024/part-00001.json",
+  "s3://school-rdp/students/year=2024/part-00002.json"
+]

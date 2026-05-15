@@ -1,0 +1,14 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["{{SOURCE_PATH}}"],
+    "schema_ref": "schemas/json_source.schema.json",
+    "options": { "format": "json" }
+  },
+  "transform": {
+    "sql": "SELECT id AS stationCode, latitude AS lat, longitude AS lon, elevation AS elev_m, name AS label, state AS region FROM df"
+  },
+  "sinks": [
+    { "kind": "xml_file", "path": "{{SINK_PATH}}" }
+  ]
+}

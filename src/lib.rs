@@ -294,6 +294,7 @@ pub mod export;
 pub mod ingestion;
 pub mod outliers;
 pub mod pipeline;
+pub mod pipeline_spec;
 pub mod privacy;
 pub mod processing;
 pub mod profiling;

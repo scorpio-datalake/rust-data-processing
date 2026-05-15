@@ -1,0 +1,14 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["{{SOURCE_PATH}}"],
+    "schema_ref": "schemas/xml_intermediate.schema.json",
+    "options": { "format": "xml" }
+  },
+  "transform": {
+    "sql": "SELECT stationCode AS station_id, lat AS geo_lat, lon AS geo_lon, elev_m AS elevation_meters, label AS station_label, region AS region_code FROM df"
+  },
+  "sinks": [
+    { "kind": "parquet_file", "path": "{{SINK_PATH}}" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "paths": ["{{PATH_A}}", "{{PATH_B}}"],
+  "schema_ref": "schemas/id_name.schema.json",
+  "options": { "format": "csv" },
+  "response": { "mode": "parquet_temp" }
+}

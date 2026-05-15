@@ -51,10 +51,10 @@ final class DocsExampleNativeIntegrationTest {
   }
 
   /**
-   * Keeps {@code docs/java/examples/ExcelSnippets.java} honest: {@code rdp_excel_ingest_path_sheet}
-   * on {@code tests/fixtures/people.xlsx} (sheet {@value #PEOPLE_SHEET}), aligned with
-   * {@code people.csv}. Generate if missing: {@code python scripts/write_people_xlsx_stdlib.py} or
-   * {@code cargo run --features excel_test_writer --bin generate_people_xlsx_fixture}.
+   * Keeps {@code docs/java/examples/ExcelSnippets.java} honest: JSON schema + payload from {@code
+   * tests/fixtures/people/} → {@code rdp_ingest_ordered_paths_json} on {@code people.xlsx} (sheet
+   * {@value #PEOPLE_SHEET}). Generate workbook if missing: {@code cargo run --features
+   * excel_test_writer --bin generate_people_xlsx_fixture}.
    */
   @Test
   void excelIngestPathSheetMatchesDocsExampleWhenFixturePresent() throws Throwable {
@@ -74,12 +74,25 @@ final class DocsExampleNativeIntegrationTest {
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
       RdpNativeJson.invokeAbiVersion(linker, lookup);
+      Path fixtures =
+          io.github.rust_data_processing.support.RdpJvmSysTestSupport.resolveTestsFixturesDir()
+              .orElseThrow();
+      String payload =
+          io.github.rust_data_processing.fixture.PipelineJsonFixtures.resolvePayloadJson(
+              io.github.rust_data_processing.fixture.PipelineJsonFixtures.resolveBundleRoot(
+                      fixtures, "people")
+                  .orElseThrow(),
+              "payloads/excel_sheet_dataset.payload.json",
+              java.util.Map.of(
+                  "SOURCE_PATH",
+                  peopleXlsx.get().toAbsolutePath().normalize().toString(),
+                  "SHEET_NAME",
+                  PEOPLE_SHEET));
       JSONObject root =
-          RdpNativeJson.excelIngestPathSheet(
-              linker, lookup, arena, peopleXlsx.get().toString(), PEOPLE_SHEET);
+          RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload);
       PytestMirrorAssertions.assertEnvelopeOk(root);
       JSONObject interchange = root.getJSONObject("interchange");
-      assertEquals("excel_ingest_sheet", interchange.getString("kind"));
+      assertEquals("ingest_ordered_paths_dataset", interchange.getString("kind"));
       assertEquals(2, interchange.getJSONObject("dataset").getJSONArray("rows").length());
     }
   }
@@ -115,6 +128,30 @@ final class DocsExampleNativeIntegrationTest {
       SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
       RdpNativeJson.invokeAbiVersion(linker, lookup);
       JvmNativeContractScenarios.sqlSuiteMirrorJoinContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Keeps {@code docs/java/examples/GhcnJsonXmlParquetPipeline.java} honest: committed GHCN sample
+   * JSON → {@code xml_file} → {@code parquet_file} with three bundle schemas under {@code
+   * tests/fixtures/ghcn/}.
+   */
+  @Test
+  void ghcnJsonXmlParquetPipelineMatchesDocsExample() throws Throwable {
+    Optional<Path> sample =
+        RdpJvmSysTestSupport.resolveFixtureFile("ghcn/ghcn_stations_sample.json");
+    Assumptions.assumeTrue(
+        sample.isPresent(),
+        "Missing tests/fixtures/ghcn/ghcn_stations_sample.json — add GHCN bundle (see ghcn/SOURCES.md)");
+
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runGhcnJsonXmlParquetPipelineContract(linker, lookup, arena);
     }
   }
 }

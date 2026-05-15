@@ -40,6 +40,7 @@ void rdp_excel_ingest_path_sheet(RdpJsonSlice *out, const char *path, const char
 void rdp_ingest_csv_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
 void rdp_ingest_json_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
 void rdp_ingest_parquet_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
+void rdp_ingest_xml_path(RdpJsonSlice *out, const char *path, const char *schema_json, const char *options_json);
 
 /** Multi-file ingest: NUL-terminated UTF-8 JSON payload (paths, schema, options, response). */
 void rdp_ingest_ordered_paths_json(RdpJsonSlice *out, const char *payload_json);

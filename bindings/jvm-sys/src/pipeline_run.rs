@@ -65,6 +65,12 @@ enum SinkSpec {
         #[serde(default)]
         sql: Option<String>,
     },
+    /// Write the frame to row-oriented `<rdp_records>` XML (see `rust_data_processing::ingestion::xml`).
+    XmlFile {
+        path: String,
+        #[serde(default)]
+        sql: Option<String>,
+    },
     /// `libpq`-style URL (`postgresql://…`), not JDBC. Optional per-sink SQL on `df`.
     Postgresql {
         url: String,
@@ -307,7 +313,9 @@ fn check_deadline(deadline: &Option<std::time::Instant>, stage: &'static str) ->
 
 #[cfg(feature = "link-main")]
 fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineErr> {
-    use rust_data_processing::ingestion::{export_dataset_to_parquet, ingest_from_ordered_paths};
+    use rust_data_processing::ingestion::{
+        export_dataset_to_parquet, export_dataset_to_xml, ingest_from_ordered_paths,
+    };
     use rust_data_processing::pipeline::DataFrame;
     use rust_data_processing::sql;
 
@@ -439,6 +447,7 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
 
         let sink_sql = match &sink {
             SinkSpec::ParquetFile { sql, .. }
+            | SinkSpec::XmlFile { sql, .. }
             | SinkSpec::Postgresql { sql, .. }
             | SinkSpec::DeltaLake { sql, .. }
             | SinkSpec::Iceberg { sql, .. }
@@ -473,6 +482,26 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                 })?;
                 sink_results.push(serde_json::json!({
                     "kind": "parquet_file",
+                    "status": "ok",
+                    "path": path,
+                    "row_count": ds.row_count(),
+                }));
+            }
+            SinkSpec::XmlFile { path, .. } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                let out_path = Path::new(&path);
+                if let Some(parent) = out_path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        PipelineErr::structured("XML_SINK_IO_FAILED", e.to_string(), "sink")
+                    })?;
+                }
+                export_dataset_to_xml(out_path, &ds).map_err(|e| {
+                    PipelineErr::structured("XML_SINK_WRITE_FAILED", e.to_string(), "sink")
+                })?;
+                sink_results.push(serde_json::json!({
+                    "kind": "xml_file",
                     "status": "ok",
                     "path": path,
                     "row_count": ds.row_count(),
@@ -809,6 +838,9 @@ mod tests {
 
     #[test]
     fn run_pipeline_parquet_sink_roundtrip() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -821,25 +853,22 @@ mod tests {
         std::fs::write(&p2, r#"[{"id":2,"name":"B"}]"#).unwrap();
         let out_parquet = dir.join("out.parquet");
 
-        let payload = serde_json::json!({
-            "version": 1,
-            "sources": {
-                "paths": [p1.to_str().unwrap(), p2.to_str().unwrap()],
-                "schema": {
-                    "fields": [
-                        {"name": "id", "data_type": "Int64"},
-                        {"name": "name", "data_type": "Utf8"}
-                    ]
-                },
-                "options": {"format": "json"}
-            },
-            "transform": {"sql": "SELECT * FROM df ORDER BY id"},
-            "sinks": [
-                {"kind": "parquet_file", "path": out_parquet.to_str().unwrap()}
-            ]
-        });
+        let bundle = PipelineBundle::from_repo_fixture("jvm_contract");
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/ordered_json_to_parquet.pipeline.json",
+                &HashMap::from([
+                    ("SOURCE_PATH_A".into(), p1.to_string_lossy().into_owned()),
+                    ("SOURCE_PATH_B".into(), p2.to_string_lossy().into_owned()),
+                    (
+                        "SINK_PATH".into(),
+                        out_parquet.to_string_lossy().into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
 
-        let v = run_pipeline_impl(&payload.to_string()).unwrap();
+        let v = run_pipeline_impl(&payload).unwrap();
         assert_eq!(v["ingested_row_count"], 2);
         assert_eq!(v["orchestration"]["pipeline_spec_version"], 1);
         assert!(v["orchestration"]["elapsed_ms"].as_u64().is_some());
@@ -851,6 +880,9 @@ mod tests {
 
     #[test]
     fn run_pipeline_legacy_student_etl_envelope() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -864,36 +896,15 @@ mod tests {
         )
         .unwrap();
 
-        let payload = serde_json::json!({
-            "engine": "rdp_rust_only_etl",
-            "json_source_paths": [p1.to_str().unwrap()],
-            "schema_student_json": {
-                "fields": [
-                    {"name": "student_id", "data_type": "Int64"},
-                    {"name": "legal_name", "data_type": "Utf8"},
-                    {"name": "email", "data_type": "Utf8"},
-                    {"name": "homeroom", "data_type": "Utf8"},
-                    {"name": "gpa", "data_type": "Float64"},
-                    {"name": "enrollment_year", "data_type": "Int64"}
-                ]
-            },
-            "schema_lake_grade_stats": {"fields": []},
-            "schema_postgres_courses_teachers": {"fields": []},
-            "lake_sink": {
-                "format": "delta_or_iceberg_tbd",
-                "catalog_uri": "thrift://iceberg-catalog.example:9083",
-                "warehouse": "s3://school-warehouse/",
-                "namespace": "curated",
-                "table_student_grades": "student_grade_stats"
-            },
-            "relational_sink": {
-                "postgresql_url": "postgresql://app:CHANGE_ME@db.example:5432/school?sslmode=require",
-                "courses_teachers_table": "public.courses_teachers"
-            },
-            "notes": "unit test"
-        });
+        let bundle = PipelineBundle::from_repo_fixture("student_etl");
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/legacy_student_etl.pipeline.json",
+                &HashMap::from([("SOURCE_PATH".into(), p1.to_string_lossy().into_owned())]),
+            )
+            .unwrap();
 
-        let v = run_pipeline_impl(&payload.to_string()).unwrap();
+        let v = run_pipeline_impl(&payload).unwrap();
         assert_eq!(v["ingested_row_count"].as_i64(), Some(1));
         assert!(v.get("declared_staging_schemas").is_some());
         let sinks = v["sink_results"].as_array().unwrap();
