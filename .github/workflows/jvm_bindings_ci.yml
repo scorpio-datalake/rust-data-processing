@@ -79,6 +79,9 @@ jobs:
       - name: Build native rdp_jvm_sys (full Rust core linkage)
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
 
+      - name: Generate tests/fixtures/people.xlsx (JVM Excel FFI + docs)
+        run: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture
+
       - name: Set RDP_JVM_SYS (Linux)
         if: runner.os == 'Linux'
         run: echo "RDP_JVM_SYS=$GITHUB_WORKSPACE/bindings/jvm-sys/target/release/librdp_jvm_sys.so" >> "$GITHUB_ENV"

@@ -24,9 +24,12 @@ import org.json.JSONObject;
  * JSON envelope with {@code interchange.kind} = {@code excel_ingest_sheet} and tabular {@code
  * interchange.dataset} ({@code schema} + {@code rows}).
  *
- * <p>Requires built {@code rdp_jvm_sys} with Excel support (CI uses {@code --features full}). Provide a
- * real {@code .xlsx} path (e.g. repo fixture when present). When a fixture is absent, skip or supply
- * your own file.
+ * <p>Requires built {@code rdp_jvm_sys} with Excel support (CI uses {@code --features full}). CI
+ * generates {@code tests/fixtures/people.xlsx} before Maven ({@code cargo run --features
+ * excel_test_writer --bin generate_people_xlsx_fixture}). The same ingest is asserted in {@code
+ * io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest#excelIngestPathSheetMatchesDocsExampleWhenFixturePresent}
+ * (and from the manifest loop in {@code FfiExportedSymbolsContractTest}). For local runs, point at
+ * a real {@code .xlsx} or generate that fixture first.
  */
 public final class ExcelSnippets {
 

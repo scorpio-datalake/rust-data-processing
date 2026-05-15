@@ -99,6 +99,11 @@ harness = false
 name = "outliers"
 harness = false
 
+[[bin]]
+name = "generate_people_xlsx_fixture"
+path = "src/bin/generate_people_xlsx_fixture.rs"
+required-features = ["excel_test_writer"]
+
 # Reduce Windows/MSVC linker memory use for `cargo test`.
 # (Integration tests can otherwise hit LNK1102 when linking large dependency graphs like Polars.)
 [profile.test]

@@ -93,7 +93,7 @@ public final class PytestMirrorAssertions {
       throw new AssertionError("rename_cast_fill_select columns");
     }
     Object tag = interchange.getJSONObject("drop_with_literal").get("first_row_tag");
-    if (!(tag instanceof String) || !"v1".equals(tag)) {
+    if (!"v1".equals(extractUtf8String(tag))) {
       throw new AssertionError("drop_with_literal tag: " + tag);
     }
   }
@@ -152,7 +152,7 @@ public final class PytestMirrorAssertions {
       throw new AssertionError("csv_row_count");
     }
     JSONArray ids = interchange.getJSONArray("csv_ids");
-    if (ids.length() != 2 || ids.getInt(0) != 2 || ids.getInt(1) != 4) {
+    if (ids.length() != 2 || extractInt64(ids.get(0)) != 2 || extractInt64(ids.get(1)) != 4) {
       throw new AssertionError("csv_ids");
     }
     if (interchange.getInt("empty_row_count") != 0) {
@@ -220,13 +220,59 @@ public final class PytestMirrorAssertions {
 
   private static void assertDoubleClose(String label, double expected, Object actual) {
     double v;
-    if (actual instanceof Number n) {
-      v = n.doubleValue();
-    } else {
-      throw new AssertionError(label + ": not a number " + actual);
+    try {
+      v = extractFloat64(actual);
+    } catch (AssertionError e) {
+      throw new AssertionError(label + ": " + e.getMessage());
     }
     if (Math.abs(v - expected) > 1e-6) {
       throw new AssertionError(label + ": expected " + expected + " got " + v);
     }
+  }
+
+  /**
+   * Rust {@code Value} uses serde's externally tagged JSON: {@code {"Int64":2}}, {@code
+   * {"Float64":30.0}}, {@code {"Utf8":"x"}}, etc. Unwrap to the inner scalar when present.
+   */
+  private static Object unwrapValueEnvelope(Object raw) {
+    if (!(raw instanceof JSONObject obj) || obj.isEmpty()) {
+      return raw;
+    }
+    if (obj.length() != 1) {
+      return raw;
+    }
+    String k = obj.keys().next();
+    return switch (k) {
+      case "Int64", "Float64", "Bool", "Utf8" -> obj.get(k);
+      case "Null" -> null;
+      default -> raw;
+    };
+  }
+
+  private static double extractFloat64(Object raw) {
+    Object v = unwrapValueEnvelope(raw);
+    if (v instanceof Number n) {
+      return n.doubleValue();
+    }
+    throw new AssertionError("not a number " + raw);
+  }
+
+  private static long extractInt64(Object raw) {
+    Object v = unwrapValueEnvelope(raw);
+    if (v instanceof Number n) {
+      return n.longValue();
+    }
+    throw new AssertionError("not an int " + raw);
+  }
+
+  private static String extractUtf8String(Object raw) {
+    Object v = unwrapValueEnvelope(raw);
+    if (v == null || JSONObject.NULL.equals(v)) {
+      return null;
+    }
+    if (v instanceof String s) {
+      return s;
+    }
+    throw new AssertionError("not a string " + raw);
   }
 }

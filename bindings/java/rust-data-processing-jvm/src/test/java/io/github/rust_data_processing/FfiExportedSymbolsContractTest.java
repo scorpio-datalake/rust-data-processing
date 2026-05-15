@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import io.github.rust_data_processing.ffi.RdpNativeJson;
 import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
 import io.github.rust_data_processing.support.RdpJvmSysTestSupport;
+import io.github.rust_data_processing.testsupport.JvmNativeContractScenarios;
 import java.io.InputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -22,7 +23,6 @@ import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.Optional;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -31,7 +31,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Contract tests: every symbol listed in {@code ffi_manifest.json} (classpath) must resolve in
- * {@code rdp_jvm_sys} and match the manifest ABI when applicable.
+ * {@code rdp_jvm_sys} and match the manifest ABI when applicable. Doc-aligned scenarios shared with
+ * {@code io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest} live in {@code
+ * io.github.rust_data_processing.testsupport.JvmNativeContractScenarios}.
  */
 final class FfiExportedSymbolsContractTest {
 
@@ -143,28 +145,15 @@ final class FfiExportedSymbolsContractTest {
           return;
         }
       case "rdp_excel_ingest_path_sheet":
-        {
-          Path excelPath =
-              Path.of("tests")
-                  .resolve("fixtures")
-                  .resolve("people.xlsx")
-                  .toAbsolutePath();
-          Assumptions.assumeTrue(
-              Files.exists(excelPath),
-              "Skip Excel FFI contract when tests/fixtures/people.xlsx is not present");
-          JSONObject root =
-              RdpNativeJson.excelIngestPathSheet(
-                  linker, lookup, arena, excelPath.toString(), "Sheet1");
-          PytestMirrorAssertions.assertEnvelopeOk(root);
-          root.getJSONObject("interchange").getJSONObject("dataset");
-          return;
-        }
+        JvmNativeContractScenarios.excelIngestPathSheetContract(linker, lookup, arena);
+        return;
       case "rdp_ingest_csv_path":
         {
-          Path csv =
-              Path.of("tests").resolve("fixtures").resolve("people.csv").toAbsolutePath();
+          Optional<Path> fixtures = RdpJvmSysTestSupport.resolveTestsFixturesDir();
           Assumptions.assumeTrue(
-              Files.exists(csv), "Skip when repo tests/fixtures/people.csv is not cwd-relative");
+              fixtures.isPresent(), "Skip when repo tests/fixtures is not discoverable from CWD");
+          Path csv = fixtures.get().resolve("people.csv");
+          Assumptions.assumeTrue(Files.exists(csv), "Skip when tests/fixtures/people.csv missing");
           String schema =
               "{\"fields\":["
                   + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
@@ -182,10 +171,11 @@ final class FfiExportedSymbolsContractTest {
         }
       case "rdp_ingest_json_path":
         {
-          Path json =
-              Path.of("tests").resolve("fixtures").resolve("people.json").toAbsolutePath();
+          Optional<Path> fixtures = RdpJvmSysTestSupport.resolveTestsFixturesDir();
           Assumptions.assumeTrue(
-              Files.exists(json), "Skip when repo tests/fixtures/people.json is not cwd-relative");
+              fixtures.isPresent(), "Skip when repo tests/fixtures is not discoverable from CWD");
+          Path json = fixtures.get().resolve("people.json");
+          Assumptions.assumeTrue(Files.exists(json), "Skip when tests/fixtures/people.json missing");
           String schema =
               "{\"fields\":["
                   + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
@@ -204,8 +194,10 @@ final class FfiExportedSymbolsContractTest {
         }
       case "rdp_ingest_parquet_path":
         {
-          Path csv =
-              Path.of("tests").resolve("fixtures").resolve("people.csv").toAbsolutePath();
+          Optional<Path> fixtures = RdpJvmSysTestSupport.resolveTestsFixturesDir();
+          Assumptions.assumeTrue(
+              fixtures.isPresent(), "Skip when repo tests/fixtures is not discoverable from CWD");
+          Path csv = fixtures.get().resolve("people.csv");
           Assumptions.assumeTrue(Files.exists(csv), "Skip when tests/fixtures/people.csv missing");
           String schema = "{\"fields\":[{\"name\":\"id\",\"data_type\":\"Int64\"}]}";
           JSONObject root =
@@ -215,10 +207,10 @@ final class FfiExportedSymbolsContractTest {
           return;
         }
       case "rdp_ingest_ordered_paths_json":
-        ingestOrderedPathsContract(linker, lookup, arena);
+        JvmNativeContractScenarios.ingestOrderedPathsContract(linker, lookup, arena);
         return;
       case "rdp_run_pipeline_json":
-        runPipelineJsonContract(linker, lookup, arena);
+        JvmNativeContractScenarios.runPipelineJsonContract(linker, lookup, arena);
         return;
       default:
         if (name.startsWith("rdp_parity_")) {
@@ -229,7 +221,8 @@ final class FfiExportedSymbolsContractTest {
         fail(
             "ffi_manifest.json lists `"
                 + name
-                + "` — add a Panama downcall + assertion in FfiExportedSymbolsContractTest");
+                + "` — add a Panama downcall + assertion in FfiExportedSymbolsContractTest (or extend"
+                + " JvmNativeContractScenarios if the scenario is shared with doc example tests)");
     }
   }
 
@@ -307,143 +300,19 @@ final class FfiExportedSymbolsContractTest {
     }
   }
 
-  private static void runPipelineJsonContract(Linker linker, SymbolLookup lookup, Arena arena)
-      throws Throwable {
-    Path dir = Files.createTempDirectory("rdp_contract_run_pipeline_");
-    try {
-      Path p1 = dir.resolve("a.json");
-      Path p2 = dir.resolve("b.json");
-      Files.writeString(p1, "[{\"id\":1,\"name\":\"A\"}]");
-      Files.writeString(p2, "[{\"id\":2,\"name\":\"B\"}]");
-      String abspath1 = p1.toAbsolutePath().toString();
-      String abspath2 = p2.toAbsolutePath().toString();
-      Path outParquet = dir.resolve("out.parquet");
-      String schemaJson =
-          "{\"fields\":["
-              + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
-              + "{\"name\":\"name\",\"data_type\":\"Utf8\"}"
-              + "]}";
-      JSONObject payload =
-          new JSONObject()
-              .put("version", 1)
-              .put(
-                  "sources",
-                  new JSONObject()
-                      .put("paths", new JSONArray().put(abspath1).put(abspath2))
-                      .put("schema", new JSONObject(schemaJson))
-                      .put("options", new JSONObject().put("format", "json")))
-              .put("transform", new JSONObject().put("sql", "SELECT * FROM df ORDER BY id"))
-              .put(
-                  "sinks",
-                  new JSONArray()
-                      .put(
-                          new JSONObject()
-                              .put("kind", "parquet_file")
-                              .put("path", outParquet.toAbsolutePath().toString())));
-      JSONObject root =
-          RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, payload.toString());
-      PytestMirrorAssertions.assertEnvelopeOk(root);
-      JSONObject inter = root.getJSONObject("interchange");
-      assertEquals("run_pipeline_json", inter.getString("kind"));
-      assertEquals(2, inter.getInt("ingested_row_count"));
-      assertTrue(Files.exists(outParquet), "pipeline parquet sink missing: " + outParquet);
-      assertEquals(
-          "ok",
-          inter.getJSONArray("sink_results").getJSONObject(0).getString("status"));
-      Files.deleteIfExists(outParquet);
-    } finally {
-      try (var walk = Files.walk(dir)) {
-        for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
-          Files.deleteIfExists(p);
-        }
-      }
-    }
-  }
+  @Test
+  void runPipelineJsonInvalidPayloadHasStructuredError() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
 
-  private static void ingestOrderedPathsContract(Linker linker, SymbolLookup lookup, Arena arena)
-      throws Throwable {
-    Path dir = Files.createTempDirectory("rdp_contract_ordered_");
-    try {
-      Path p1 = dir.resolve("a.csv");
-      Path p2 = dir.resolve("b.csv");
-      Files.writeString(p1, "id,name\n1,A\n");
-      Files.writeString(p2, "id,name\n2,B\n");
-      String abspath1 = p1.toAbsolutePath().toString();
-      String abspath2 = p2.toAbsolutePath().toString();
-      String schemaJson =
-          "{\"fields\":["
-              + "{\"name\":\"id\",\"data_type\":\"Int64\"},"
-              + "{\"name\":\"name\",\"data_type\":\"Utf8\"}"
-              + "]}";
-
-      JSONObject payloadDataset =
-          new JSONObject()
-              .put("paths", new JSONArray().put(abspath1).put(abspath2))
-              .put("schema", new JSONObject(schemaJson))
-              .put("options", new JSONObject().put("format", "csv"))
-              .put("response", new JSONObject().put("mode", "dataset").put("max_rows", 50));
-      JSONObject rootDataset =
-          RdpNativeJson.invokeIngestOrderedPathsJson(
-              linker, lookup, arena, payloadDataset.toString());
-      PytestMirrorAssertions.assertEnvelopeOk(rootDataset);
-      JSONObject interD = rootDataset.getJSONObject("interchange");
-      assertEquals("ingest_ordered_paths_dataset", interD.getString("kind"));
-      assertEquals(2, interD.getInt("total_row_count"));
-      assertEquals(2, interD.getInt("returned_row_count"));
-      assertFalse(interD.getBoolean("truncated"));
-
-      JSONObject payloadTruncate =
-          new JSONObject()
-              .put("paths", new JSONArray().put(abspath1).put(abspath2))
-              .put("schema", new JSONObject(schemaJson))
-              .put("options", new JSONObject().put("format", "csv"))
-              .put("response", new JSONObject().put("mode", "dataset").put("max_rows", 1));
-      JSONObject rootTruncate =
-          RdpNativeJson.invokeIngestOrderedPathsJson(
-              linker, lookup, arena, payloadTruncate.toString());
-      PytestMirrorAssertions.assertEnvelopeOk(rootTruncate);
-      JSONObject interT = rootTruncate.getJSONObject("interchange");
-      assertTrue(interT.getBoolean("truncated"));
-      assertEquals(1, interT.getInt("returned_row_count"));
-      assertEquals(2, interT.getInt("total_row_count"));
-
-      JSONObject payloadParquet =
-          new JSONObject()
-              .put("paths", new JSONArray().put(abspath1).put(abspath2))
-              .put("schema", new JSONObject(schemaJson))
-              .put("options", new JSONObject().put("format", "csv"))
-              .put("response", new JSONObject().put("mode", "parquet_temp"));
-      JSONObject rootParquet =
-          RdpNativeJson.invokeIngestOrderedPathsJson(
-              linker, lookup, arena, payloadParquet.toString());
-      PytestMirrorAssertions.assertEnvelopeOk(rootParquet);
-      JSONObject interP = rootParquet.getJSONObject("interchange");
-      assertEquals("ingest_ordered_paths_parquet_temp", interP.getString("kind"));
-      Path parquetOut = Path.of(interP.getString("path"));
-      assertTrue(Files.exists(parquetOut));
-      Files.deleteIfExists(parquetOut);
-
-      JSONObject payloadArrow =
-          new JSONObject()
-              .put("paths", new JSONArray().put(abspath1).put(abspath2))
-              .put("schema", new JSONObject(schemaJson))
-              .put("options", new JSONObject().put("format", "csv"))
-              .put("response", new JSONObject().put("mode", "arrow_ipc_temp"));
-      JSONObject rootArrow =
-          RdpNativeJson.invokeIngestOrderedPathsJson(
-              linker, lookup, arena, payloadArrow.toString());
-      PytestMirrorAssertions.assertEnvelopeOk(rootArrow);
-      JSONObject interA = rootArrow.getJSONObject("interchange");
-      assertEquals("ingest_ordered_paths_arrow_ipc_temp", interA.getString("kind"));
-      Path arrowOut = Path.of(interA.getString("path"));
-      assertTrue(Files.exists(arrowOut));
-      Files.deleteIfExists(arrowOut);
-    } finally {
-      try (var walk = Files.walk(dir)) {
-        for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
-          Files.deleteIfExists(p);
-        }
-      }
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, "not json");
+      assertFalse(root.getBoolean("ok"));
+      JSONObject err = root.getJSONObject("error");
+      assertEquals("ORCHESTRATION_JSON_INVALID", err.getString("code"));
+      assertEquals("parse", err.getString("stage"));
     }
   }
 }

@@ -49,6 +49,19 @@ pub fn json_err(msg: impl Into<String>) -> RdpJsonSlice {
     vec_to_slice(serde_json::to_vec(&v).unwrap_or_else(|_| b"{\"ok\":false}".to_vec()))
 }
 
+/// Structured failure for **`rdp_run_pipeline_json`** (stable `error.code` / `error.stage`; see ADR 006).
+pub fn json_err_structured(code: &str, message: impl Into<String>, stage: Option<&str>) -> RdpJsonSlice {
+    let v = serde_json::json!({
+        "ok": false,
+        "error": {
+            "code": code,
+            "message": message.into(),
+            "stage": stage,
+        }
+    });
+    vec_to_slice(serde_json::to_vec(&v).unwrap_or_else(|_| b"{\"ok\":false}".to_vec()))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn rdp_json_slice_free(s: RdpJsonSlice) {
     if s.ptr.is_null() {

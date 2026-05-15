@@ -134,6 +134,10 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
 
+      - name: Generate tests/fixtures/people.xlsx (JVM Excel FFI)
+        if: steps.gate.outputs.skip != 'true'
+        run: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture
+
       - name: Set RDP_JVM_SYS for tests
         if: steps.gate.outputs.skip != 'true'
         run: echo "RDP_JVM_SYS=$GITHUB_WORKSPACE/bindings/jvm-sys/target/release/librdp_jvm_sys.so" >> "$GITHUB_ENV"

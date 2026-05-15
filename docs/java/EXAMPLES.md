@@ -140,7 +140,7 @@ Python uses **`ingest_from_path`** and **`DataSet`** directly. On the JVM, see:
 - **`rdp_parity_ingestion`** — CSV / ingestion path exercised in Rust; `interchange` includes tabular **`dataset`** (`schema` + `rows`) for Java-side projection.
 - **`rdp_parity_types_dataset`** — tabular JSON shape for typed datasets.
 
-Validate the envelope and `kind` the same way as **`FfiExportedSymbolsContractTest`** in `rust-data-processing-jvm`.
+Validate the envelope and `kind` the same way as **`FfiExportedSymbolsContractTest`** and **`DocsExampleNativeIntegrationTest`** in `rust-data-processing-jvm`.
 
 Illustrative Java snippets (copy into a module that depends on `rust-data-processing-jvm`): [`JsonParquetExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/JsonParquetExcelSnippets.java) (CSV / JSON metrics), [`ExcelSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ExcelSnippets.java) (`rdp_excel_ingest_path_sheet`), [`ParquetSnippets.java`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ParquetSnippets.java) (`rdp_export_parquet_temp`).
 

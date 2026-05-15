@@ -10,6 +10,8 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.json.JSONObject;
 
 /**
@@ -32,6 +34,29 @@ public final class RdpNativeJson {
           ValueLayout.JAVA_LONG.withName("cap"));
 
   private RdpNativeJson() {}
+
+  /**
+   * Resolves an existing native library path from {@code RDP_JVM_SYS} or system property {@code
+   * rdp.jvm.sys.library} (first match wins). Returns {@code null} if unset, blank, or the path is
+   * not a regular file (symlinks to files count as present).
+   */
+  public static Path resolveNativeLibraryFromEnvOrProperty() {
+    String env = System.getenv("RDP_JVM_SYS");
+    if (env != null && !env.isBlank()) {
+      Path p = Path.of(env.strip()).toAbsolutePath();
+      if (Files.isRegularFile(p)) {
+        return p;
+      }
+    }
+    String prop = System.getProperty("rdp.jvm.sys.library");
+    if (prop != null && !prop.isBlank()) {
+      Path p = Path.of(prop.strip()).toAbsolutePath();
+      if (Files.isRegularFile(p)) {
+        return p;
+      }
+    }
+    return null;
+  }
 
   /**
    * Reads UTF-8 JSON from native {@code RdpJsonSlice} after Rust filled {@code sliceStruct} ({@code
@@ -199,10 +224,12 @@ public final class RdpNativeJson {
 
   /**
    * Single-document pipeline: {@code rdp_run_pipeline_json}. {@code payloadJson} is UTF-8 JSON
-   * with {@code sources} (paths, schema, options), optional {@code transform.sql} on registered
-   * table {@code df}, and {@code sinks} (each optional per-sink {@code sql}). The JVM example
-   * {@code syntheticPipelineSpec()} shape ({@code json_source_paths}, {@code lake_sink}, …) is
-   * also accepted — Rust maps it to the same execution path.
+   * with optional {@code pipeline_spec_version} (default 1; alias {@code version}), optional
+   * {@code orchestration} ({@code timeout_ms}, {@code max_ingested_rows}, {@code idempotency_key}),
+   * {@code sources} (paths, schema, options), optional {@code transform.sql} on {@code df}, and
+   * {@code sinks}. On failure {@code ok} is false and {@code error} is an object with {@code code},
+   * {@code message}, and {@code stage} (see ADR 006). The legacy student-ETL document shape is also
+   * accepted.
    */
   public static JSONObject invokeRunPipelineJson(
       Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
