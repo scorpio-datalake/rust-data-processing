@@ -116,6 +116,33 @@ public final class JvmNativeContractScenarios {
     PytestMirrorAssertions.assertSqlSuiteMirror(root.getJSONObject("interchange"));
   }
 
+  /**
+   * {@code docs/java/examples/ExcelSnippets#excelIngestViaPayload}: {@code
+   * payloads/excel_sheet_dataset.payload.json} on {@code people.xlsx}.
+   */
+  public static void runExcelSnippetsViaPayloadContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    Path bundle = requireBundle("people");
+    Path workbook =
+        RdpJvmSysTestSupport.resolveFixtureFile("people.xlsx")
+            .orElseThrow(() -> new IllegalStateException("tests/fixtures/people.xlsx missing"));
+    String payload =
+        PipelineFixtureSupport.resolvePayloadJson(
+            bundle,
+            "payloads/excel_sheet_dataset.payload.json",
+            Map.of(
+                "SOURCE_PATH", workbook.toAbsolutePath().normalize().toString(),
+                "SHEET_NAME", "Sheet1"));
+    JSONObject root = RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload);
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    assertEquals(
+        "ingest_ordered_paths_dataset",
+        root.getJSONObject("interchange").getString("kind"));
+    assertEquals(
+        2,
+        root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+  }
+
   public static void excelIngestPathSheetContract(Linker linker, SymbolLookup lookup, Arena arena)
       throws Throwable {
     Optional<Path> excelPath = RdpJvmSysTestSupport.resolveFixtureFile("people.xlsx");
@@ -130,6 +157,13 @@ public final class JvmNativeContractScenarios {
     JSONObject interchange = root.getJSONObject("interchange");
     assertEquals("excel_ingest_sheet", interchange.getString("kind"));
     assertEquals(2, interchange.getJSONObject("dataset").getJSONArray("rows").length());
+  }
+
+  /** {@code docs/java/examples/ExcelSnippets}: payload ingest + {@code rdp_excel_ingest_path_sheet}. */
+  public static void runExcelSnippetsPeopleContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    runExcelSnippetsViaPayloadContract(linker, lookup, arena);
+    excelIngestPathSheetContract(linker, lookup, arena);
   }
 
   public static void runPipelineJsonContract(Linker linker, SymbolLookup lookup, Arena arena)

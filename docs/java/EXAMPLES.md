@@ -142,10 +142,10 @@ Source: [`docs/java/examples/*.java`](examples/). Each class has a `main` that e
 
 | Java class | Native entry point(s) | Primary bundle | JUnit (when native lib present) |
 | --- | --- | --- | --- |
-| [`DataFrameCentricPipeline.java`](examples/DataFrameCentricPipeline.java) | `rdp_run_pipeline_json` | `jvm_contract` | `DocsExampleNativeIntegrationTest#runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample` |
+| [`DataFrameCentricPipeline.java`](examples/DataFrameCentricPipeline.java) | `rdp_run_pipeline_json` | `jvm_contract` | `runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample`; Rust/Python `dataframe_centric_pipeline_fixtures` |
 | [`SQLQueries.java`](examples/SQLQueries.java) | `rdp_run_pipeline_json` + `rdp_parity_sql_suite_mirror` | `jvm_contract`, `sql_parity` | `runPipelineJsonSingleTableSql…`, `rdpParitySqlSuiteMirrorJoin…` |
-| [`GhcnJsonXmlParquetPipeline.java`](examples/GhcnJsonXmlParquetPipeline.java) | `rdp_run_pipeline_json`, `rdp_ingest_xml_path`, `rdp_ingest_parquet_path` | `ghcn` | `ghcnJsonXmlParquetPipelineMatchesDocsExample`, `XmlGhcnPipelineContractTest` |
-| [`ExcelSnippets.java`](examples/ExcelSnippets.java) | `rdp_ingest_ordered_paths_json` | `people` | `excelIngestPathSheetMatchesDocsExampleWhenFixturePresent` |
+| [`GhcnJsonXmlParquetPipeline.java`](examples/GhcnJsonXmlParquetPipeline.java) | `rdp_run_pipeline_json`, `rdp_ingest_xml_path`, `rdp_ingest_parquet_path` | `ghcn` | `ghcnJsonXmlParquetPipelineMatchesDocsExample`, `XmlGhcnPipelineContractTest`; Rust/Python `ghcn_*_pipeline_fixtures` |
+| [`ExcelSnippets.java`](examples/ExcelSnippets.java) | `rdp_ingest_ordered_paths_json`, `rdp_excel_ingest_path_sheet` | `people` | `excelSnippetsPeopleMatchesDocsExampleWhenFixturePresent`; Rust/Python `excel_snippets_fixtures` |
 | [`JsonParquetExcelSnippets.java`](examples/JsonParquetExcelSnippets.java) | `rdp_ingest_ordered_paths_json`, `rdp_ingest_*_path`, `rdp_run_pipeline_json` | `people` | `jsonParquetExcelSnippetsPeopleMatchesDocsExample` |
 | [`ParquetSnippets.java`](examples/ParquetSnippets.java) | `rdp_run_pipeline_json`, `rdp_export_parquet_temp`, `rdp_ingest_parquet_path` | `people` | `parquetSnippetsCsvToParquetRoundTripMatchesDocsExample`, `parquetSnippetsExportTempMatchesDocsExample` |
 | [`PathFromDirectoryScan.java`](examples/PathFromDirectoryScan.java) | `rdp_ingest_ordered_paths_json` | `watermark` | `pathFromDirectoryScanWatermarkMatchesDocsExample` |

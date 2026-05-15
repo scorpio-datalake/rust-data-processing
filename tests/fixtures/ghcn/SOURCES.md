@@ -8,4 +8,4 @@
 | `pipelines/*.pipeline.json` | `rdp_run_pipeline_json` templates with `schema_ref` + `{{SOURCE_PATH}}` / `{{SINK_PATH}}` placeholders. Resolved by [`pipeline_spec`](../../../src/pipeline_spec.rs) in Rust and `PipelineFixtureSupport` in JVM tests. |
 JUnit and examples **must not** download at runtime. Regenerate manually if the inventory format changes.
 
-**Java doc example:** `docs/java/examples/GhcnJsonXmlParquetPipeline.java` (same bundle; CI via `DocsExampleNativeIntegrationTest` and `XmlGhcnPipelineContractTest`).
+**Java doc example:** `docs/java/examples/GhcnJsonXmlParquetPipeline.java` (same bundle; CI via `DocsExampleNativeIntegrationTest`, `XmlGhcnPipelineContractTest`, Rust `tests/ghcn_json_xml_parquet_pipeline_fixtures.rs`, `jvm-sys` `run_pipeline_ghcn_json_xml_parquet_committed_fixture`, Python `test_ghcn_json_xml_parquet_pipeline_fixtures.py`).

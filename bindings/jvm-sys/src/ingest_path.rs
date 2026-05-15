@@ -446,6 +446,36 @@ mod people_payload_tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/people.csv")
     }
 
+    fn people_xlsx() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/people.xlsx")
+    }
+
+    #[test]
+    fn people_excel_sheet_dataset_payload_ordered_ingest() {
+        let xlsx = people_xlsx();
+        assert!(
+            xlsx.is_file(),
+            "missing {} — run: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture",
+            xlsx.display()
+        );
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let payload = bundle
+            .resolve_payload_json(
+                "payloads/excel_sheet_dataset.payload.json",
+                &HashMap::from([
+                    (
+                        "SOURCE_PATH".into(),
+                        xlsx.to_string_lossy().into_owned(),
+                    ),
+                    ("SHEET_NAME".into(), "Sheet1".into()),
+                ]),
+            )
+            .unwrap();
+        let v = ordered_paths_impl(&payload).unwrap();
+        assert_eq!(v["kind"], "ingest_ordered_paths_dataset");
+        assert_eq!(v["returned_row_count"].as_i64(), Some(2));
+    }
+
     #[test]
     fn people_json_path_dataset_payload_ordered_ingest() {
         let bundle = PipelineBundle::from_repo_fixture("people");

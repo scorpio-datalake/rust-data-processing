@@ -245,6 +245,24 @@ mod tests {
     }
 
     #[test]
+    fn ghcn_xml_to_parquet_pipeline_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("ghcn");
+        let json = bundle
+            .resolve_pipeline_json(
+                "pipelines/xml_to_parquet.pipeline.json",
+                &HashMap::from([
+                    ("SOURCE_PATH".into(), "/in.xml".into()),
+                    ("SINK_PATH".into(), "/out.parquet".into()),
+                ]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["sinks"][0]["kind"], "parquet_file");
+        assert!(v["sources"]["schema"]["fields"].is_array());
+        assert!(v["sources"].get("schema_ref").is_none());
+    }
+
+    #[test]
     fn jvm_contract_resolves_ordered_paths_payload() {
         let bundle = PipelineBundle::from_repo_fixture("jvm_contract");
         let json = bundle
@@ -269,6 +287,25 @@ mod tests {
             .unwrap();
         assert!(sql.contains("active = TRUE"));
         assert!(sql.contains("ORDER BY id DESC"));
+    }
+
+    #[test]
+    fn jvm_contract_dataframe_centric_pipeline_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("jvm_contract");
+        let json = bundle
+            .resolve_pipeline_json(
+                "pipelines/dataframe_centric_sql.pipeline.json",
+                &HashMap::from([
+                    ("SOURCE_PATH".into(), "/in.json".into()),
+                    ("SINK_PATH".into(), "/out.parquet".into()),
+                ]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["sinks"][0]["kind"], "parquet_file");
+        assert!(v["sources"]["schema"]["fields"].is_array());
+        assert!(v["sources"].get("schema_ref").is_none());
+        assert!(v["transform"]["sql"].as_str().unwrap().contains("score * 2.0"));
     }
 
     #[test]
@@ -308,6 +345,25 @@ mod tests {
         assert_eq!(v["paths"][0], "/in.json");
         assert!(v["schema"]["fields"].is_array());
         assert_eq!(v["options"]["format"], "json");
+    }
+
+    #[test]
+    fn people_excel_sheet_dataset_payload_expands_schema_ref() {
+        let bundle = PipelineBundle::from_repo_fixture("people");
+        let json = bundle
+            .resolve_payload_json(
+                "payloads/excel_sheet_dataset.payload.json",
+                &HashMap::from([
+                    ("SOURCE_PATH".into(), "/in.xlsx".into()),
+                    ("SHEET_NAME".into(), "Sheet1".into()),
+                ]),
+            )
+            .unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(v["paths"][0], "/in.xlsx");
+        assert_eq!(v["options"]["format"], "excel");
+        assert_eq!(v["options"]["sheet_name"], "Sheet1");
+        assert!(v["schema"]["fields"].is_array());
     }
 
     #[test]

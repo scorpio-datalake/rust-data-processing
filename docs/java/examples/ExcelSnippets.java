@@ -28,8 +28,12 @@ import org.json.JSONObject;
  * tests use this symbol; see {@code FfiExportedSymbolsContractTest}.
  *
  * <p>Fixture: {@code tests/fixtures/people.xlsx} (sheet {@code Sheet1}). Generate if missing:
- * {@code cargo run --features excel_test_writer --bin generate_people_xlsx_fixture}. CI: {@code
- * DocsExampleNativeIntegrationTest#excelIngestPathSheetMatchesDocsExampleWhenFixturePresent}.
+ * {@code cargo run --features excel_test_writer --bin generate_people_xlsx_fixture}.
+ *
+ * <p><strong>Tests</strong> — Rust {@code tests/excel_snippets_fixtures.rs} ({@code --features excel}),
+ * {@code jvm-sys} {@code people_excel_sheet_dataset_payload_ordered_ingest}, Python {@code
+ * test_excel_snippets_fixtures.py}, JUnit {@code
+ * DocsExampleNativeIntegrationTest#excelSnippetsPeopleMatchesDocsExampleWhenFixturePresent}.
  */
 public final class ExcelSnippets {
 

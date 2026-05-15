@@ -25,8 +25,10 @@ import org.json.JSONObject;
  * / {@code full}), {@link RdpNativeJson#resolveNativeLibraryFromEnvOrProperty()} must resolve to
  * that file, and the JVM needs {@code --enable-native-access=ALL-UNNAMED}.
  *
- * <p>CI: {@code
- * io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest#runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample}.
+ * <p><strong>Tests</strong> — Rust {@code tests/dataframe_centric_pipeline_fixtures.rs}, {@code
+ * jvm-sys} {@code run_pipeline_dataframe_centric_sql_committed_fixture}, Python {@code
+ * test_dataframe_centric_pipeline_fixtures.py}, JUnit {@code
+ * DocsExampleNativeIntegrationTest#runPipelineJsonPolarsSqlFilterAndMultiplyMatchesDocsExample}.
  */
 public final class DataFrameCentricPipeline {
 

@@ -1001,6 +1001,113 @@ mod tests {
         let _ = std::fs::remove_file(out);
     }
 
+    /// Same pipeline as `docs/java/examples/DataFrameCentricPipeline.java`.
+    #[test]
+    fn run_pipeline_dataframe_centric_sql_committed_fixture() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
+        let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let json_input = repo.join("tests/fixtures/jvm_contract_three_rows.json");
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let out = std::env::temp_dir().join(format!("rdp_dataframe_centric_{stamp}.parquet"));
+
+        let bundle = PipelineBundle::from_repo_fixture("jvm_contract");
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/dataframe_centric_sql.pipeline.json",
+                &HashMap::from([
+                    (
+                        "SOURCE_PATH".into(),
+                        json_input.to_string_lossy().into_owned(),
+                    ),
+                    (
+                        "SINK_PATH".into(),
+                        out.to_string_lossy().into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
+
+        let v = run_pipeline_impl(&payload).unwrap();
+        assert_eq!(v["ingested_row_count"].as_i64(), Some(3));
+        let sinks = v["sink_results"].as_array().unwrap();
+        assert_eq!(sinks.len(), 1);
+        assert_eq!(sinks[0]["kind"].as_str(), Some("parquet_file"));
+        assert_eq!(sinks[0]["status"].as_str(), Some("ok"));
+        assert_eq!(sinks[0]["row_count"].as_i64(), Some(2));
+        assert!(out.is_file());
+        let _ = std::fs::remove_file(out);
+    }
+
+    /// Same two-stage pipeline as `docs/java/examples/GhcnJsonXmlParquetPipeline.java`.
+    #[test]
+    fn run_pipeline_ghcn_json_xml_parquet_committed_fixture() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
+        let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let json_input = repo.join("tests/fixtures/ghcn/ghcn_stations_sample.json");
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let work = std::env::temp_dir().join(format!("rdp_ghcn_pipeline_{stamp}"));
+        std::fs::create_dir_all(&work).unwrap();
+        let xml_out = work.join("stations.xml");
+        let parquet_out = work.join("stations.parquet");
+
+        let bundle = PipelineBundle::from_repo_fixture("ghcn");
+        let json_to_xml = bundle
+            .resolve_pipeline_json(
+                "pipelines/json_to_xml.pipeline.json",
+                &HashMap::from([
+                    (
+                        "SOURCE_PATH".into(),
+                        json_input.to_string_lossy().into_owned(),
+                    ),
+                    (
+                        "SINK_PATH".into(),
+                        xml_out.to_string_lossy().into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
+        let v1 = run_pipeline_impl(&json_to_xml).unwrap();
+        let xml_sink = &v1["sink_results"].as_array().unwrap()[0];
+        assert_eq!(xml_sink["kind"].as_str(), Some("xml_file"));
+        assert_eq!(xml_sink["status"].as_str(), Some("ok"));
+        assert_eq!(xml_sink["row_count"].as_i64(), Some(5));
+        assert!(xml_out.is_file());
+
+        let xml_to_parquet = bundle
+            .resolve_pipeline_json(
+                "pipelines/xml_to_parquet.pipeline.json",
+                &HashMap::from([
+                    (
+                        "SOURCE_PATH".into(),
+                        xml_out.to_string_lossy().into_owned(),
+                    ),
+                    (
+                        "SINK_PATH".into(),
+                        parquet_out.to_string_lossy().into_owned(),
+                    ),
+                ]),
+            )
+            .unwrap();
+        let v2 = run_pipeline_impl(&xml_to_parquet).unwrap();
+        let parquet_sink = &v2["sink_results"].as_array().unwrap()[0];
+        assert_eq!(parquet_sink["kind"].as_str(), Some("parquet_file"));
+        assert_eq!(parquet_sink["status"].as_str(), Some("ok"));
+        assert_eq!(parquet_sink["row_count"].as_i64(), Some(5));
+        assert!(parquet_out.is_file());
+
+        let _ = std::fs::remove_dir_all(work);
+    }
+
     #[test]
     fn run_pipeline_invalid_json_returns_structured_error() {
         let err = run_pipeline_impl("{not json").unwrap_err();

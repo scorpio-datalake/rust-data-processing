@@ -19,7 +19,10 @@ import org.json.JSONObject;
  *
  * <p>CI: {@code XmlGhcnPipelineContractTest}, {@code
  * JvmNativeContractScenarios#runGhcnJsonXmlParquetPipelineContract}, {@code
- * DocsExampleNativeIntegrationTest#ghcnJsonXmlParquetPipelineMatchesDocsExample}.
+ * DocsExampleNativeIntegrationTest#ghcnJsonXmlParquetPipelineMatchesDocsExample}; Rust {@code
+ * tests/ghcn_json_xml_parquet_pipeline_fixtures.rs} and {@code jvm-sys}
+ * {@code run_pipeline_ghcn_json_xml_parquet_committed_fixture}; Python {@code
+ * test_ghcn_json_xml_parquet_pipeline_fixtures.py}.
  */
 public final class GhcnJsonXmlParquetPipeline {
 
