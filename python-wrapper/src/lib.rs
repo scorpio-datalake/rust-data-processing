@@ -528,7 +528,7 @@ impl PyExecutionEngine {
         let pred = predicate.clone_ref(py);
         let err: Mutex<Option<PyErr>> = Mutex::new(None);
         let err_ref = &err;
-        let out = Python::detach(|| {
+        let out = py.detach(|| {
             self.inner.filter_parallel(&data, move |row| {
                 if err_ref.lock().unwrap().is_some() {
                     return false;
@@ -579,7 +579,7 @@ impl PyExecutionEngine {
         let err: Mutex<Option<PyErr>> = Mutex::new(None);
         let err_ref = &err;
         let null_row = vec![Value::Null; ncols];
-        let out = Python::detach(|| {
+        let out = py.detach(|| {
             self.inner.map_parallel(&data, move |row| {
                 if err_ref.lock().unwrap().is_some() {
                     return null_row.clone();
