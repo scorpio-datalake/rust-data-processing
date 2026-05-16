@@ -53,7 +53,7 @@ impl PipelineBundle {
     /// Load a serde [`Schema`] from `rel` (e.g. `schemas/json_source.schema.json`).
     pub fn load_schema(&self, rel: &str) -> IngestionResult<Schema> {
         let path = self.root.join(rel);
-        let text = std::fs::read_to_string(&path).map_err(|e| IngestionError::Io(e))?;
+        let text = std::fs::read_to_string(&path).map_err(IngestionError::Io)?;
         serde_json::from_str(&text).map_err(|e| IngestionError::SchemaMismatch {
             message: format!("schema JSON {}: {e}", path.display()),
         })
@@ -95,7 +95,7 @@ impl PipelineBundle {
 
     fn load_json_value(&self, rel: &str) -> IngestionResult<serde_json::Value> {
         let path = self.root.join(rel);
-        let text = std::fs::read_to_string(&path).map_err(|e| IngestionError::Io(e))?;
+        let text = std::fs::read_to_string(&path).map_err(IngestionError::Io)?;
         serde_json::from_str(&text).map_err(|e| IngestionError::SchemaMismatch {
             message: format!("JSON {}: {e}", path.display()),
         })

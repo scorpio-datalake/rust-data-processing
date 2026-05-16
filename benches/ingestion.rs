@@ -254,7 +254,7 @@ fn write_xlsx(path: &Path, n: usize) -> std::io::Result<()> {
             .map_err(|e| std::io::Error::other(e.to_string()))?;
         ws.write_number(row, 2, score)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
-        ws.write_string(row, 3, &format!("name_{i}"))
+        ws.write_string(row, 3, format!("name_{i}"))
             .map_err(|e| std::io::Error::other(e.to_string()))?;
     }
 

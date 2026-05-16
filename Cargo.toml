@@ -109,3 +109,9 @@ required-features = ["excel_test_writer"]
 # (Integration tests can otherwise hit LNK1102 when linking large dependency graphs like Polars.)
 [profile.test]
 debug = 0
+
+# Dependencies still use the `dev` profile; full debug (`debug = 2`) makes `.rlib`s enormous and
+# routinely exhausts `rust-lld` during `--lib` / integration test links on 8–16 GB Windows boxes.
+# `debug = 1` keeps line tables for backtraces while cutting PDB/link pressure sharply.
+[profile.dev]
+debug = 1

@@ -65,7 +65,7 @@ fn dataframe_centric_sql_filter_and_multiply_matches_doc_example() {
         format: Some(IngestionFormat::Json),
         ..Default::default()
     };
-    let ds = ingest_from_path(&three_rows_json(), &schema, &opts).unwrap();
+    let ds = ingest_from_path(three_rows_json(), &schema, &opts).unwrap();
     assert_eq!(ds.row_count(), 3);
 
     let sql = bundle
@@ -93,7 +93,7 @@ fn dataframe_centric_sql_then_parquet_round_trip() {
         format: Some(IngestionFormat::Json),
         ..Default::default()
     };
-    let ds = ingest_from_path(&three_rows_json(), &schema, &opts).unwrap();
+    let ds = ingest_from_path(three_rows_json(), &schema, &opts).unwrap();
     let sql = bundle
         .pipeline_transform_sql("pipelines/dataframe_centric_sql.pipeline.json")
         .unwrap();

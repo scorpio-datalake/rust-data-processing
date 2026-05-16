@@ -137,7 +137,7 @@ fn people_json_path_ingest_with_committed_options() {
         format: Some(IngestionFormat::Json),
         ..Default::default()
     };
-    let ds = ingest_from_path(&people_json_path(), &schema, &opts).unwrap();
+    let ds = ingest_from_path(people_json_path(), &schema, &opts).unwrap();
     assert_eq!(ds.row_count(), 2);
 }
 
@@ -151,7 +151,7 @@ fn people_csv_path_ingest_with_committed_options() {
         format: Some(IngestionFormat::Csv),
         ..Default::default()
     };
-    let ds = ingest_from_path(&people_csv_path(), &schema, &opts).unwrap();
+    let ds = ingest_from_path(people_csv_path(), &schema, &opts).unwrap();
     assert_eq!(ds.row_count(), 2);
     assert_eq!(ds.rows[0][0], Value::Int64(1));
 }

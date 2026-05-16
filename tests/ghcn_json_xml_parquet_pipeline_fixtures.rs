@@ -99,7 +99,7 @@ fn ghcn_json_xml_parquet_pipeline_matches_doc_example() {
         format: Some(IngestionFormat::Json),
         ..Default::default()
     };
-    let json_ds = ingest_from_path(&ghcn_json_sample(), &json_schema, &json_opts).unwrap();
+    let json_ds = ingest_from_path(ghcn_json_sample(), &json_schema, &json_opts).unwrap();
     assert_eq!(json_ds.row_count(), EXPECTED_ROW_COUNT);
 
     let sql_json_to_xml = bundle
