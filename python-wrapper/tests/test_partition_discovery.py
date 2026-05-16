@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 import rust_data_processing as rdp
 
 from tests.conftest import fixture_path
@@ -17,7 +16,7 @@ def _norm(p: str) -> str:
 
 def test_discover_hive_two_partitions_plus_root_file() -> None:
     root = fixture_path("hive_partitioned")
-    files = rdp.discover_hive_partitioned_files(root, None)
+    files = rdp.discover_hive_partitioned_files(str(root), None)
     assert len(files) == 3
     by_tail = {_norm(f["path"]).split("hive_partitioned/")[-1]: f for f in files}
 
@@ -34,21 +33,21 @@ def test_discover_hive_two_partitions_plus_root_file() -> None:
 
 def test_discover_hive_with_glob_pattern() -> None:
     root = fixture_path("hive_partitioned")
-    files = rdp.discover_hive_partitioned_files(root, "**/events.csv")
+    files = rdp.discover_hive_partitioned_files(str(root), "**/events.csv")
     assert len(files) == 2
     assert all(_norm(f["path"]).endswith("events.csv") for f in files)
 
 
 def test_discover_skips_non_hive_directories() -> None:
     root = fixture_path("hive_partitioned_skip")
-    files = rdp.discover_hive_partitioned_files(root, None)
+    files = rdp.discover_hive_partitioned_files(str(root), None)
     assert files == []
 
 
 def test_discover_rejects_non_directory_root() -> None:
     f = fixture_path("hive_partitioned", "at_root.csv")
     with pytest.raises(ValueError, match="directory|hive"):
-        rdp.discover_hive_partitioned_files(f, None)
+        rdp.discover_hive_partitioned_files(str(f), None)
 
 
 def test_paths_from_glob_finds_fixture_csvs() -> None:

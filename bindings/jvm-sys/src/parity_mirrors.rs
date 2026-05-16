@@ -395,7 +395,6 @@ fn people_dataset() -> rust_data_processing::types::DataSet {
 fn mirror_sql_suite_impl() -> Result<serde_json::Value, String> {
     use rust_data_processing::pipeline::DataFrame;
     use rust_data_processing::sql;
-    use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
 
     let ds = people_dataset();
     let df = DataFrame::from_dataset(&ds).map_err(|e| e.to_string())?;

@@ -66,7 +66,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Rust build/test: ci_expanded only (skip default features).",
     )
-    parser.add_argument("--docs-only", action="store_true")
+    parser.add_argument("--docs-only", action="store_true", help="Generate Rust, Python, and Java docs.")
+    parser.add_argument("--docs-rust-only", action="store_true", help="Generate Rust API docs (cargo doc) only.")
+    parser.add_argument(
+        "--docs-python-only",
+        action="store_true",
+        help="Generate Python API docs (pdoc) under _site/python/ only.",
+    )
+    parser.add_argument(
+        "--docs-java-only",
+        action="store_true",
+        help="Generate Java examples HTML (pandoc) under _site/java/ only.",
+    )
     parser.add_argument(
         "--wait-seconds",
         type=float,
@@ -89,13 +100,21 @@ def main(argv: list[str] | None = None) -> int:
     rust_bt_wait = args.rust_build_test_wait_seconds
     offline_flag = ["--offline"] if args.offline else []
 
-    if args.docs_only:
-        _run_module(docs_rust_main, offline_flag)
-        pause(wait, "before Python docs")
-        _run_module(docs_python_main, [])
-        pause(wait, "before Java docs")
-        _run_module(docs_java_main, ["--skip-if-no-pandoc"])
-        banner("Done (docs only)")
+    want_docs_rust = args.docs_only or args.docs_rust_only
+    want_docs_python = args.docs_only or args.docs_python_only
+    want_docs_java = args.docs_only or args.docs_java_only
+    if want_docs_rust or want_docs_python or want_docs_java:
+        if want_docs_rust:
+            _run_module(docs_rust_main, offline_flag)
+        if want_docs_python:
+            if want_docs_rust:
+                pause(wait, "before Python docs")
+            _run_module(docs_python_main, [])
+        if want_docs_java:
+            if want_docs_rust or want_docs_python:
+                pause(wait, "before Java docs")
+            _run_module(docs_java_main, ["--skip-if-no-pandoc"])
+        banner("Done (docs)")
         return 0
 
     rust_flags: list[str] = []

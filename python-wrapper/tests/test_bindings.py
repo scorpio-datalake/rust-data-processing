@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 import rust_data_processing as rdp
 
 

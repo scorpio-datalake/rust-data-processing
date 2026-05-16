@@ -186,11 +186,11 @@ impl PyDataSet {
             .collect()
     }
 
-    fn schema(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn schema(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         schema_to_py_list(py, &self.inner.schema)
     }
 
-    fn to_rows(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn to_rows(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let outer = PyList::empty(py);
         for row in &self.inner.rows {
             let inner = PyList::empty(py);
@@ -409,29 +409,23 @@ impl PyDataFrame {
             .map_err(ingestion_err_to_py)
     }
 
-    fn reduce(&self, column: &str, op: &str) -> PyResult<Option<PyObject>> {
+    fn reduce(&self, py: Python<'_>, column: &str, op: &str) -> PyResult<Option<Py<PyAny>>> {
         let rop = parse_reduce_op(op)?;
         let v = self
             .inner
             .clone()
             .reduce(column, rop)
             .map_err(ingestion_err_to_py)?;
-        Python::with_gil(|py| match v {
-            None => Ok(None),
-            Some(val) => Ok(Some(value_to_py(py, &val))),
-        })
+        Ok(v.map(|val| value_to_py(py, &val)))
     }
 
-    fn sum(&self, column: &str) -> PyResult<Option<PyObject>> {
+    fn sum(&self, py: Python<'_>, column: &str) -> PyResult<Option<Py<PyAny>>> {
         let v = self
             .inner
             .clone()
             .sum(column)
             .map_err(ingestion_err_to_py)?;
-        Python::with_gil(|py| match v {
-            None => Ok(None),
-            Some(val) => Ok(Some(value_to_py(py, &val))),
-        })
+        Ok(v.map(|val| value_to_py(py, &val)))
     }
 
     #[pyo3(signature = (columns, std_kind=None))]
@@ -440,7 +434,7 @@ impl PyDataFrame {
         py: Python<'_>,
         columns: Vec<String>,
         std_kind: Option<&str>,
-    ) -> PyResult<PyObject> {
+    ) -> PyResult<Py<PyAny>> {
         let kind = match std_kind {
             None => VarianceKind::Sample,
             Some(s) => parse_variance_kind(s)?,
@@ -534,12 +528,12 @@ impl PyExecutionEngine {
         let pred = predicate.clone_ref(py);
         let err: Mutex<Option<PyErr>> = Mutex::new(None);
         let err_ref = &err;
-        let out = py.allow_threads(|| {
+        let out = Python::detach(|| {
             self.inner.filter_parallel(&data, move |row| {
                 if err_ref.lock().unwrap().is_some() {
                     return false;
                 }
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let list = PyList::empty(py);
                     for v in row {
                         if list.append(value_to_py(py, v)).is_err() {
@@ -585,12 +579,12 @@ impl PyExecutionEngine {
         let err: Mutex<Option<PyErr>> = Mutex::new(None);
         let err_ref = &err;
         let null_row = vec![Value::Null; ncols];
-        let out = py.allow_threads(|| {
+        let out = Python::detach(|| {
             self.inner.map_parallel(&data, move |row| {
                 if err_ref.lock().unwrap().is_some() {
                     return null_row.clone();
                 }
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let list = PyList::empty(py);
                     for v in row {
                         if list.append(value_to_py(py, v)).is_err() {
@@ -655,13 +649,13 @@ impl PyExecutionEngine {
         ds: &PyDataSet,
         column: &str,
         op: &str,
-    ) -> PyResult<Option<PyObject>> {
+    ) -> PyResult<Option<Py<PyAny>>> {
         let rop = parse_reduce_op(op)?;
         let v = self.inner.reduce(&ds.inner, column, rop);
         Ok(v.map(|val| value_to_py(py, &val)))
     }
 
-    fn metrics_snapshot(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn metrics_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let s = self.inner.metrics().snapshot();
         metrics_snapshot_to_py(py, &s)
     }
@@ -688,7 +682,7 @@ fn infer_schema_from_path_py(
     py: Python<'_>,
     path: &str,
     options: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let opts = merge_ingestion_options(py, options)?;
     let s = infer_schema_from_path(path, &opts).map_err(ingestion_err_to_py)?;
     schema_to_py_list(py, &s)
@@ -702,7 +696,7 @@ fn ingest_from_ordered_paths_py(
     paths: Vec<String>,
     schema: &Bound<'_, PyAny>,
     options: Option<&Bound<'_, PyAny>>,
-) -> PyResult<(PyDataSet, PyObject)> {
+) -> PyResult<(PyDataSet, Py<PyAny>)> {
     let schema = schema_from_py(schema)?;
     let opts = merge_ingestion_options(py, options)?;
     let pbs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
@@ -904,7 +898,7 @@ fn processing_reduce(
     ds: &PyDataSet,
     column: &str,
     op: &str,
-) -> PyResult<Option<PyObject>> {
+) -> PyResult<Option<Py<PyAny>>> {
     let rop = parse_reduce_op(op)?;
     Ok(reduce(&ds.inner, column, rop).map(|v| value_to_py(py, &v)))
 }
@@ -975,7 +969,7 @@ fn processing_feature_wise_mean_std(
     ds: &PyDataSet,
     columns: Vec<String>,
     std_kind: Option<&str>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let kind = match std_kind {
         None => VarianceKind::Sample,
         Some(s) => parse_variance_kind(s)?,
@@ -1002,7 +996,7 @@ fn processing_arg_max_row(
     py: Python<'_>,
     ds: &PyDataSet,
     column: &str,
-) -> PyResult<Option<(usize, PyObject)>> {
+) -> PyResult<Option<(usize, Py<PyAny>)>> {
     match arg_max_row(&ds.inner, column) {
         None => Err(PyValueError::new_err(format!("unknown column '{column}'"))),
         Some(None) => Ok(None),
@@ -1015,7 +1009,7 @@ fn processing_arg_min_row(
     py: Python<'_>,
     ds: &PyDataSet,
     column: &str,
-) -> PyResult<Option<(usize, PyObject)>> {
+) -> PyResult<Option<(usize, Py<PyAny>)>> {
     match arg_min_row(&ds.inner, column) {
         None => Err(PyValueError::new_err(format!("unknown column '{column}'"))),
         Some(None) => Ok(None),
@@ -1029,7 +1023,7 @@ fn processing_top_k_by_frequency(
     ds: &PyDataSet,
     column: &str,
     k: usize,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let Some(rows) = top_k_by_frequency(&ds.inner, column, k) else {
         return Err(PyValueError::new_err(format!("unknown column '{column}'")));
     };
@@ -1057,7 +1051,7 @@ fn discover_hive_partitioned_files(
     py: Python<'_>,
     root: &str,
     file_pattern: Option<&str>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let files = discover_hive_partitioned_files_rs(root, file_pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for pf in files {
@@ -1078,7 +1072,7 @@ fn discover_hive_partitioned_files(
 
 /// Expand a filesystem glob to existing file paths (sorted).
 #[pyfunction]
-fn paths_from_glob(py: Python<'_>, pattern: &str) -> PyResult<PyObject> {
+fn paths_from_glob(py: Python<'_>, pattern: &str) -> PyResult<Py<PyAny>> {
     let paths = paths_from_glob_rs(pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for p in paths {
@@ -1094,7 +1088,7 @@ fn paths_from_directory_scan_py(
     py: Python<'_>,
     root: &str,
     relative_pattern: Option<&str>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let paths = paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for p in paths {
@@ -1105,7 +1099,7 @@ fn paths_from_directory_scan_py(
 
 /// Validate paths exist as files; return them in order with duplicates removed (first wins).
 #[pyfunction]
-fn paths_from_explicit_list(py: Python<'_>, paths: Vec<String>) -> PyResult<PyObject> {
+fn paths_from_explicit_list(py: Python<'_>, paths: Vec<String>) -> PyResult<Py<PyAny>> {
     let pbs: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
     let out = paths_from_explicit_list_rs(&pbs).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
@@ -1117,7 +1111,7 @@ fn paths_from_explicit_list(py: Python<'_>, paths: Vec<String>) -> PyResult<PyOb
 
 /// Parse a single path component as `key=value`, or return `None` if invalid.
 #[pyfunction]
-fn parse_partition_segment(py: Python<'_>, component: &str) -> PyResult<PyObject> {
+fn parse_partition_segment(py: Python<'_>, component: &str) -> PyResult<Py<PyAny>> {
     match parse_partition_segment_rs(component) {
         Some(s) => {
             let d = PyDict::new(py);

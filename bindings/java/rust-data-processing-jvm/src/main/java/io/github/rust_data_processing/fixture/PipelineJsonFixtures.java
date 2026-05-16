@@ -11,15 +11,15 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Loads shared pipeline, payload, and schema JSON from {@code tests/fixtures/<bundle>/} — same files
- * as {@code rust_data_processing::pipeline_spec::PipelineBundle} and Python
- * {@code tests.pipeline_fixture_support}.
+ * Loads shared pipeline, payload, and schema JSON from {@code tests/fixtures/<bundle>/} — same
+ * files as {@code rust_data_processing::pipeline_spec::PipelineBundle} and Python {@code
+ * tests.pipeline_fixture_support}.
  */
 public final class PipelineJsonFixtures {
 
   /**
-   * Default third argument for {@code rdp_ingest_*_path} when no format, watermark, or sheet options
-   * apply. Prefer this over committing an empty {@code *.options.json} file per bundle.
+   * Default third argument for {@code rdp_ingest_*_path} when no format, watermark, or sheet
+   * options apply. Prefer this over committing an empty {@code *.options.json} file per bundle.
    */
   public static final String DEFAULT_PATH_INGEST_OPTIONS_JSON = "{}";
 
@@ -86,8 +86,12 @@ public final class PipelineJsonFixtures {
     return root.toString();
   }
 
-  /** {@code transform.sql} from a pipeline template (after reading raw JSON, before placeholder bind). */
-  public static String pipelineTransformSql(Path bundleRoot, String pipelineRel) throws IOException {
+  /**
+   * {@code transform.sql} from a pipeline template (after reading raw JSON, before placeholder
+   * bind).
+   */
+  public static String pipelineTransformSql(Path bundleRoot, String pipelineRel)
+      throws IOException {
     JSONObject pipeline = new JSONObject(readUtf8(bundleRoot, pipelineRel));
     return pipeline.getJSONObject("transform").getString("sql");
   }

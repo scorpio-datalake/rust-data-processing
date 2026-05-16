@@ -17,7 +17,7 @@ from common import (
     JVM_SYS_DIR,
     REPO_ROOT,
     banner,
-    gradlew_path,
+    gradlew_argv,
     native_lib_release,
     require_tool,
     run,
@@ -25,19 +25,13 @@ from common import (
 
 
 def gradle_clean() -> None:
-    gw = gradlew_path()
-    if not gw.is_file():
-        raise SystemExit(f"Gradle wrapper not found: {gw}")
     banner("Java: Gradle clean")
-    run([str(gw), "clean", "--no-daemon"], cwd=JVM_GRADLE_DIR)
+    run(gradlew_argv("clean", "--no-daemon"), cwd=JVM_GRADLE_DIR)
 
 
 def spotless_check() -> None:
-    gw = gradlew_path()
-    if not gw.is_file():
-        raise SystemExit(f"Gradle wrapper not found: {gw}")
     banner("Java: Spotless (Google Java Format check)")
-    run([str(gw), "spotlessCheck", "--no-daemon"], cwd=JVM_GRADLE_DIR)
+    run(gradlew_argv("spotlessCheck", "--no-daemon"), cwd=JVM_GRADLE_DIR)
 
 
 def check_manifests() -> None:

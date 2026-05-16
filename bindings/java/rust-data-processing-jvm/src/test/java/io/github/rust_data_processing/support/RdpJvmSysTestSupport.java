@@ -56,9 +56,10 @@ public final class RdpJvmSysTestSupport {
   }
 
   /**
-   * Absolute path to a file under repo {@code tests/fixtures} when {@link #resolveTestsFixturesDir()}
-   * succeeds and {@code name} exists (e.g. {@code jvm_contract_three_rows.json} for JVM contract
-   * tests — inspect these files to see the inputs RDP ingests).
+   * Absolute path to a file under repo {@code tests/fixtures} when {@link
+   * #resolveTestsFixturesDir()} succeeds and {@code name} exists (e.g. {@code
+   * jvm_contract_three_rows.json} for JVM contract tests — inspect these files to see the inputs
+   * RDP ingests).
    */
   public static Optional<Path> resolveFixtureFile(String name) {
     return resolveTestsFixturesDir()

@@ -23,9 +23,7 @@ def test_ghcn_json_to_xml_pipeline_template_resolves() -> None:
             "ghcn",
             "pipelines/json_to_xml.pipeline.json",
             {
-                "SOURCE_PATH": str(
-                    fixture_path("ghcn", "ghcn_stations_sample.json").resolve()
-                ),
+                "SOURCE_PATH": str(fixture_path("ghcn", "ghcn_stations_sample.json").resolve()),
                 "SINK_PATH": "/tmp/out.xml",
             },
         )
@@ -53,7 +51,9 @@ def test_ghcn_xml_to_parquet_pipeline_template_resolves() -> None:
 def test_ghcn_json_to_intermediate_sql_matches_pipeline_fixture() -> None:
     schema = load_schema_fields("schemas", "json_source.schema.json", bundle="ghcn")
     ds = rdp.ingest_from_path(
-        fixture_path("ghcn", "ghcn_stations_sample.json"), schema, {"format": "json"}
+        str(fixture_path("ghcn", "ghcn_stations_sample.json")),
+        schema,
+        {"format": "json"},
     )
     sql = pipeline_transform_sql("ghcn", "pipelines/json_to_xml.pipeline.json")
     out = rdp.sql_query_dataset(ds, sql)
@@ -67,7 +67,7 @@ def test_ghcn_committed_intermediate_xml_ingest() -> None:
     """``verifyXmlWithSchema`` uses the intermediate schema on pipeline-produced XML."""
     schema = load_schema_fields("schemas", "xml_intermediate.schema.json", bundle="ghcn")
     ds = rdp.ingest_from_path(
-        fixture_path("ghcn", "ghcn_stations_intermediate.xml"),
+        str(fixture_path("ghcn", "ghcn_stations_intermediate.xml")),
         schema,
         {"format": "xml"},
     )
@@ -79,7 +79,7 @@ def test_ghcn_xml_to_lake_sql_on_committed_intermediate_xml() -> None:
     """``verifyParquetWithSchema`` SQL stage on committed intermediate XML (JVM runs full pipeline)."""
     schema = load_schema_fields("schemas", "xml_intermediate.schema.json", bundle="ghcn")
     ds = rdp.ingest_from_path(
-        fixture_path("ghcn", "ghcn_stations_intermediate.xml"),
+        str(fixture_path("ghcn", "ghcn_stations_intermediate.xml")),
         schema,
         {"format": "xml"},
     )

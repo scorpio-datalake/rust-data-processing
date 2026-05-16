@@ -40,7 +40,7 @@ def test_student_etl_ordered_ingest_two_committed_parts() -> None:
         {"format": "json"},
     )
     assert ds.row_count() == 2
-    assert len(meta.paths) == 2
+    assert len(meta["paths"]) == 2
     assert ds.to_rows()[0][0] == 1
     assert ds.to_rows()[1][0] == 2
 

@@ -14,7 +14,7 @@ def test_sql_query_dataset_pipeline_sql_matches_jvm_contract_fixture() -> None:
     """Single-table: ``jvm_contract`` three_rows + ``sql_query_dataset.pipeline.json`` SQL."""
     schema = load_schema_fields("schemas", "three_rows.schema.json", bundle="jvm_contract")
     ds = rdp.ingest_from_path(
-        fixture_path("jvm_contract", "data", "three_rows.json"),
+        str(fixture_path("jvm_contract", "data", "three_rows.json")),
         schema,
         {"format": "json"},
     )
@@ -32,12 +32,12 @@ def test_sql_parity_join_matches_committed_fixtures() -> None:
     left_schema = load_schema_fields("schemas", "join_left.schema.json", bundle="sql_parity")
     right_schema = load_schema_fields("schemas", "join_right.schema.json", bundle="sql_parity")
     left = rdp.ingest_from_path(
-        fixture_path("sql_parity", "data", "join_left.json"),
+        str(fixture_path("sql_parity", "data", "join_left.json")),
         left_schema,
         {"format": "json"},
     )
     right = rdp.ingest_from_path(
-        fixture_path("sql_parity", "data", "join_right.json"),
+        str(fixture_path("sql_parity", "data", "join_right.json")),
         right_schema,
         {"format": "json"},
     )

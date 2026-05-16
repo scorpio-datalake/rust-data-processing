@@ -8,13 +8,10 @@ import os
 import sys
 from pathlib import Path
 
-from common import JVM_GRADLE_DIR, banner, gradlew_path, native_lib_release, run
+from common import JVM_GRADLE_DIR, banner, gradlew_argv, native_lib_release, run
 
 
 def test(native_lib: Path | None = None) -> None:
-    gradlew = gradlew_path()
-    if not gradlew.is_file():
-        raise SystemExit(f"Gradle wrapper not found: {gradlew}")
 
     lib = native_lib
     if lib is None:
@@ -32,7 +29,7 @@ def test(native_lib: Path | None = None) -> None:
 
     banner("Java: Gradle check")
     run(
-        [str(gradlew), "check", "--no-daemon", "--stacktrace"],
+        gradlew_argv("check", "--no-daemon", "--stacktrace"),
         cwd=JVM_GRADLE_DIR,
         env={"RDP_JVM_SYS": str(lib.resolve())},
     )

@@ -31,10 +31,7 @@ def load_schema_fields(*parts: str, bundle: str | None = None) -> list[dict[str,
     else:
         path = FIXTURES.joinpath(*parts)
     data = load_schema(path)
-    return [
-        {"name": f["name"], "data_type": f["data_type"].lower()}
-        for f in data["fields"]
-    ]
+    return [{"name": f["name"], "data_type": f["data_type"].lower()} for f in data["fields"]]
 
 
 def _expand_schema_refs(node: Any, root: Path) -> None:
@@ -74,9 +71,7 @@ def _bind_placeholders(node: Any, bindings: dict[str, str]) -> None:
                 _bind_placeholders(item, bindings)
 
 
-def resolve_pipeline_json(
-    bundle: str, pipeline_rel: str, bindings: dict[str, str]
-) -> str:
+def resolve_pipeline_json(bundle: str, pipeline_rel: str, bindings: dict[str, str]) -> str:
     root = bundle_root(bundle)
     doc = _read_json(root / pipeline_rel)
     _expand_schema_refs(doc, root)

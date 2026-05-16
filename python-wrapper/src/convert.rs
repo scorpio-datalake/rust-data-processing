@@ -64,7 +64,7 @@ pub(crate) fn schema_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Schema> {
     Ok(Schema::new(fields))
 }
 
-pub(crate) fn schema_to_py_list(py: Python<'_>, schema: &Schema) -> PyResult<PyObject> {
+pub(crate) fn schema_to_py_list(py: Python<'_>, schema: &Schema) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for f in &schema.fields {
         let d = PyDict::new(py);
@@ -87,8 +87,9 @@ pub(crate) fn parse_format(s: &str) -> PyResult<IngestionFormat> {
         "json" | "ndjson" => Ok(IngestionFormat::Json),
         "parquet" | "pq" => Ok(IngestionFormat::Parquet),
         "excel" | "xlsx" | "xls" | "ods" => Ok(IngestionFormat::Excel),
+        "xml" => Ok(IngestionFormat::Xml),
         _ => Err(PyValueError::new_err(format!(
-            "unknown format '{s}'; expected csv, json, parquet, or excel"
+            "unknown format '{s}'; expected csv, json, parquet, excel, or xml"
         ))),
     }
 }
@@ -151,7 +152,7 @@ pub(crate) fn ingestion_options_from_py(
     Ok(o)
 }
 
-pub(crate) fn value_to_py(py: Python<'_>, v: &Value) -> PyObject {
+pub(crate) fn value_to_py(py: Python<'_>, v: &Value) -> Py<PyAny> {
     match v {
         Value::Null => py.None().into(),
         Value::Int64(i) => i
@@ -546,7 +547,7 @@ pub(crate) fn execution_options_from_py(
 pub(crate) fn metrics_snapshot_to_py(
     py: Python<'_>,
     s: &rust_data_processing::execution::ExecutionMetricsSnapshot,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let d = PyDict::new(py);
     d.set_item("run_id", s.run_id)?;
     d.set_item("rows_processed", s.rows_processed)?;

@@ -73,6 +73,15 @@ public final class RdpNativeJson {
     return new String(rawJson, StandardCharsets.UTF_8);
   }
 
+  /** Null-terminated UTF-8 in arena scope ({@link Arena#allocateFrom(String)} is JDK 22+). */
+  private static MemorySegment allocateUtf8CString(Arena arena, String text) {
+    byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
+    MemorySegment segment = arena.allocate(utf8.length + 1L);
+    segment.copyFrom(MemorySegment.ofArray(utf8));
+    segment.set(ValueLayout.JAVA_BYTE, utf8.length, (byte) 0);
+    return segment;
+  }
+
   /** Full JSON envelope: {@code ok}, {@code interchange}, {@code notes}. */
   public static JSONObject invokeParityExport(
       Linker linker, SymbolLookup lookup, Arena arena, String exportedSymbol) throws Throwable {
@@ -132,8 +141,8 @@ public final class RdpNativeJson {
       Linker linker, SymbolLookup lookup, Arena arena, String path, String sheetName)
       throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment pathUtf8 = arena.allocateFrom(path);
-    MemorySegment sheetUtf8 = arena.allocateFrom(sheetName);
+    MemorySegment pathUtf8 = allocateUtf8CString(arena, path);
+    MemorySegment sheetUtf8 = allocateUtf8CString(arena, sheetName);
 
     MethodHandle fn =
         linker.downcallHandle(
@@ -158,8 +167,8 @@ public final class RdpNativeJson {
 
   /**
    * Ingest one CSV file: {@code rdp_ingest_csv_path}. {@code schemaJson} is serde {@code Schema}
-   * JSON; {@code optionsJson} is an object (use {@code "{}"} for defaults). Format is forced to
-   * CSV regardless of extension.
+   * JSON; {@code optionsJson} is an object (use {@code "{}"} for defaults). Format is forced to CSV
+   * regardless of extension.
    */
   public static JSONObject invokeIngestCsvPath(
       Linker linker,
@@ -169,7 +178,8 @@ public final class RdpNativeJson {
       String schemaJson,
       String optionsJson)
       throws Throwable {
-    return invokePathIngest(linker, lookup, arena, "rdp_ingest_csv_path", path, schemaJson, optionsJson);
+    return invokePathIngest(
+        linker, lookup, arena, "rdp_ingest_csv_path", path, schemaJson, optionsJson);
   }
 
   /** Ingest one JSON file (array-of-objects or NDJSON): {@code rdp_ingest_json_path}. */
@@ -181,7 +191,8 @@ public final class RdpNativeJson {
       String schemaJson,
       String optionsJson)
       throws Throwable {
-    return invokePathIngest(linker, lookup, arena, "rdp_ingest_json_path", path, schemaJson, optionsJson);
+    return invokePathIngest(
+        linker, lookup, arena, "rdp_ingest_json_path", path, schemaJson, optionsJson);
   }
 
   /** Ingest one Parquet file: {@code rdp_ingest_parquet_path}. */
@@ -193,7 +204,8 @@ public final class RdpNativeJson {
       String schemaJson,
       String optionsJson)
       throws Throwable {
-    return invokePathIngest(linker, lookup, arena, "rdp_ingest_parquet_path", path, schemaJson, optionsJson);
+    return invokePathIngest(
+        linker, lookup, arena, "rdp_ingest_parquet_path", path, schemaJson, optionsJson);
   }
 
   /** Ingest row-oriented {@code <rdp_records>} XML: {@code rdp_ingest_xml_path}. */
@@ -205,7 +217,8 @@ public final class RdpNativeJson {
       String schemaJson,
       String optionsJson)
       throws Throwable {
-    return invokePathIngest(linker, lookup, arena, "rdp_ingest_xml_path", path, schemaJson, optionsJson);
+    return invokePathIngest(
+        linker, lookup, arena, "rdp_ingest_xml_path", path, schemaJson, optionsJson);
   }
 
   /**
@@ -216,7 +229,7 @@ public final class RdpNativeJson {
   public static JSONObject invokeIngestOrderedPathsJson(
       Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment payloadUtf8 = arena.allocateFrom(payloadJson);
+    MemorySegment payloadUtf8 = allocateUtf8CString(arena, payloadJson);
     MethodHandle fn =
         linker.downcallHandle(
             lookup.find("rdp_ingest_ordered_paths_json").orElseThrow(),
@@ -235,18 +248,18 @@ public final class RdpNativeJson {
   }
 
   /**
-   * Single-document pipeline: {@code rdp_run_pipeline_json}. {@code payloadJson} is UTF-8 JSON
-   * with optional {@code pipeline_spec_version} (default 1; alias {@code version}), optional
-   * {@code orchestration} ({@code timeout_ms}, {@code max_ingested_rows}, {@code idempotency_key}),
-   * {@code sources} (paths, schema, options), optional {@code transform.sql} on {@code df}, and
-   * {@code sinks}. On failure {@code ok} is false and {@code error} is an object with {@code code},
-   * {@code message}, and {@code stage} (see ADR 006). The legacy student-ETL document shape is also
+   * Single-document pipeline: {@code rdp_run_pipeline_json}. {@code payloadJson} is UTF-8 JSON with
+   * optional {@code pipeline_spec_version} (default 1; alias {@code version}), optional {@code
+   * orchestration} ({@code timeout_ms}, {@code max_ingested_rows}, {@code idempotency_key}), {@code
+   * sources} (paths, schema, options), optional {@code transform.sql} on {@code df}, and {@code
+   * sinks}. On failure {@code ok} is false and {@code error} is an object with {@code code}, {@code
+   * message}, and {@code stage} (see ADR 006). The legacy student-ETL document shape is also
    * accepted.
    */
   public static JSONObject invokeRunPipelineJson(
       Linker linker, SymbolLookup lookup, Arena arena, String payloadJson) throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment payloadUtf8 = arena.allocateFrom(payloadJson);
+    MemorySegment payloadUtf8 = allocateUtf8CString(arena, payloadJson);
     MethodHandle fn =
         linker.downcallHandle(
             lookup.find("rdp_run_pipeline_json").orElseThrow(),
@@ -274,9 +287,9 @@ public final class RdpNativeJson {
       String optionsJson)
       throws Throwable {
     MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
-    MemorySegment pathUtf8 = arena.allocateFrom(path);
-    MemorySegment schemaUtf8 = arena.allocateFrom(schemaJson);
-    MemorySegment optionsUtf8 = arena.allocateFrom(optionsJson);
+    MemorySegment pathUtf8 = allocateUtf8CString(arena, path);
+    MemorySegment schemaUtf8 = allocateUtf8CString(arena, schemaJson);
+    MemorySegment optionsUtf8 = allocateUtf8CString(arena, optionsJson);
 
     MethodHandle fn =
         linker.downcallHandle(

@@ -6,11 +6,11 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import PYTHON_WRAPPER, banner, require_tool, run
+from common import PYTHON_WRAPPER, banner, require_uv, run
 
 
 def test(*, extra_pytest_args: list[str] | None = None) -> None:
-    require_tool("uv")
+    require_uv()
     banner("Python: pytest")
     cmd = ["uv", "run", "pytest", "-m", "not deep and not benchmark", "-q"]
     if extra_pytest_args:

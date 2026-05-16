@@ -6,13 +6,13 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import PYTHON_WRAPPER, banner, require_tool, run
+from common import PYTHON_WRAPPER, banner, require_uv, run
 
 from python_clean import clean as python_clean_wrapper
 
 
 def lint(*, check_only: bool) -> None:
-    require_tool("uv")
+    require_uv()
     banner("Python: Ruff format" + (" --check" if check_only else ""))
     fmt_cmd = ["uv", "run", "ruff", "format"]
     if check_only:
@@ -24,7 +24,7 @@ def lint(*, check_only: bool) -> None:
 
 
 def build(*, release: bool = True, skip_fmt: bool = False) -> None:
-    require_tool("uv")
+    require_uv()
     banner("Python: uv sync (dev group)")
     run(["uv", "sync", "--group", "dev"], cwd=PYTHON_WRAPPER)
     if not skip_fmt:
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.clean:
         python_clean_wrapper()
-    require_tool("uv")
+    require_uv()
     if args.fmt_only:
         banner("Python: uv sync (dev group) — fmt-only mode")
         run(["uv", "sync", "--group", "dev"], cwd=PYTHON_WRAPPER)

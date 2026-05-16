@@ -19,10 +19,14 @@ __pycache__/
 venv/
 
 # Native extensions / build outputs (maturin, PyO3, MSVC). Rebuild with cargo/maturin — do not commit.
+*.so
 *.pyd
 *.dll
 *.pdb
 **/*.rs.bk
+# Empty junk from pasted compiler diagnostics (`path:line:col`)
+**/*:[0-9]:*
+**/*.py:[0-9]:*
 HighLevelDevelopmentPlan.txt
 epcis_and_stories.txt
 test_run.log

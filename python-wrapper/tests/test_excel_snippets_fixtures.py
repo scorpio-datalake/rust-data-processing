@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 import rust_data_processing as rdp
 
 from tests.conftest import fixture_path
@@ -18,8 +17,7 @@ PEOPLE_XLSX = fixture_path("people.xlsx")
 def _require_people_xlsx() -> None:
     if not PEOPLE_XLSX.is_file():
         pytest.skip(
-            "missing tests/fixtures/people.xlsx — "
-            "python scripts/write_people_xlsx_stdlib.py"
+            "missing tests/fixtures/people.xlsx — python scripts/write_people_xlsx_stdlib.py"
         )
 
 
@@ -57,9 +55,7 @@ def test_people_excel_ordered_ingest_via_resolved_payload() -> None:
         {"name": f["name"], "data_type": f["data_type"].lower()}
         for f in payload["schema"]["fields"]
     ]
-    ds, _meta = rdp.ingest_from_ordered_paths(
-        payload["paths"], schema, payload["options"]
-    )
+    ds, _meta = rdp.ingest_from_ordered_paths(payload["paths"], schema, payload["options"])
     assert ds.row_count() == 2
     assert ds.to_rows()[0] == [1, "Ada", 98.5, True]
 
@@ -69,7 +65,7 @@ def test_people_excel_path_ingest_sheet1_matches_doc_example() -> None:
     _require_people_xlsx()
     schema = load_schema_fields("schemas", "people_flat.schema.json", bundle="people")
     ds = rdp.ingest_from_path(
-        PEOPLE_XLSX,
+        str(PEOPLE_XLSX),
         schema,
         {"format": "excel", "sheet_name": DEFAULT_SHEET},
     )

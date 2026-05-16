@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 
 import pytest
-
 import rust_data_processing as rdp
 
-from tests.conftest import FIXTURES, fixture_path
+from tests.conftest import fixture_path
 from tests.pipeline_fixture_support import bundle_root, load_schema, load_schema_fields
 
 
@@ -38,7 +37,9 @@ def test_jvm_contract_pipeline_templates_have_transform_sql() -> None:
 def test_ghcn_json_ingest_matches_fixture_schema() -> None:
     schema = load_schema_fields("schemas", "json_source.schema.json", bundle="ghcn")
     ds = rdp.ingest_from_path(
-        fixture_path("ghcn", "ghcn_stations_sample.json"), schema, {"format": "json"}
+        str(fixture_path("ghcn", "ghcn_stations_sample.json")),
+        schema,
+        {"format": "json"},
     )
     assert ds.row_count() == 5
     assert ds.to_rows()[0][0] == "ACW00011604"

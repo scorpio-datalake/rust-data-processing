@@ -8,7 +8,7 @@ from pathlib import Path
 
 import rust_data_processing as rdp
 
-from tests.pipeline_fixture_support import bundle_root, load_schema_fields, resolve_payload_json
+from tests.pipeline_fixture_support import load_schema_fields, resolve_payload_json
 
 
 def _events_schema() -> list[dict[str, str]]:

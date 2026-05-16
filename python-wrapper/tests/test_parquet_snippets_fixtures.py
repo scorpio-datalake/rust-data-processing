@@ -7,7 +7,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 import rust_data_processing as rdp
 
 from tests.conftest import fixture_path
@@ -35,26 +34,23 @@ def test_people_csv_ingest_with_flat_schema() -> None:
     flat = load_schema_fields("schemas", "people_flat.schema.json", bundle="people")
     csv = load_schema_fields("schemas", "people_csv.schema.json", bundle="people")
     assert flat == csv
-    ds = rdp.ingest_from_path(fixture_path("people.csv"), flat, {"format": "csv"})
+    ds = rdp.ingest_from_path(str(fixture_path("people.csv")), flat, {"format": "csv"})
     assert ds.row_count() == 2
 
 
 def test_people_parquet_round_trip_via_pyarrow() -> None:
     """CSV → Parquet → ingest (Rust export; JVM uses ``rdp_run_pipeline_json`` for the write)."""
-    pq = pytest.importorskip("pyarrow")
     pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
 
     schema = load_schema_fields("schemas", "people_flat.schema.json", bundle="people")
-    ds = rdp.ingest_from_path(fixture_path("people.csv"), schema, {"format": "csv"})
+    ds = rdp.ingest_from_path(str(fixture_path("people.csv")), schema, {"format": "csv"})
     assert ds.row_count() == 2
 
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "people.parquet"
         table = pa.Table.from_pylist(
-            [
-                {"id": r[0], "name": r[1], "score": r[2], "active": r[3]}
-                for r in ds.to_rows()
-            ]
+            [{"id": r[0], "name": r[1], "score": r[2], "active": r[3]} for r in ds.to_rows()]
         )
         pq.write_table(table, path)
         back = rdp.ingest_from_path(str(path), schema, {"format": "parquet"})

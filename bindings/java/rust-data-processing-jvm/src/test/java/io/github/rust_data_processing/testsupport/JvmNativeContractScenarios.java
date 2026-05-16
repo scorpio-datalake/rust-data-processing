@@ -131,13 +131,14 @@ public final class JvmNativeContractScenarios {
             bundle,
             "payloads/excel_sheet_dataset.payload.json",
             Map.of(
-                "SOURCE_PATH", workbook.toAbsolutePath().normalize().toString(),
-                "SHEET_NAME", "Sheet1"));
+                "SOURCE_PATH",
+                workbook.toAbsolutePath().normalize().toString(),
+                "SHEET_NAME",
+                "Sheet1"));
     JSONObject root = RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload);
     PytestMirrorAssertions.assertEnvelopeOk(root);
     assertEquals(
-        "ingest_ordered_paths_dataset",
-        root.getJSONObject("interchange").getString("kind"));
+        "ingest_ordered_paths_dataset", root.getJSONObject("interchange").getString("kind"));
     assertEquals(
         2,
         root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
@@ -159,9 +160,11 @@ public final class JvmNativeContractScenarios {
     assertEquals(2, interchange.getJSONObject("dataset").getJSONArray("rows").length());
   }
 
-  /** {@code docs/java/examples/ExcelSnippets}: payload ingest + {@code rdp_excel_ingest_path_sheet}. */
-  public static void runExcelSnippetsPeopleContract(
-      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+  /**
+   * {@code docs/java/examples/ExcelSnippets}: payload ingest + {@code rdp_excel_ingest_path_sheet}.
+   */
+  public static void runExcelSnippetsPeopleContract(Linker linker, SymbolLookup lookup, Arena arena)
+      throws Throwable {
     runExcelSnippetsViaPayloadContract(linker, lookup, arena);
     excelIngestPathSheetContract(linker, lookup, arena);
   }
@@ -189,9 +192,7 @@ public final class JvmNativeContractScenarios {
       assertEquals("run_pipeline_json", inter.getString("kind"));
       assertEquals(2, inter.getInt("ingested_row_count"));
       assertTrue(Files.exists(outParquet), "pipeline parquet sink missing: " + outParquet);
-      assertEquals(
-          "ok",
-          inter.getJSONArray("sink_results").getJSONObject(0).getString("status"));
+      assertEquals("ok", inter.getJSONArray("sink_results").getJSONObject(0).getString("status"));
       assertTrue(inter.has("orchestration"));
       assertEquals(1, inter.getJSONObject("orchestration").getInt("pipeline_spec_version"));
     } finally {
@@ -273,8 +274,9 @@ public final class JvmNativeContractScenarios {
 
   public static void runGhcnJsonXmlParquetPipelineContract(
       Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
-    Path bundle = PipelineFixtureSupport.resolveBundleRoot("ghcn")
-        .orElseThrow(() -> new IllegalStateException("tests/fixtures/ghcn not found"));
+    Path bundle =
+        PipelineFixtureSupport.resolveBundleRoot("ghcn")
+            .orElseThrow(() -> new IllegalStateException("tests/fixtures/ghcn not found"));
     Path jsonInput = requireJvmContractFixture("ghcn/ghcn_stations_sample.json");
     Path work = Files.createTempDirectory("rdp_contract_ghcn_json_xml_parquet_");
     Path xmlPath = work.resolve("stations.xml");
@@ -291,7 +293,8 @@ public final class JvmNativeContractScenarios {
       JSONObject xmlStage =
           RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, jsonToXmlPayload);
       PytestMirrorAssertions.assertEnvelopeOk(xmlStage);
-      JSONObject xmlSink = xmlStage.getJSONObject("interchange").getJSONArray("sink_results").getJSONObject(0);
+      JSONObject xmlSink =
+          xmlStage.getJSONObject("interchange").getJSONArray("sink_results").getJSONObject(0);
       assertEquals("xml_file", xmlSink.getString("kind"));
       assertEquals("ok", xmlSink.getString("status"));
       assertEquals(5, xmlSink.getInt("row_count"));
@@ -304,10 +307,14 @@ public final class JvmNativeContractScenarios {
           RdpNativeJson.invokeIngestXmlPath(
               linker, lookup, arena, xmlPath.toString(), xmlSchemaJson, pathIngestOpts);
       PytestMirrorAssertions.assertEnvelopeOk(xmlVerify);
+      assertEquals("ingest_path_xml", xmlVerify.getJSONObject("interchange").getString("kind"));
       assertEquals(
-          "ingest_path_xml", xmlVerify.getJSONObject("interchange").getString("kind"));
-      assertEquals(
-          5, xmlVerify.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+          5,
+          xmlVerify
+              .getJSONObject("interchange")
+              .getJSONObject("dataset")
+              .getJSONArray("rows")
+              .length());
 
       String xmlToParquetPayload =
           PipelineFixtureSupport.resolvePipelineJson(
@@ -345,8 +352,8 @@ public final class JvmNativeContractScenarios {
   }
 
   /**
-   * {@code docs/java/examples/RDPOnlyETLExample}: legacy three-path pipeline over committed
-   * {@code student_etl/data/part-*.json}.
+   * {@code docs/java/examples/RDPOnlyETLExample}: legacy three-path pipeline over committed {@code
+   * student_etl/data/part-*.json}.
    */
   public static void runStudentEtlLegacyThreePathsContract(
       Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
@@ -399,8 +406,7 @@ public final class JvmNativeContractScenarios {
                 "PATH_A", p0.toAbsolutePath().normalize().toString(),
                 "PATH_B", p1.toAbsolutePath().normalize().toString()));
 
-    JSONObject root =
-        RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload);
+    JSONObject root = RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, payload);
     PytestMirrorAssertions.assertEnvelopeOk(root);
     JSONObject inter = root.getJSONObject("interchange");
     assertEquals("ingest_ordered_paths_dataset", inter.getString("kind"));
@@ -484,7 +490,11 @@ public final class JvmNativeContractScenarios {
     PytestMirrorAssertions.assertEnvelopeOk(jsonRoot);
     assertEquals(
         2,
-        jsonRoot.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+        jsonRoot
+            .getJSONObject("interchange")
+            .getJSONObject("dataset")
+            .getJSONArray("rows")
+            .length());
 
     String csvPayload =
         PipelineFixtureSupport.resolvePayloadJson(
@@ -496,7 +506,11 @@ public final class JvmNativeContractScenarios {
     PytestMirrorAssertions.assertEnvelopeOk(csvRoot);
     assertEquals(
         2,
-        csvRoot.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+        csvRoot
+            .getJSONObject("interchange")
+            .getJSONObject("dataset")
+            .getJSONArray("rows")
+            .length());
 
     String jsonSchema =
         PipelineFixtureSupport.loadSchemaJson(bundle, "schemas/people_json.schema.json");
@@ -507,11 +521,16 @@ public final class JvmNativeContractScenarios {
             arena,
             jsonPath.toString(),
             jsonSchema,
-            PipelineFixtureSupport.readBundleUtf8(bundle, "payloads/json_path_ingest.options.json"));
+            PipelineFixtureSupport.readBundleUtf8(
+                bundle, "payloads/json_path_ingest.options.json"));
     PytestMirrorAssertions.assertEnvelopeOk(jsonPathRoot);
     assertEquals(
         2,
-        jsonPathRoot.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+        jsonPathRoot
+            .getJSONObject("interchange")
+            .getJSONObject("dataset")
+            .getJSONArray("rows")
+            .length());
 
     String csvSchema =
         PipelineFixtureSupport.loadSchemaJson(bundle, "schemas/people_csv.schema.json");
@@ -526,14 +545,19 @@ public final class JvmNativeContractScenarios {
     PytestMirrorAssertions.assertEnvelopeOk(csvPathRoot);
     assertEquals(
         2,
-        csvPathRoot.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+        csvPathRoot
+            .getJSONObject("interchange")
+            .getJSONObject("dataset")
+            .getJSONArray("rows")
+            .length());
 
     runParquetSnippetsCsvToParquetRoundTripContract(linker, lookup, arena);
   }
 
   /**
-   * {@code docs/java/examples/ParquetSnippets}: {@code people/pipelines/csv_to_parquet.pipeline.json}
-   * then {@code rdp_ingest_parquet_path} with {@code people_flat.schema.json}.
+   * {@code docs/java/examples/ParquetSnippets}: {@code
+   * people/pipelines/csv_to_parquet.pipeline.json} then {@code rdp_ingest_parquet_path} with {@code
+   * people_flat.schema.json}.
    */
   public static void runParquetSnippetsCsvToParquetRoundTripContract(
       Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
@@ -557,7 +581,8 @@ public final class JvmNativeContractScenarios {
 
       JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipeline);
       PytestMirrorAssertions.assertEnvelopeOk(root);
-      JSONObject sink = root.getJSONObject("interchange").getJSONArray("sink_results").getJSONObject(0);
+      JSONObject sink =
+          root.getJSONObject("interchange").getJSONArray("sink_results").getJSONObject(0);
       assertEquals("parquet_file", sink.getString("kind"));
       assertEquals("ok", sink.getString("status"));
       assertEquals(2, sink.getInt("row_count"));
@@ -574,10 +599,14 @@ public final class JvmNativeContractScenarios {
               flatSchema,
               PipelineFixtureSupport.defaultPathIngestOptionsJson());
       PytestMirrorAssertions.assertEnvelopeOk(ingest);
+      assertEquals("ingest_path_parquet", ingest.getJSONObject("interchange").getString("kind"));
       assertEquals(
-          "ingest_path_parquet", ingest.getJSONObject("interchange").getString("kind"));
-      assertEquals(
-          2, ingest.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+          2,
+          ingest
+              .getJSONObject("interchange")
+              .getJSONObject("dataset")
+              .getJSONArray("rows")
+              .length());
     } finally {
       deleteTree(work);
     }

@@ -47,9 +47,7 @@ def test_people_json_ordered_ingest_via_resolved_payload() -> None:
         {"name": f["name"], "data_type": f["data_type"].lower()}
         for f in payload["schema"]["fields"]
     ]
-    ds, _meta = rdp.ingest_from_ordered_paths(
-        payload["paths"], schema, payload["options"]
-    )
+    ds, _meta = rdp.ingest_from_ordered_paths(payload["paths"], schema, payload["options"])
     assert ds.row_count() == 2
     assert ds.to_rows()[0][1] == "Ada"
 
@@ -66,22 +64,20 @@ def test_people_csv_ordered_ingest_via_resolved_payload() -> None:
         {"name": f["name"], "data_type": f["data_type"].lower()}
         for f in payload["schema"]["fields"]
     ]
-    ds, _meta = rdp.ingest_from_ordered_paths(
-        payload["paths"], schema, payload["options"]
-    )
+    ds, _meta = rdp.ingest_from_ordered_paths(payload["paths"], schema, payload["options"])
     assert ds.row_count() == 2
     assert ds.to_rows()[0] == [1, "Ada", 98.5, True]
 
 
 def test_people_json_path_ingest_matches_doc_example() -> None:
     schema = load_schema_fields("schemas", "people_json.schema.json", bundle="people")
-    ds = rdp.ingest_from_path(fixture_path("people.json"), schema, {"format": "json"})
+    ds = rdp.ingest_from_path(str(fixture_path("people.json")), schema, {"format": "json"})
     assert ds.row_count() == 2
     assert ds.to_rows()[0][0] == 1
 
 
 def test_people_csv_path_ingest_matches_doc_example() -> None:
     schema = load_schema_fields("schemas", "people_csv.schema.json", bundle="people")
-    ds = rdp.ingest_from_path(fixture_path("people.csv"), schema, {"format": "csv"})
+    ds = rdp.ingest_from_path(str(fixture_path("people.csv")), schema, {"format": "csv"})
     assert ds.row_count() == 2
     assert ds.to_rows()[0][1] == "Ada"

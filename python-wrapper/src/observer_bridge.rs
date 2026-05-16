@@ -20,6 +20,7 @@ fn ingestion_format_label(f: rust_data_processing::ingestion::IngestionFormat) -
         F::Json => "json",
         F::Parquet => "parquet",
         F::Excel => "excel",
+        F::Xml => "xml",
     }
 }
 
@@ -32,7 +33,7 @@ fn severity_str(s: IngestionSeverity) -> &'static str {
     }
 }
 
-fn ctx_to_pydict(py: Python<'_>, ctx: &IngestionContext) -> PyObject {
+fn ctx_to_pydict(py: Python<'_>, ctx: &IngestionContext) -> Py<PyAny> {
     let d = PyDict::new(py);
     let _ = d.set_item("path", ctx.path.to_string_lossy().to_string());
     let _ = d.set_item("format", ingestion_format_label(ctx.format));
@@ -68,7 +69,7 @@ impl IngestionObserver for PyIngestionObserver {
         let Some(ref cb) = self.on_success else {
             return;
         };
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let ctx_d = ctx_to_pydict(py, ctx);
             let st = PyDict::new(py);
             let _ = st.set_item("rows", stats.rows);
@@ -85,7 +86,7 @@ impl IngestionObserver for PyIngestionObserver {
         let Some(ref cb) = self.on_failure else {
             return;
         };
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let ctx_d = ctx_to_pydict(py, ctx);
             let _ = cb
                 .bind(py)
@@ -99,7 +100,7 @@ impl IngestionObserver for PyIngestionObserver {
         severity: IngestionSeverity,
         error: &IngestionError,
     ) {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let ctx_d = ctx_to_pydict(py, ctx);
             let args = (ctx_d, severity_str(severity), error.to_string());
             if let Some(ref cb) = self.on_alert {
@@ -137,7 +138,7 @@ pub fn apply_ingestion_observer_options(
 }
 
 /// Serialize [`ExecutionEvent`] into a plain dict for Python (`on_execution_event`).
-pub fn execution_event_to_pydict(py: Python<'_>, event: &ExecutionEvent) -> PyResult<PyObject> {
+pub fn execution_event_to_pydict(py: Python<'_>, event: &ExecutionEvent) -> PyResult<Py<PyAny>> {
     let d = PyDict::new(py);
     match event {
         ExecutionEvent::RunStarted => {
@@ -187,7 +188,7 @@ pub struct PyExecutionObserver {
 
 impl ExecutionObserver for PyExecutionObserver {
     fn on_event(&self, event: &ExecutionEvent) {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             if let Ok(d) = execution_event_to_pydict(py, event) {
                 let _ = self.callback.bind(py).call1((d,));
             }

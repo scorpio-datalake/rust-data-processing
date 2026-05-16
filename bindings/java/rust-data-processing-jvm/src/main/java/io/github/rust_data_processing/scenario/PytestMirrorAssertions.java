@@ -4,8 +4,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Field-level checks aligned with {@code python-wrapper/tests/*.py} scenarios — mirrors Rust
- * {@code parity_mirrors.rs}. Used by JUnit tests and runnable Java examples.
+ * Field-level checks aligned with {@code python-wrapper/tests/*.py} scenarios — mirrors Rust {@code
+ * parity_mirrors.rs}. Used by JUnit tests and runnable Java examples.
  */
 public final class PytestMirrorAssertions {
 
@@ -171,7 +171,8 @@ public final class PytestMirrorAssertions {
     if (interchange.getInt("row_count") <= 1000) {
       throw new AssertionError("row_count");
     }
-    if (interchange.getLong("group_by_total_rows_sum") != interchange.getLong("dataset_row_count")) {
+    if (interchange.getLong("group_by_total_rows_sum")
+        != interchange.getLong("dataset_row_count")) {
       throw new AssertionError("group_by row sum");
     }
     if (!interchange.getBoolean("feature_wise_len_match")) {

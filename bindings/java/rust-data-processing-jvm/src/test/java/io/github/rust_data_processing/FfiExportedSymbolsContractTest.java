@@ -32,8 +32,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Contract tests: every symbol listed in {@code ffi_manifest.json} (classpath) must resolve in
  * {@code rdp_jvm_sys} and match the manifest ABI when applicable. Doc-aligned scenarios shared with
- * {@code io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest} live in {@code
- * io.github.rust_data_processing.testsupport.JvmNativeContractScenarios}.
+ * {@code io.github.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest} live in
+ * {@code io.github.rust_data_processing.testsupport.JvmNativeContractScenarios}.
  */
 final class FfiExportedSymbolsContractTest {
 
@@ -95,7 +95,8 @@ final class FfiExportedSymbolsContractTest {
   }
 
   private static void invokeExportedSymbol(
-      Linker linker, SymbolLookup lookup, Arena arena, String name, int expectedAbi) throws Throwable {
+      Linker linker, SymbolLookup lookup, Arena arena, String name, int expectedAbi)
+      throws Throwable {
     switch (name) {
       case "rdp_ffi_abi_version":
         assertEquals(expectedAbi, RdpNativeJson.invokeAbiVersion(linker, lookup));
@@ -155,14 +156,19 @@ final class FfiExportedSymbolsContractTest {
           Path csv = fixtures.get().resolve("people.csv");
           Assumptions.assumeTrue(Files.exists(csv), "Skip when tests/fixtures/people.csv missing");
           String schema =
-              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.loadPeopleSchemaJson(
-                  "schemas/people_csv.schema.json");
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport
+                  .loadPeopleSchemaJson("schemas/people_csv.schema.json");
           JSONObject root =
-              RdpNativeJson.invokeIngestCsvPath(linker, lookup, arena, csv.toString(), schema, "{}");
+              RdpNativeJson.invokeIngestCsvPath(
+                  linker, lookup, arena, csv.toString(), schema, "{}");
           PytestMirrorAssertions.assertEnvelopeOk(root);
+          assertEquals("ingest_path_csv", root.getJSONObject("interchange").getString("kind"));
           assertEquals(
-              "ingest_path_csv", root.getJSONObject("interchange").getString("kind"));
-          assertEquals(2, root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+              2,
+              root.getJSONObject("interchange")
+                  .getJSONObject("dataset")
+                  .getJSONArray("rows")
+                  .length());
           return;
         }
       case "rdp_ingest_json_path":
@@ -171,17 +177,22 @@ final class FfiExportedSymbolsContractTest {
           Assumptions.assumeTrue(
               fixtures.isPresent(), "Skip when repo tests/fixtures is not discoverable from CWD");
           Path json = fixtures.get().resolve("people.json");
-          Assumptions.assumeTrue(Files.exists(json), "Skip when tests/fixtures/people.json missing");
+          Assumptions.assumeTrue(
+              Files.exists(json), "Skip when tests/fixtures/people.json missing");
           String schema =
-              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.loadPeopleSchemaJson(
-                  "schemas/people_json.schema.json");
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport
+                  .loadPeopleSchemaJson("schemas/people_json.schema.json");
           JSONObject root =
               RdpNativeJson.invokeIngestJsonPath(
                   linker, lookup, arena, json.toString(), schema, "{}");
           PytestMirrorAssertions.assertEnvelopeOk(root);
+          assertEquals("ingest_path_json", root.getJSONObject("interchange").getString("kind"));
           assertEquals(
-              "ingest_path_json", root.getJSONObject("interchange").getString("kind"));
-          assertEquals(2, root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+              2,
+              root.getJSONObject("interchange")
+                  .getJSONObject("dataset")
+                  .getJSONArray("rows")
+                  .length());
           return;
         }
       case "rdp_ingest_parquet_path":
@@ -200,9 +211,12 @@ final class FfiExportedSymbolsContractTest {
         }
       case "rdp_ingest_xml_path":
         {
-          Path xml = JvmNativeContractScenarios.requireJvmContractFixture("ghcn/ghcn_stations_intermediate.xml");
+          Path xml =
+              JvmNativeContractScenarios.requireJvmContractFixture(
+                  "ghcn/ghcn_stations_intermediate.xml");
           Path bundle =
-              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.resolveBundleRoot("ghcn")
+              io.github.rust_data_processing.testsupport.PipelineFixtureSupport.resolveBundleRoot(
+                      "ghcn")
                   .orElseThrow();
           String schema =
               io.github.rust_data_processing.testsupport.PipelineFixtureSupport.loadSchemaJson(
@@ -211,9 +225,13 @@ final class FfiExportedSymbolsContractTest {
               RdpNativeJson.invokeIngestXmlPath(
                   linker, lookup, arena, xml.toString(), schema, "{}");
           PytestMirrorAssertions.assertEnvelopeOk(root);
+          assertEquals("ingest_path_xml", root.getJSONObject("interchange").getString("kind"));
           assertEquals(
-              "ingest_path_xml", root.getJSONObject("interchange").getString("kind"));
-          assertEquals(5, root.getJSONObject("interchange").getJSONObject("dataset").getJSONArray("rows").length());
+              5,
+              root.getJSONObject("interchange")
+                  .getJSONObject("dataset")
+                  .getJSONArray("rows")
+                  .length());
           return;
         }
       case "rdp_ingest_ordered_paths_json":

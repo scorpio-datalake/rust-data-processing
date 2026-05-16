@@ -8,11 +8,11 @@ import shutil
 import sys
 from pathlib import Path
 
-from common import PYTHON_WRAPPER, REPO_ROOT, banner, require_tool, run
+from common import PYTHON_WRAPPER, REPO_ROOT, banner, require_uv, run
 
 
 def generate() -> None:
-    require_tool("uv")
+    require_uv()
     banner("Python docs: uv sync + maturin (for pdoc imports)")
     run(["uv", "sync", "--group", "dev"], cwd=PYTHON_WRAPPER)
     run(["uv", "run", "maturin", "develop", "--release"], cwd=PYTHON_WRAPPER)
