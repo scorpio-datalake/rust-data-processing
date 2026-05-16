@@ -9,9 +9,9 @@ target/
 dist/
 wheels/
 
-# Maturin editable-install native module (rebuild with `uv run maturin develop`)
-rust_data_processing/_rust_data_processing*.so
-rust_data_processing/_rust_data_processing*.pyd
+# Maturin / PyO3 native modules (rebuild with `uv run maturin develop` — never commit)
+*.so
+*.pyd
 
 # Local pdoc scratch output (never commit)
 _pdoc_test*/
