@@ -1,11 +1,11 @@
-# Build + test the Rust library on every PR and on pushes to main.
+# Build + test the Rust library on every PR and on pushes to main / phase branches.
 # (Python wrapper is covered by python_ci.yml.)
 
 name: Rust CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "phase*"]
   pull_request:
   # Optional: keep dependency advisories fresh even without PR activity.
   schedule:
