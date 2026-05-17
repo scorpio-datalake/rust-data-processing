@@ -12,9 +12,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Walk-through: read the bundled {@code ffi_manifest.json} from the {@code rust-data-processing-jvm}
- * JAR, list exported symbols, and (if {@code RDP_JVM_SYS} is set) compare {@code rdp_ffi_abi_version()}
- * to {@code abi_version_constant}. See {@code docs/java/FFI_MANIFEST_JAVA_USAGE.md}.
+ * Walk-through: read the bundled {@code ffi_manifest.json} from the {@code
+ * rust-data-processing-jvm} JAR, list exported symbols, and (if {@code RDP_JVM_SYS} is set) compare
+ * {@code rdp_ffi_abi_version()} to {@code abi_version_constant}. See {@code
+ * docs/java/FFI_MANIFEST_JAVA_USAGE.md}.
  */
 public final class LoadFfiManifestExample {
 
@@ -65,7 +66,8 @@ public final class LoadFfiManifestExample {
   }
 
   private static JSONObject readBundledManifest() throws Exception {
-    try (InputStream in = RdpNativeJson.class.getResourceAsStream(RdpNativeJson.FFI_MANIFEST_RESOURCE)) {
+    try (InputStream in =
+        RdpNativeJson.class.getResourceAsStream(RdpNativeJson.FFI_MANIFEST_RESOURCE)) {
       if (in == null) {
         throw new IllegalStateException(
             "Missing classpath resource "

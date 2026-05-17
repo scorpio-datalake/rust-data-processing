@@ -12,8 +12,8 @@ import java.util.Optional;
 import org.json.JSONObject;
 
 /**
- * Runs several {@code rdp_parity_*} exports in one process so you can see JSON envelopes end to
- * end (bindings, mapping spec, transform, processing, SQL, validation, benchmark smoke). With
+ * Runs several {@code rdp_parity_*} exports in one process so you can see JSON envelopes end to end
+ * (bindings, mapping spec, transform, processing, SQL, validation, benchmark smoke). With
  * arguments, runs only the symbols you name (must appear in {@code ffi_manifest.json}).
  *
  * <p>For production, prefer running large ETL in Rust and writing Parquet/CSV/DB instead of pulling
@@ -27,7 +27,10 @@ import org.json.JSONObject;
  */
 public final class ParityScenariosWalkthrough {
 
-  /** Order mirrors common docs: types → bindings → mapping → transform → processing → SQL → validation → smoke. */
+  /**
+   * Order mirrors common docs: types → bindings → mapping → transform → processing → SQL →
+   * validation → smoke.
+   */
   private static final List<String> DEFAULT_EXPORTS =
       List.of(
           "rdp_parity_types_dataset",
@@ -47,14 +50,14 @@ public final class ParityScenariosWalkthrough {
       System.err.println(ExamplesNativeLibrary.missingLibraryMessage());
       System.exit(2);
     }
-    List<String> exports =
-        args.length == 0 ? DEFAULT_EXPORTS : Arrays.asList(args);
+    List<String> exports = args.length == 0 ? DEFAULT_EXPORTS : Arrays.asList(args);
 
     Linker linker = Linker.nativeLinker();
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
       System.out.println("Native library: " + lib.get());
-      System.out.println("ABI (rdp_ffi_abi_version): " + RdpNativeJson.invokeAbiVersion(linker, lookup));
+      System.out.println(
+          "ABI (rdp_ffi_abi_version): " + RdpNativeJson.invokeAbiVersion(linker, lookup));
       System.out.println("---");
       for (String name : exports) {
         runOne(linker, lookup, arena, name);

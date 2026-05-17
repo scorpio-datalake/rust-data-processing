@@ -27,7 +27,8 @@ final class ExamplesMirrorSmokeTest {
         Arguments.of("rdp_parity_sql_suite_mirror", "test_sql_parity.py"),
         Arguments.of("rdp_parity_partition_discovery_mirror", "test_partition_discovery.py"),
         Arguments.of("rdp_parity_watermark_mirror", "test_watermark_ingestion.py"),
-        Arguments.of("rdp_parity_deep_seattle_mirror", "test_deep_parity.py (Seattle subset)"),
+        Arguments.of(
+            "rdp_parity_deep_seattle_mirror", "test_deep_parity.py (Seattle subset)"),
         Arguments.of("rdp_parity_sft_sample_mirror", "test_sft_sample.py"),
         Arguments.of("rdp_parity_benchmark_smoke_mirror", "test_benchmarks.py (smoke)"),
         Arguments.of("rdp_parity_observability_mirror", "test_observability_parity.py"));
@@ -35,8 +36,8 @@ final class ExamplesMirrorSmokeTest {
 
   @ParameterizedTest(name = "{1}")
   @MethodSource("mirrorExports")
-  void mirrorExportMatchesPytestScenario(String exportName, @SuppressWarnings("unused") String label)
-      throws Throwable {
+  void mirrorExportMatchesPytestScenario(
+      String exportName, @SuppressWarnings("unused") String label) throws Throwable {
     Optional<Path> lib = ExamplesNativeLibrary.resolveNativeLibraryPath();
     Assumptions.assumeTrue(lib.isPresent(), ExamplesNativeLibrary.missingLibraryMessage());
 
