@@ -113,6 +113,10 @@
               <mainClass>org.openjdk.jmh.Main</mainClass>
               <classpathScope>runtime</classpathScope>
               <cleanupDaemonThreads>false</cleanupDaemonThreads>
+              <jvmArgs>
+                <jvmArg>--enable-preview</jvmArg>
+                <jvmArg>--enable-native-access=ALL-UNNAMED</jvmArg>
+              </jvmArgs>
               <environmentVariables>
                 <RDP_JVM_SYS>${env.RDP_JVM_SYS}</RDP_JVM_SYS>
               </environmentVariables>
@@ -169,6 +173,18 @@
       </activation>
       <properties>
         <rdp.surefire.argLine>--enable-preview --enable-native-access=ALL-UNNAMED</rdp.surefire.argLine>
+      </properties>
+    </profile>
+    <profile>
+      <!-- Polars-heavy FFI tests: larger stack avoids Surefire fork crashes on Windows CI. -->
+      <id>windows-surefire</id>
+      <activation>
+        <os>
+          <family>windows</family>
+        </os>
+      </activation>
+      <properties>
+        <rdp.surefire.argLine>--enable-preview --enable-native-access=ALL-UNNAMED -Xss8m</rdp.surefire.argLine>
       </properties>
     </profile>
     <profile>

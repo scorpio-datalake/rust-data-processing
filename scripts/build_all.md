@@ -22,7 +22,7 @@ First run on a minimal cloud image may use `sudo` to install OpenJDK 21, `build-
 3. **`build_all.py`** — in order, with short pauses between heavy steps:
    - Rust: `cargo fmt --check`, clippy, build, tests + doctests, `ci_expanded` tests, `people.xlsx` fixture
    - Python: Ruff, `uv sync`, `maturin develop`, pytest; on Linux, wheel build + pip smoke
-   - Java: Spotless (Gradle main module), `rdp_jvm_sys`, `people.xlsx`, `mvn verify` (main + examples + Spark on Linux), Gradle `check` + `jmh` + `publishToMavenLocal`
+   - Java (same gates as `.github/workflows/jvm_bindings_ci.yml`): FFI manifest + version checks, Spotless (Gradle main + Maven on all three modules), `rdp_jvm_sys` (`--features full`), `people.xlsx`, `mvn verify` + install (main + examples), Spark `mvn package`, Gradle `check` + `jmh` + `publishToMavenLocal`
    - Docs: `cargo doc`, pdoc → `_site/python/`, pandoc → `_site/java/examples.html`
 
 ## Convenience flags
@@ -55,7 +55,22 @@ Examples:
 ./scripts/build_all.sh --docs-rust --docs-python   # both (orchestrator accepts combined *-only flags)
 ./scripts/build_all.sh --offline --rust-only
 ./scripts/build_all.sh --no-clean --skip-java --skip-docs   # Rust + Python only, keep artifacts
+./scripts/build_all.sh --no-clean --java-only               # JVM CI only, reuse prior builds
 ```
+
+## Lighter runs (limited CPU / disk)
+
+Use the existing skip flags instead of a separate “fast” mode. Full `./scripts/build_all.sh` matches CI; trim what you are not touching:
+
+| Goal | Example |
+|------|---------|
+| Java only (JVM CI parity) | `./scripts/build_all.sh --java-only` |
+| Skip JVM entirely | `./scripts/build_all.sh --skip-java` or `--skip-java --skip-docs` |
+| Skip formatting only | add `--skip-fmt` (Rust, Python, and Java) |
+| Keep compile artifacts | add `--no-clean` |
+| Shorter pauses between steps | `--wait-seconds 0 --rust-build-test-wait-seconds 0` |
+
+`--java-only` still runs native `cargo build` for `rdp_jvm_sys`, Maven verify on main + examples, Spark compile, and Gradle check/JMH — the same steps as JVM bindings CI (except the GitHub OS matrix).
 
 ## Orchestrator flags (passed to `build_all.py`)
 
@@ -121,7 +136,7 @@ Same modules the orchestrator calls (from repo root):
 python3 scripts/python_scripts/python_build.py
 python3 scripts/python_scripts/python_test.py
 
-python3 scripts/python_scripts/java_build.py   # native lib, Spotless (Gradle), people.xlsx
+python3 scripts/python_scripts/java_build.py   # native lib, Spotless (Gradle + Maven), people.xlsx
 python3 scripts/python_scripts/java_test.py    # mvn verify (3 modules) + gradlew check/jmh
 
 python3 scripts/python_scripts/docs_rust.py
@@ -136,6 +151,7 @@ python3 scripts/python_scripts/docs_java.py
 | `BUILD_ALL_NO_AUTO_JAVA=1` | JVM steps need JDK 21+ | Fail instead of `apt install openjdk-21-jdk` |
 | `BUILD_ALL_NO_AUTO_BUILD_ESSENTIAL=1` | Rust needs `cc` | Fail instead of `apt install build-essential` |
 | `BUILD_ALL_NO_AUTO_UV=1` | Python steps need `uv` | Fail instead of astral `uv` installer |
+| `BUILD_ALL_NO_AUTO_MAVEN=1` | JVM steps need `mvn` | Fail instead of `apt install maven` |
 | `BUILD_ALL_NO_CARGO_PREFETCH=1` | `--offline` and empty cache | Fail instead of one online `cargo fetch` |
 
 ## Prerequisites (if auto-install is disabled)
@@ -154,7 +170,9 @@ python3 scripts/python_scripts/docs_java.py
 | `python: command not found` | `sudo apt install python3` |
 | `Required tool not on PATH: uv` | Re-run (auto-install) or `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `Permission denied: .../gradlew` | Re-run (script chmods or uses `bash gradlew`); or `chmod +x bindings/java/rust-data-processing-jvm/gradlew` |
-| `Native library not found` (Java test) | Run `java_build.py` first or set `RDP_JVM_SYS` to the `.so` path |
+| `Native library not found` (Java test) | Run `java_build.py` first or set `RDP_JVM_SYS` to the `.so` / `.dll` path |
+| Spotless fails on `jvm-examples` but `--java-only` passed | Run `java_build.py` without `--skip-fmt` (checks Maven Spotless on all modules) |
+| Windows CI Surefire exit `-1073741819` | JVM CI matrix includes Windows; local `--java-only` on Linux does not — push to CI or run on Windows |
 | `Required tool not on PATH: mvn` | Install Maven (`sudo apt install maven` on Debian/Ubuntu) |
 | `no matching package named ...` with `--offline` | Run once without `--offline`, or unset `BUILD_ALL_NO_CARGO_PREFETCH` |
 | `linker cc not found` | Allow `build-essential` install or `sudo apt install build-essential` |

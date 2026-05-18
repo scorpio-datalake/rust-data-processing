@@ -19,11 +19,11 @@ from common import (
     JVM_MAVEN_MAIN,
     JVM_MAVEN_SPARK,
     banner,
+    ensure_maven,
     gradlew_argv,
     java_ci_env,
     mvn_argv,
     native_lib_release,
-    require_mvn,
     run,
 )
 
@@ -46,7 +46,7 @@ def _resolve_native_lib(native_lib: Path | None) -> Path:
 
 
 def maven_modules(*, native_lib: Path, skip_spotless: bool) -> None:
-    require_mvn()
+    ensure_maven()
     env = java_ci_env(native_lib=native_lib)
 
     banner("Maven verify + install (main JVM bindings)")
@@ -63,16 +63,16 @@ def maven_modules(*, native_lib: Path, skip_spotless: bool) -> None:
         env=env,
     )
 
-    if platform.system() == "Linux":
-        banner("Maven package (Spark materializer bridge)")
-        run(
-            mvn_argv("-DskipTests", "package", skip_spotless=skip_spotless),
-            cwd=JVM_MAVEN_SPARK,
-            env=env,
-        )
-    else:
+    banner("Maven package (Spark materializer bridge, compile + Spotless)")
+    run(
+        mvn_argv("-DskipTests", "package", skip_spotless=skip_spotless),
+        cwd=JVM_MAVEN_SPARK,
+        env=env,
+    )
+    if platform.system() != "Linux":
         print(
-            "  (Skipping rust-data-processing-jvm-spark: CI runs Maven package on Linux only)",
+            "  Note: GitHub JVM CI runs Spark `mvn package` on Linux only; "
+            "local build-all still compiles Spark here to catch Java errors early.",
             flush=True,
         )
 
@@ -114,8 +114,32 @@ def verify_jvm_jar_artifacts() -> None:
         print(f"  ok {path}", flush=True)
 
 
+def _jvm_ci_platform_note() -> None:
+    sys_name = platform.system()
+    if sys_name == "Windows":
+        print(
+            "  JVM CI also runs on windows-latest (Surefire + native FFI). "
+            "This run exercises the Windows code paths.",
+            flush=True,
+        )
+    elif sys_name == "Darwin":
+        print(
+            "  JVM CI also runs on macos-latest. Linux/Windows-only failures "
+            "require pushing or running build-all on those OSes.",
+            flush=True,
+        )
+    else:
+        print(
+            "  JVM CI matrix: ubuntu + windows + macos. Run "
+            "`pwsh -File scripts/build_all.ps1 --java-only --no-clean` on Windows "
+            "before pushing if you changed JNI/FFI or native code.",
+            flush=True,
+        )
+
+
 def test(*, native_lib: Path | None = None, skip_spotless: bool = False) -> None:
     lib = _resolve_native_lib(native_lib)
+    _jvm_ci_platform_note()
     maven_modules(native_lib=lib, skip_spotless=skip_spotless)
     gradle_modules(native_lib=lib)
     verify_jvm_jar_artifacts()

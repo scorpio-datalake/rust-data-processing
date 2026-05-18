@@ -1,7 +1,7 @@
 # Phase 3 P3-E1: build rdp_jvm_sys → manifest + version checks → Maven verify + Gradle check (+ publishToMavenLocal smoke).
 # Java tests: Surefire runs src/test/java/**/*Test.java on `mvn verify`; Gradle runs the same JUnit 5 suite on `./gradlew check`.
 # FfiExportedSymbolsContractTest + ParityMatrixDeferredExportTest run when RDP_JVM_SYS points at the built rdp_jvm_sys artifact.
-# JMH: `mvn verify` runs exec-maven-plugin at integration-test; `./gradlew jmh` runs the same hotspot benchmarks (requires JAVA_TOOL_OPTIONS).
+# JMH: `mvn verify` runs exec-maven-plugin at integration-test; `./gradlew jmh` runs the same hotspot benchmarks (JVM flags via exec jvmArgs / Gradle jvmArgs).
 # Matrix: Linux / Windows / macOS × JDK 21 (P3-E1-S1c, P3-E1-S4a).
 
 name: JVM bindings CI
@@ -42,9 +42,6 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    env:
-      # Panama downcalls + JMH (`src/jmh/java`) — required for `integration-test` / `./gradlew jmh`.
-      JAVA_TOOL_OPTIONS: --enable-preview --enable-native-access=ALL-UNNAMED
 
     steps:
       - uses: actions/checkout@v5
@@ -95,6 +92,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: echo "RDP_JVM_SYS=$GITHUB_WORKSPACE/bindings/jvm-sys/target/release/rdp_jvm_sys.dll" >> "$GITHUB_ENV"
+
+      - name: Add rdp_jvm_sys to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: echo "${{ github.workspace }}\bindings\jvm-sys\target\release" >> "$env:GITHUB_PATH"
 
       # `-B` batch mode only; avoid `-q` so logs show Surefire test execution (RUNNING / PASSED / SKIPPED).
       - name: Maven verify + install (main JVM bindings JAR)

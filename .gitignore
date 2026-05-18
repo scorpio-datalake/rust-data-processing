@@ -38,3 +38,8 @@ Planning/
 # Java / Gradle outputs under bindings/java (never commit — run mvn/gradlew locally).
 bindings/java/**/build/
 bindings/java/**/.gradle/
+.m2/
+bindings/java/**/target/
+bindings/java/**/build/
+
+

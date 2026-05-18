@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Build rdp_jvm_sys and run JVM consistency checks.
 
-Gradle: optional ``clean``, Spotless (Google Java Format) on the main module, then native
-``cargo`` build and ``people.xlsx`` fixture generation. Full Maven/Gradle CI parity
-(``mvn verify`` on all modules, JMH, etc.) runs in ``java_test.py``.
+Gradle + Maven Spotless on all JVM modules, optional ``clean``, then native ``cargo`` build
+and ``people.xlsx`` fixture generation. Full Maven/Gradle CI parity (``mvn verify``, JMH,
+etc.) runs in ``java_test.py``.
 """
 
 from __future__ import annotations
@@ -23,23 +23,14 @@ from common import (
     native_lib_release,
     require_tool,
     run,
+    run_jvm_manifest_checks,
+    run_jvm_spotless,
 )
 
 
 def gradle_clean() -> None:
     banner("Java: Gradle clean")
     run(gradlew_argv("clean", "--no-daemon"), cwd=JVM_GRADLE_DIR)
-
-
-def spotless_check() -> None:
-    banner("Java: Spotless (Google Java Format check)")
-    run(gradlew_argv("spotlessCheck", "--no-daemon"), cwd=JVM_GRADLE_DIR)
-
-
-def check_manifests() -> None:
-    banner("JVM: ffi manifest + Java version consistency")
-    run([sys.executable, "scripts/check_jvm_ffi_manifest.py"], cwd=REPO_ROOT)
-    run([sys.executable, "scripts/check_java_version_consistency.py"], cwd=REPO_ROOT)
 
 
 def build_native(*, release: bool = True) -> Path:
@@ -91,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--skip-fmt",
         action="store_true",
-        help="Skip Spotless check (Gradle).",
+        help="Skip Spotless check (Gradle + Maven on all JVM modules).",
     )
     parser.add_argument(
         "--fmt-only",
@@ -103,11 +94,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.clean:
         gradle_clean()
 
-    if not args.skip_fmt:
-        spotless_check()
-
     if not args.skip_checks:
-        check_manifests()
+        run_jvm_manifest_checks()
+
+    if not args.skip_fmt:
+        run_jvm_spotless()
 
     if args.fmt_only:
         return 0

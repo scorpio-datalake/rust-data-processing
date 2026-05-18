@@ -57,11 +57,81 @@ def require_mvn() -> None:
     require_tool("mvn")
 
 
+def ensure_maven() -> None:
+    """Maven is required for JVM CI parity (Spotless + verify on all Java modules)."""
+    if shutil.which("mvn"):
+        return
+    if os.environ.get("BUILD_ALL_NO_AUTO_MAVEN"):
+        raise SystemExit(
+            "error: `mvn` not found. Install Maven or unset BUILD_ALL_NO_AUTO_MAVEN "
+            "to allow apt install on Debian/Ubuntu.",
+        )
+    if not _is_debian_like_linux():
+        raise SystemExit(
+            "error: `mvn` not found. Install Apache Maven for your OS, then re-run.",
+        )
+    banner("Java: installing Maven (sudo apt-get)")
+    subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "DEBIAN_FRONTEND=noninteractive",
+            "apt-get",
+            "install",
+            "-y",
+            "maven",
+        ],
+        check=True,
+    )
+    require_mvn()
+
+
+JVM_MAVEN_MODULE_SPECS: tuple[tuple[Path, str], ...] = (
+    (JVM_MAVEN_MAIN, "main"),
+    (JVM_MAVEN_EXAMPLES, "examples"),
+    (JVM_MAVEN_SPARK, "spark"),
+)
+
+
+def run_jvm_manifest_checks() -> None:
+    """Same scripts as .github/workflows/jvm_bindings_ci.yml (fast, no native build)."""
+    banner("JVM: ffi manifest + Java version consistency")
+    run([sys.executable, "scripts/check_jvm_ffi_manifest.py"], cwd=REPO_ROOT)
+    run([sys.executable, "scripts/check_java_version_consistency.py"], cwd=REPO_ROOT)
+
+
+def run_jvm_spotless(*, skip_gradle: bool = False, skip_maven: bool = False) -> None:
+    """Gradle (main module) + Maven Spotless on all JVM modules — matches JVM CI validate phase."""
+    if not skip_gradle:
+        banner("Java: Spotless (Gradle, main module)")
+        run(gradlew_argv("spotlessCheck", "--no-daemon"), cwd=JVM_GRADLE_DIR)
+    if not skip_maven:
+        ensure_maven()
+        env = java_ci_env()
+        for module, label in JVM_MAVEN_MODULE_SPECS:
+            banner(f"Java: Spotless (Maven, {label})")
+            run(mvn_argv("spotless:check"), cwd=module, env=env)
+
+
 def java_ci_env(*, native_lib: Path | None = None) -> dict[str, str]:
-    """Environment for JVM CI parity (Maven verify, Gradle check, JMH)."""
-    env = {"JAVA_TOOL_OPTIONS": JAVA_TOOL_OPTIONS_CI}
+    """Environment for JVM CI parity (Maven verify, Gradle check, JMH).
+
+    JVM flags use Surefire argLine / Gradle jvmArgs (not JAVA_TOOL_OPTIONS) so
+    Windows Surefire forks avoid duplicate --enable-preview (exit -1073741819).
+    """
+    env: dict[str, str] = {}
     if native_lib is not None:
-        env["RDP_JVM_SYS"] = str(native_lib.resolve())
+        resolved = native_lib.resolve()
+        env["RDP_JVM_SYS"] = str(resolved)
+        if platform.system() == "Windows":
+            dll_dir = str(resolved.parent)
+            path = os.environ.get("PATH", "")
+            env["PATH"] = dll_dir + (os.pathsep + path if path else "")
+    gw = os.environ.get("GITHUB_WORKSPACE")
+    if gw:
+        env["GITHUB_WORKSPACE"] = gw
+    elif (REPO_ROOT / "tests" / "fixtures" / "people.csv").is_file():
+        env["GITHUB_WORKSPACE"] = str(REPO_ROOT)
     return env
 
 

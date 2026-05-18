@@ -12,7 +12,7 @@ Usage: ./scripts/build_all.sh [OPTIONS] [ORCHESTRATOR_ARGS...]
 
 Convenience flags (expanded before calling build_all.py):
   --python-only     Python wrapper build + tests only
-  --java-only       JVM native lib + Maven verify (all modules) + Gradle check/JMH
+  --java-only       JVM CI parity: native lib + Maven verify (all modules) + Gradle check/JMH
   --rust-only       Rust build + tests only (no upfront cargo clean)
   --docs-only       Generate Rust, Python, and Java HTML docs
   --docs-rust       Rust API docs only (cargo doc)
@@ -138,6 +138,32 @@ needs_java_toolchain() {
   return 0
 }
 
+needs_maven() {
+  needs_java_toolchain
+}
+
+ensure_maven_for_build() {
+  needs_maven || return 0
+  if command -v mvn >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ -n "${BUILD_ALL_NO_AUTO_MAVEN:-}" ]]; then
+    echo "error: mvn not found. Install Maven or unset BUILD_ALL_NO_AUTO_MAVEN." >&2
+    exit 1
+  fi
+  if ! is_debian_like; then
+    echo "error: mvn not found. Install Apache Maven for your OS." >&2
+    exit 1
+  fi
+  echo "== Java: installing Maven (sudo apt-get) =="
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y maven
+  command -v mvn >/dev/null 2>&1 || {
+    echo "error: mvn still not on PATH after install" >&2
+    exit 1
+  }
+}
+
 java_major_version() {
   "${py}" -c '
 import re, subprocess, sys
@@ -210,6 +236,7 @@ ensure_java_for_build() {
 }
 
 ensure_java_for_build
+ensure_maven_for_build
 
 if [[ "${skip_upstream_clean}" != true ]]; then
   echo "== Rust: cargo clean =="

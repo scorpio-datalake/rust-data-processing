@@ -9,7 +9,7 @@ Thin coordinator over sibling modules in this directory. Run from repo root:
 Individual steps (same directory):
 
     rust_build.py, rust_test.py, python_clean.py, python_build.py, python_test.py,
-    java_clean.py, java_build.py, docs_rust.py, docs_python.py, docs_java.py
+    java_clean.py, java_build.py, java_test.py, docs_rust.py, docs_python.py, docs_java.py
 """
 
 from __future__ import annotations
