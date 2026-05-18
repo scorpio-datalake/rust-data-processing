@@ -64,19 +64,16 @@ public final class RdpSparkMaterializer {
 
     if (!interchange.has("dataset")) {
       throw new IllegalArgumentException(
-          "interchange has no dataset and kind is not a known temp-file handoff (kind=" + kind + ")");
+          "interchange has no dataset and kind is not a known temp-file handoff (kind="
+              + kind
+              + ")");
     }
     JSONObject dataset = interchange.getJSONObject("dataset");
     Path csv = Files.createTempFile("rdp_spark_", ".csv");
     try {
       writeTabularDatasetAsCsv(dataset, csv);
       String csvUri = csv.toAbsolutePath().toUri().toString();
-      Dataset<Row> df =
-          spark
-              .read()
-              .option("header", true)
-              .option("inferSchema", true)
-              .csv(csvUri);
+      Dataset<Row> df = spark.read().option("header", true).option("inferSchema", true).csv(csvUri);
       return cacheCountAndDelete(df, csv);
     } catch (Throwable t) {
       Files.deleteIfExists(csv);

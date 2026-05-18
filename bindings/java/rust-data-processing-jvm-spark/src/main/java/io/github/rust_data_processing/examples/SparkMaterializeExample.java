@@ -31,8 +31,7 @@ public final class SparkMaterializeExample {
     Linker linker = Linker.nativeLinker();
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
-      Dataset<Row> df =
-          RdpSparkMaterializer.fromExportParquetTemp(linker, lookup, arena, spark);
+      Dataset<Row> df = RdpSparkMaterializer.fromExportParquetTemp(linker, lookup, arena, spark);
       df.printSchema();
       df.show();
     } finally {

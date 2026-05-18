@@ -12,7 +12,7 @@ Usage: ./scripts/build_all.sh [OPTIONS] [ORCHESTRATOR_ARGS...]
 
 Convenience flags (expanded before calling build_all.py):
   --python-only     Python wrapper build + tests only
-  --java-only       JVM native lib + Gradle build + tests only
+  --java-only       JVM native lib + Maven verify (all modules) + Gradle check/JMH
   --rust-only       Rust build + tests only (no upfront cargo clean)
   --docs-only       Generate Rust, Python, and Java HTML docs
   --docs-rust       Rust API docs only (cargo doc)

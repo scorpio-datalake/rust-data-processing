@@ -1,18 +1,34 @@
 #!/usr/bin/env python3
-"""Run JVM Gradle check (requires RDP_JVM_SYS or a built release native lib)."""
+"""JVM CI parity: Maven verify (all modules), Gradle check + JMH + publishToMavenLocal.
+
+Mirrors .github/workflows/jvm_bindings_ci.yml. Requires ``java_build.py`` (native lib +
+``RDP_JVM_SYS``) and ``mvn`` on PATH.
+"""
 
 from __future__ import annotations
 
 import argparse
 import os
+import platform
 import sys
 from pathlib import Path
 
-from common import JVM_GRADLE_DIR, banner, gradlew_argv, native_lib_release, run
+from common import (
+    JVM_GRADLE_DIR,
+    JVM_MAVEN_EXAMPLES,
+    JVM_MAVEN_MAIN,
+    JVM_MAVEN_SPARK,
+    banner,
+    gradlew_argv,
+    java_ci_env,
+    mvn_argv,
+    native_lib_release,
+    require_mvn,
+    run,
+)
 
 
-def test(native_lib: Path | None = None) -> None:
-
+def _resolve_native_lib(native_lib: Path | None) -> Path:
     lib = native_lib
     if lib is None:
         env_lib = os.environ.get("RDP_JVM_SYS")
@@ -26,13 +42,83 @@ def test(native_lib: Path | None = None) -> None:
             "Native library not found. Set RDP_JVM_SYS or run java_build.py first.\n"
             f"  Expected release artifact: {native_lib_release()}"
         )
+    return lib
 
-    banner("Java: Gradle check")
+
+def maven_modules(*, native_lib: Path, skip_spotless: bool) -> None:
+    require_mvn()
+    env = java_ci_env(native_lib=native_lib)
+
+    banner("Maven verify + install (main JVM bindings)")
     run(
-        gradlew_argv("check", "--no-daemon", "--stacktrace"),
-        cwd=JVM_GRADLE_DIR,
-        env={"RDP_JVM_SYS": str(lib.resolve())},
+        mvn_argv("verify", "install", skip_spotless=skip_spotless),
+        cwd=JVM_MAVEN_MAIN,
+        env=env,
     )
+
+    banner("Maven verify (pytest-mirror examples module)")
+    run(
+        mvn_argv("verify", skip_spotless=skip_spotless),
+        cwd=JVM_MAVEN_EXAMPLES,
+        env=env,
+    )
+
+    if platform.system() == "Linux":
+        banner("Maven package (Spark materializer bridge)")
+        run(
+            mvn_argv("-DskipTests", "package", skip_spotless=skip_spotless),
+            cwd=JVM_MAVEN_SPARK,
+            env=env,
+        )
+    else:
+        print(
+            "  (Skipping rust-data-processing-jvm-spark: CI runs Maven package on Linux only)",
+            flush=True,
+        )
+
+
+def gradle_modules(*, native_lib: Path) -> None:
+    env = java_ci_env(native_lib=native_lib)
+
+    banner("Gradle jar + check")
+    run(
+        gradlew_argv("jar", "check", "--no-daemon", "--stacktrace"),
+        cwd=JVM_GRADLE_DIR,
+        env=env,
+    )
+
+    banner("Gradle JMH benchmarks")
+    run(
+        gradlew_argv("jmh", "--no-daemon", "--stacktrace"),
+        cwd=JVM_GRADLE_DIR,
+        env=env,
+    )
+
+    banner("Gradle publishToMavenLocal (smoke)")
+    run(
+        gradlew_argv("publishToMavenLocal", "--no-daemon"),
+        cwd=JVM_GRADLE_DIR,
+        env=env,
+    )
+
+
+def verify_jvm_jar_artifacts() -> None:
+    banner("Verify JVM JAR artifacts (Maven + Gradle)")
+    maven_jars = list((JVM_MAVEN_MAIN / "target").glob("rust-data-processing-jvm-*.jar"))
+    gradle_jars = list((JVM_GRADLE_DIR / "build" / "libs").glob("rust-data-processing-jvm-*.jar"))
+    if not maven_jars:
+        raise SystemExit(f"No Maven JAR under {JVM_MAVEN_MAIN / 'target'}")
+    if not gradle_jars:
+        raise SystemExit(f"No Gradle JAR under {JVM_GRADLE_DIR / 'build' / 'libs'}")
+    for path in sorted(maven_jars + gradle_jars):
+        print(f"  ok {path}", flush=True)
+
+
+def test(*, native_lib: Path | None = None, skip_spotless: bool = False) -> None:
+    lib = _resolve_native_lib(native_lib)
+    maven_modules(native_lib=lib, skip_spotless=skip_spotless)
+    gradle_modules(native_lib=lib)
+    verify_jvm_jar_artifacts()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,8 +129,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to rdp_jvm_sys (default: RDP_JVM_SYS env or release build).",
     )
+    parser.add_argument(
+        "--skip-fmt",
+        action="store_true",
+        help="Pass -Dspotless.check.skip=true to Maven (Gradle spotless skipped in java_build).",
+    )
     args = parser.parse_args(argv)
-    test(native_lib=args.native_lib)
+    test(native_lib=args.native_lib, skip_spotless=args.skip_fmt)
     return 0
 
 

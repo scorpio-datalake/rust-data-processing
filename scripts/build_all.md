@@ -20,9 +20,9 @@ First run on a minimal cloud image may use `sudo` to install OpenJDK 21, `build-
 1. **`cargo clean`** — root Rust workspace  
 2. **`python_clean.py`** — Python wrapper build artifacts under `python-wrapper/`  
 3. **`build_all.py`** — in order, with short pauses between heavy steps:
-   - Rust: `cargo fmt --check`, clippy, build, tests (including expanded feature set)
-   - Python: Ruff, `uv sync`, `maturin develop`, pytest
-   - Java: Spotless, `cargo build` for `rdp_jvm_sys`, `./gradlew check`
+   - Rust: `cargo fmt --check`, clippy, build, tests + doctests, `ci_expanded` tests, `people.xlsx` fixture
+   - Python: Ruff, `uv sync`, `maturin develop`, pytest; on Linux, wheel build + pip smoke
+   - Java: Spotless (Gradle main module), `rdp_jvm_sys`, `people.xlsx`, `mvn verify` (main + examples + Spark on Linux), Gradle `check` + `jmh` + `publishToMavenLocal`
    - Docs: `cargo doc`, pdoc → `_site/python/`, pandoc → `_site/java/examples.html`
 
 ## Convenience flags
@@ -32,7 +32,7 @@ These are handled in the shell script (not only in Python):
 | Flag | Effect |
 |------|--------|
 | `--python-only` | Python build + tests; skips Rust, Java, docs; **no** upfront `cargo clean` / python clean |
-| `--java-only` | JVM build + Gradle `check`; skips Rust, Python, docs; **no** upfront clean |
+| `--java-only` | JVM CI parity (`java_build.py` + `java_test.py`); skips Rust, Python, docs; **no** upfront clean |
 | `--rust-only` | Rust build + tests only; **no** upfront clean |
 | `--docs-only` | Generate Rust, Python, and Java docs only; **no** upfront clean |
 | `--docs-rust` | Rust API docs only (`cargo doc` → `target/doc/…`) |
@@ -121,8 +121,8 @@ Same modules the orchestrator calls (from repo root):
 python3 scripts/python_scripts/python_build.py
 python3 scripts/python_scripts/python_test.py
 
-python3 scripts/python_scripts/java_build.py
-python3 scripts/python_scripts/java_test.py
+python3 scripts/python_scripts/java_build.py   # native lib, Spotless (Gradle), people.xlsx
+python3 scripts/python_scripts/java_test.py    # mvn verify (3 modules) + gradlew check/jmh
 
 python3 scripts/python_scripts/docs_rust.py
 python3 scripts/python_scripts/docs_python.py
@@ -142,7 +142,7 @@ python3 scripts/python_scripts/docs_java.py
 
 - **Rust:** [rustup](https://rustup.rs/) (`cargo`, `rustc` on `PATH`; `~/.cargo/env` sourced when present)
 - **Python:** `python3`, plus **`uv`** for wrapper build/test/docs
-- **Java:** **JDK 21+** for Gradle; native lib built from `bindings/jvm-sys`
+- **Java:** **JDK 21+**, **Maven** (`mvn`), Gradle wrapper under `bindings/java/rust-data-processing-jvm`; native lib from `bindings/jvm-sys`
 - **C linker:** `build-essential` (or any toolchain providing `cc`) for Rust crate build scripts
 - **Docs:** `pandoc` for Java examples HTML (optional in full pipeline)
 
@@ -155,5 +155,6 @@ python3 scripts/python_scripts/docs_java.py
 | `Required tool not on PATH: uv` | Re-run (auto-install) or `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | `Permission denied: .../gradlew` | Re-run (script chmods or uses `bash gradlew`); or `chmod +x bindings/java/rust-data-processing-jvm/gradlew` |
 | `Native library not found` (Java test) | Run `java_build.py` first or set `RDP_JVM_SYS` to the `.so` path |
+| `Required tool not on PATH: mvn` | Install Maven (`sudo apt install maven` on Debian/Ubuntu) |
 | `no matching package named ...` with `--offline` | Run once without `--offline`, or unset `BUILD_ALL_NO_CARGO_PREFETCH` |
 | `linker cc not found` | Allow `build-essential` install or `sudo apt install build-essential` |

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build rdp_jvm_sys and run JVM consistency checks.
 
-Gradle: optional ``clean``, Spotless (Google Java Format), then native ``cargo`` build.
-Maven modules also run Spotless on ``validate`` (``mvn verify``).
+Gradle: optional ``clean``, Spotless (Google Java Format) on the main module, then native
+``cargo`` build and ``people.xlsx`` fixture generation. Full Maven/Gradle CI parity
+(``mvn verify`` on all modules, JMH, etc.) runs in ``java_test.py``.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from common import (
     JVM_SYS_DIR,
     REPO_ROOT,
     banner,
+    generate_people_xlsx_fixture,
     gradlew_argv,
     native_lib_release,
     require_tool,
@@ -111,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     build_native(release=not args.debug)
+    generate_people_xlsx_fixture()
     return 0
 
 

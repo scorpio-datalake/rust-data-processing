@@ -6,7 +6,14 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import REPO_ROOT, banner, require_tool, run, setup_rust_toolchain_env
+from common import (
+    REPO_ROOT,
+    banner,
+    generate_people_xlsx_fixture,
+    require_tool,
+    run,
+    setup_rust_toolchain_env,
+)
 
 
 def test(*, expanded: bool) -> None:
@@ -20,19 +27,10 @@ def test(*, expanded: bool) -> None:
     run(args, cwd=REPO_ROOT)
 
 
-def generate_people_xlsx() -> None:
-    banner("Rust: generate tests/fixtures/people.xlsx")
-    run(
-        [
-            "cargo",
-            "run",
-            "--features",
-            "excel_test_writer",
-            "--bin",
-            "generate_people_xlsx_fixture",
-        ],
-        cwd=REPO_ROOT,
-    )
+def test_doctests() -> None:
+    require_tool("cargo")
+    banner("Rust test (doctests)")
+    run(["cargo", "test", "--locked", "--doc"], cwd=REPO_ROOT)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,9 +51,10 @@ def main(argv: list[str] | None = None) -> int:
     setup_rust_toolchain_env(offline=args.offline)
     if not args.expanded_only:
         test(expanded=False)
+        test_doctests()
     test(expanded=True)
     if not args.skip_fixtures:
-        generate_people_xlsx()
+        generate_people_xlsx_fixture()
     return 0
 
 

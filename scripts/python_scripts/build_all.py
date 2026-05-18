@@ -151,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         pause(wait, "before JVM build")
         _run_module(java_build_main, java_args)
         pause(wait, "before JVM tests")
-        _run_module(java_test_main, [])
+        _run_module(java_test_main, java_args)
 
     if not args.skip_docs:
         pause(wait, "before Rust docs")

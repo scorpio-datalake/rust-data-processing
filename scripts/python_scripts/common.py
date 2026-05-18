@@ -18,7 +18,13 @@ if str(_SCRIPT_DIR) not in sys.path:
 REPO_ROOT = Path(__file__).resolve().parents[2]
 JVM_SYS_DIR = REPO_ROOT / "bindings" / "jvm-sys"
 JVM_GRADLE_DIR = REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm"
+JVM_MAVEN_MAIN = REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm"
+JVM_MAVEN_EXAMPLES = REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm-examples"
+JVM_MAVEN_SPARK = REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm-spark"
 PYTHON_WRAPPER = REPO_ROOT / "python-wrapper"
+
+# Matches .github/workflows/jvm_bindings_ci.yml (Panama + JMH).
+JAVA_TOOL_OPTIONS_CI = "--enable-preview --enable-native-access=ALL-UNNAMED"
 
 DEFAULT_WAIT_SECONDS = 10
 DEFAULT_RUST_BUILD_TEST_WAIT_SECONDS = 30
@@ -45,6 +51,43 @@ def run(
 def require_tool(name: str) -> None:
     if shutil.which(name) is None:
         raise SystemExit(f"Required tool not on PATH: {name}")
+
+
+def require_mvn() -> None:
+    require_tool("mvn")
+
+
+def java_ci_env(*, native_lib: Path | None = None) -> dict[str, str]:
+    """Environment for JVM CI parity (Maven verify, Gradle check, JMH)."""
+    env = {"JAVA_TOOL_OPTIONS": JAVA_TOOL_OPTIONS_CI}
+    if native_lib is not None:
+        env["RDP_JVM_SYS"] = str(native_lib.resolve())
+    return env
+
+
+def mvn_argv(*goals: str, skip_spotless: bool = False) -> list[str]:
+    cmd = ["mvn", "-B"]
+    if skip_spotless:
+        cmd.append("-Dspotless.check.skip=true")
+    cmd.extend(goals)
+    return cmd
+
+
+def generate_people_xlsx_fixture() -> None:
+    """Same as JVM bindings CI — Excel FFI tests and docs."""
+    require_tool("cargo")
+    banner("Generate tests/fixtures/people.xlsx")
+    run(
+        [
+            "cargo",
+            "run",
+            "--features",
+            "excel_test_writer",
+            "--bin",
+            "generate_people_xlsx_fixture",
+        ],
+        cwd=REPO_ROOT,
+    )
 
 
 def _prepend_path(directory: Path) -> None:

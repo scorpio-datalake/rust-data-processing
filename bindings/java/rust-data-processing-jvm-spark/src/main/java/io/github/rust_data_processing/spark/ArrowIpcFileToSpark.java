@@ -27,8 +27,8 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 /**
- * Loads an on-disk Arrow IPC <strong>file</strong> (Polars {@code IpcWriter} / Feather-style footer)
- * into a Spark {@code Dataset<Row>} without Spark's Parquet reader. Intended for {@code
+ * Loads an on-disk Arrow IPC <strong>file</strong> (Polars {@code IpcWriter} / Feather-style
+ * footer) into a Spark {@code Dataset<Row>} without Spark's Parquet reader. Intended for {@code
  * arrow_ipc_export_temp} envelopes only; wide Arrow types may require extending {@link
  * #toSparkType}.
  */
@@ -79,25 +79,25 @@ final class ArrowIpcFileToSpark {
 
   private static DataType toSparkType(ArrowType type) {
     if (type instanceof ArrowType.Utf8 || type instanceof ArrowType.LargeUtf8) {
-      return DataTypes.StringType();
+      return DataTypes.StringType;
     }
     if (type instanceof ArrowType.Bool) {
-      return DataTypes.BooleanType();
+      return DataTypes.BooleanType;
     }
     if (type instanceof ArrowType.Int it) {
       if (it.getIsSigned() && it.getBitWidth() == 64) {
-        return DataTypes.LongType();
+        return DataTypes.LongType;
       }
       if (it.getIsSigned() && it.getBitWidth() == 32) {
-        return DataTypes.IntegerType();
+        return DataTypes.IntegerType;
       }
     }
     if (type instanceof ArrowType.FloatingPoint fp) {
       if (fp.getPrecision() == FloatingPointPrecision.DOUBLE) {
-        return DataTypes.DoubleType();
+        return DataTypes.DoubleType;
       }
       if (fp.getPrecision() == FloatingPointPrecision.SINGLE) {
-        return DataTypes.FloatType();
+        return DataTypes.FloatType;
       }
     }
     throw new IllegalArgumentException("Unsupported Arrow type for Spark bridge: " + type);
