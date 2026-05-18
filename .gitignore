@@ -41,5 +41,5 @@ bindings/java/**/.gradle/
 .m2/
 bindings/java/**/target/
 bindings/java/**/build/
-
+scripts/git_scripts/
 
