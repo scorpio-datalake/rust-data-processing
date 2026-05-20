@@ -1,0 +1,8 @@
+{
+  "fields": [
+    { "name": "id", "data_type": "Int64" },
+    { "name": "user.name", "data_type": "Utf8" },
+    { "name": "score", "data_type": "Float64" },
+    { "name": "active", "data_type": "Bool" }
+  ]
+}

@@ -3,39 +3,20 @@
 from __future__ import annotations
 
 import pytest
-
 import rust_data_processing as rdp
 
 from tests.conftest import fixture_path
 from tests.helpers import feature_wise_parity, reduce_parity
+from tests.pipeline_fixture_support import load_schema_fields
 
 pytestmark = pytest.mark.deep
 
-SEATTLE_SCHEMA = [
-    {"name": "date", "data_type": "utf8"},
-    {"name": "precipitation", "data_type": "float64"},
-    {"name": "temp_max", "data_type": "float64"},
-    {"name": "temp_min", "data_type": "float64"},
-    {"name": "wind", "data_type": "float64"},
-    {"name": "weather", "data_type": "utf8"},
-]
-
-JOB_RUNS_SCHEMA = [
-    {"name": "job_id", "data_type": "int64"},
-    {"name": "creator_user_name", "data_type": "utf8"},
-    {"name": "created_time", "data_type": "int64"},
-    {"name": "settings.name", "data_type": "utf8"},
-    {"name": "settings.tags.team", "data_type": "utf8"},
-    {"name": "settings.tags.env", "data_type": "utf8"},
-    {"name": "cluster.num_workers", "data_type": "int64"},
-    {"name": "metrics.duration_ms", "data_type": "float64"},
-    {"name": "metrics.success", "data_type": "bool"},
-    {"name": "metrics.bytes_written", "data_type": "int64"},
-]
+SEATTLE_SCHEMA = load_schema_fields("schemas", "seattle.schema.json", bundle="deep")
+JOB_RUNS_SCHEMA = load_schema_fields("schemas", "job_runs.schema.json", bundle="deep")
 
 
 def _seattle() -> rdp.DataSet:
-    return rdp.ingest_from_path(fixture_path("deep/seattle-weather.csv"), SEATTLE_SCHEMA, {})
+    return rdp.ingest_from_path(str(fixture_path("deep/seattle-weather.csv")), SEATTLE_SCHEMA, {})
 
 
 def test_deep_csv_seattle_weather_ingests_and_casts() -> None:
@@ -116,7 +97,7 @@ def test_deep_arg_extrema_and_topk_weather_on_seattle() -> None:
 
 
 def _job_runs() -> rdp.DataSet:
-    return rdp.ingest_from_path(fixture_path("deep/job_runs_sample.json"), JOB_RUNS_SCHEMA, {})
+    return rdp.ingest_from_path(str(fixture_path("deep/job_runs_sample.json")), JOB_RUNS_SCHEMA, {})
 
 
 def test_deep_reduce_new_ops_parity_on_job_runs_json_fixture() -> None:
@@ -274,7 +255,7 @@ def test_deep_parquet_apache_fixture_ingests_supported_columns() -> None:
         if len(fields) >= 6:
             break
     assert fields
-    ds = rdp.ingest_from_path(path, fields, {"format": "parquet"})
+    ds = rdp.ingest_from_path(str(path), fields, {"format": "parquet"})
     assert ds.row_count() == tbl.num_rows
     casted = []
     for f in fields:

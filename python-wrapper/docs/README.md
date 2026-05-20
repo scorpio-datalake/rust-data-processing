@@ -9,8 +9,9 @@
 
 CI builds browsable HTML on each push to `main` (combined with Rust rustdoc). Entry point:
 
-- [GitHub Pages — Python API (pdoc)](https://vihangdesai2018-png.github.io/rust-data-processing/python/) — landing + Rust rustdoc: [site root](https://vihangdesai2018-png.github.io/rust-data-processing/)
+- [GitHub Pages — Python API (pdoc)](https://rust-data-processing.github.io/rust-data-processing/python/) — landing + Rust rustdoc: [site root](https://rust-data-processing.github.io/rust-data-processing/)
 - **Examples** in pdoc come from the repo’s [`docs/python/README.md`](../../docs/python/README.md) (included via `rust_data_processing.examples`). Published URL: `python/examples.html` (copy of the module page).
+- **Java examples** (JVM / Panama parity tour, including incremental ETL anchors): [`docs/java/EXAMPLES.md`](../../docs/java/EXAMPLES.md) — published on the same site as [`java/examples.html`](https://rust-data-processing.github.io/rust-data-processing/java/examples.html).
 
 Local build (from `python-wrapper/` after `uv sync --group dev`):
 
@@ -21,6 +22,6 @@ uv run pdoc -d google -o ../_site/python rust_data_processing rust_data_processi
 
 From the repository root (PowerShell), the same output is produced by `./scripts/build_docs.ps1 -All` → `_site/python/index.html`.
 
-Rust-side reference: repository root **`API.md`**, **`README.md`**, and **`docs/REDUCE_AGG_SEMANTICS.md`** (aggregate semantics). The Python package mirrors the main crate APIs where practical; gaps are listed in **`PARITY.md`** and optionally in a local **`Planning/PHASE1A_PLAN.md`** if you maintain one.
+Rust-side reference: repository root **`API.md`**, **`README.md`**, and **`docs/REDUCE_AGG_SEMANTICS.md`** (aggregate semantics). The Python package mirrors the main crate APIs where practical; gaps are listed in **`PARITY.md`**. JVM parity is tracked in **`Planning/PHASE3_EPICS.md`** only.
 
 Maintainer overview of doc hosting: **`docs/DOCUMENTATION.md`**.

@@ -6,13 +6,11 @@ use std::path::PathBuf;
 use rust_data_processing::ingestion::{
     IngestionOptions, ingest_from_ordered_paths, paths_from_directory_scan,
 };
-use rust_data_processing::types::{DataType, Field, Schema, Value};
+use rust_data_processing::pipeline_spec::PipelineBundle;
+use rust_data_processing::types::{Schema, Value};
 
 fn schema_ts() -> Schema {
-    Schema::new(vec![
-        Field::new("id", DataType::Int64),
-        Field::new("ts", DataType::Int64),
-    ])
+    PipelineBundle::from_repo_fixture("watermark").expect_schema("schemas/events.schema.json")
 }
 
 #[test]

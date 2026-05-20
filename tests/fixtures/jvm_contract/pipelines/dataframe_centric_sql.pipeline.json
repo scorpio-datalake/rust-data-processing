@@ -1,0 +1,14 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["{{SOURCE_PATH}}"],
+    "schema_ref": "schemas/three_rows.schema.json",
+    "options": { "format": "json" }
+  },
+  "transform": {
+    "sql": "SELECT id, active, (score * 2.0) AS score FROM df WHERE active = TRUE ORDER BY id"
+  },
+  "sinks": [
+    { "kind": "parquet_file", "path": "{{SINK_PATH}}" }
+  ]
+}

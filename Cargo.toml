@@ -6,11 +6,13 @@ rust-version = "1.85"
 description = "Schema-first ingestion (CSV, JSON, Parquet, Excel) into an in-memory DataSet, plus Polars-backed pipelines, SQL, profiling, validation, and map/reduce-style processing."
 readme = "README_CRATE.md"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/vihangdesai2018-png/rust-data-processing"
+repository = "https://github.com/rust-data-processing/rust-data-processing"
 documentation = "https://docs.rs/rust-data-processing"
 keywords = ["csv", "json", "parquet", "dataset", "etl"]
 categories = ["database-implementations", "parser-implementations"]
 exclude = [
+    "bindings/",
+    "spikes/",
     "Planning/",
     "python-wrapper/",
     "docs/python/",
@@ -31,6 +33,7 @@ cargo-args = ["-j", "1"]
 
 [dependencies]
 csv = "1.3.1"
+quick-xml = "0.37.5"
 glob = "0.3"
 walkdir = "2"
 calamine = { version = "0.33.0", optional = true }
@@ -41,7 +44,7 @@ serde_json = "1.0.139"
 serde_arrow = { version = "0.14.0", default-features = false, features = ["arrow-54"], optional = true }
 thiserror = "2.0.11"
 sha2 = "0.10"
-polars = { version = "0.53.0", features = ["lazy", "csv", "parquet", "json", "fmt"] }
+polars = { version = "0.53.0", features = ["lazy", "csv", "parquet", "json", "fmt", "ipc"] }
 polars-sql = { version = "0.53.0", optional = true }
 rust_xlsxwriter = { version = "0.93", optional = true }
 arrow = { version = "54", optional = true }
@@ -97,7 +100,18 @@ harness = false
 name = "outliers"
 harness = false
 
+[[bin]]
+name = "generate_people_xlsx_fixture"
+path = "src/bin/generate_people_xlsx_fixture.rs"
+required-features = ["excel_test_writer"]
+
 # Reduce Windows/MSVC linker memory use for `cargo test`.
 # (Integration tests can otherwise hit LNK1102 when linking large dependency graphs like Polars.)
 [profile.test]
 debug = 0
+
+# Dependencies still use the `dev` profile; full debug (`debug = 2`) makes `.rlib`s enormous and
+# routinely exhausts `rust-lld` during `--lib` / integration test links on 8–16 GB Windows boxes.
+# `debug = 1` keeps line tables for backtraces while cutting PDB/link pressure sharply.
+[profile.dev]
+debug = 1

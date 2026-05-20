@@ -1,0 +1,5 @@
+{
+  "format": "csv",
+  "watermark_column": "ts",
+  "watermark_exclusive_above": 100
+}

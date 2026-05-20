@@ -18,7 +18,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-REPO_SLUG = "vihangdesai2018-png/rust-data-processing"
+REPO_SLUG = "rust-data-processing/rust-data-processing"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$")
 
 BUMP_PATHS = [

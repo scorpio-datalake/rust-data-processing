@@ -1,0 +1,6 @@
+{
+  "paths": ["{{PATH_A}}", "{{PATH_B}}", "{{PATH_C}}"],
+  "schema_ref": "schemas/student_source.schema.json",
+  "options": { "format": "json" },
+  "response": { "mode": "dataset", "max_rows": 50 }
+}

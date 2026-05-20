@@ -23,7 +23,7 @@ use super::polars_bridge::{infer_schema_from_dataframe_lossy, polars_error_to_in
 use super::watermark::{
     apply_watermark_after_ingest, max_value_in_column, validate_watermark_config,
 };
-use super::{csv, excel, json, parquet};
+use super::{csv, excel, json, parquet, xml};
 use polars::prelude::*;
 
 /// Supported ingestion formats.
@@ -37,6 +37,8 @@ pub enum IngestionFormat {
     Parquet,
     /// Spreadsheet/workbook formats (feature-gated behind `excel`).
     Excel,
+    /// Row-oriented `<rdp_records>` XML (see [`super::xml`]).
+    Xml,
 }
 
 impl IngestionFormat {
@@ -47,6 +49,7 @@ impl IngestionFormat {
             "json" | "ndjson" => Some(Self::Json),
             "parquet" | "pq" => Some(Self::Parquet),
             "xlsx" | "xls" | "xlsm" | "xlsb" | "ods" => Some(Self::Excel),
+            "xml" => Some(Self::Xml),
             _ => None,
         }
     }
@@ -309,6 +312,7 @@ pub fn ingest_from_path(
         IngestionFormat::Excel => {
             ingest_excel_dispatch(path, schema, &options.excel_sheet_selection)
         }
+        IngestionFormat::Xml => xml::ingest_xml_from_path(path, schema),
     };
 
     let result = result.and_then(|ds| apply_watermark_after_ingest(ds, schema, options));
@@ -458,6 +462,10 @@ pub fn infer_schema_from_path(
             infer_schema_from_dataframe_lossy(&df)
         }
         IngestionFormat::Excel => infer_excel_schema_dispatch(path, &options.excel_sheet_selection),
+        IngestionFormat::Xml => Err(IngestionError::SchemaMismatch {
+            message: "infer_schema_from_path is not supported for XML; provide an explicit Schema"
+                .to_string(),
+        }),
     }
 }
 
@@ -591,4 +599,38 @@ impl IngestionRequest {
     pub fn run(&self) -> IngestionResult<DataSet> {
         ingest_from_path(&self.path, &self.schema, &self.options)
     }
+}
+
+/// Write an in-memory [`DataSet`] to a single Parquet file using Polars.
+///
+/// Intended for JVM / Spark bridges that prefer reading Parquet from disk over large JSON payloads.
+pub fn export_dataset_to_xml(path: &Path, ds: &DataSet) -> IngestionResult<()> {
+    xml::export_dataset_to_xml(path, ds)
+}
+
+/// Write an in-memory [`DataSet`] to a single Parquet file using Polars.
+pub fn export_dataset_to_parquet(path: &Path, ds: &DataSet) -> IngestionResult<()> {
+    use super::polars_bridge::{dataset_to_dataframe, polars_error_to_ingestion};
+    use std::fs::File;
+
+    let mut df = dataset_to_dataframe(ds)?;
+    let mut file = File::create(path)?;
+    ParquetWriter::new(&mut file)
+        .finish(&mut df)
+        .map_err(|e| polars_error_to_ingestion("write parquet from DataSet", e))?;
+    Ok(())
+}
+
+/// Write an in-memory [`DataSet`] to a single Arrow IPC **file** using Polars (for JVM / Arrow
+/// bridges that prefer IPC over large JSON `DataSet` payloads).
+pub fn export_dataset_to_arrow_ipc(path: &Path, ds: &DataSet) -> IngestionResult<()> {
+    use super::polars_bridge::{dataset_to_dataframe, polars_error_to_ingestion};
+    use std::fs::File;
+
+    let mut df = dataset_to_dataframe(ds)?;
+    let mut file = File::create(path)?;
+    IpcWriter::new(&mut file)
+        .finish(&mut df)
+        .map_err(|e| polars_error_to_ingestion("write arrow ipc from DataSet", e))?;
+    Ok(())
 }

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdp_records>
+  <record>
+    <stationCode>ACW00011604</stationCode>
+    <lat>17.1167</lat>
+    <lon>-61.7833</lon>
+    <elev_m>10.1</elev_m>
+    <label>ST JOHNS COOLIDGE FLD</label>
+    <region></region>
+  </record>
+  <record>
+    <stationCode>ACW00011647</stationCode>
+    <lat>17.1333</lat>
+    <lon>-61.7833</lon>
+    <elev_m>19.2</elev_m>
+    <label>ST JOHNS</label>
+    <region></region>
+  </record>
+  <record>
+    <stationCode>AE000041196</stationCode>
+    <lat>25.333</lat>
+    <lon>55.517</lon>
+    <elev_m>34</elev_m>
+    <label>SHARJAH INTER. AIRP</label>
+    <region></region>
+  </record>
+  <record>
+    <stationCode>AEM00041194</stationCode>
+    <lat>25.255</lat>
+    <lon>55.364</lon>
+    <elev_m>10.4</elev_m>
+    <label>DUBAI INTL</label>
+    <region></region>
+  </record>
+  <record>
+    <stationCode>AF000040930</stationCode>
+    <lat>35.317</lat>
+    <lon>69.017</lon>
+    <elev_m>3366</elev_m>
+    <label>NORTH-SALANG</label>
+    <region></region>
+  </record>
+</rdp_records>

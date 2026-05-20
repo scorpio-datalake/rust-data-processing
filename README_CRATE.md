@@ -1,6 +1,6 @@
 # rust-data-processing
 
-![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/vihangdesai2018-png/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
+![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/rust-data-processing/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
 
 **Rust** library: schema-first ingestion (CSV, JSON, Parquet, Excel with Cargo features) into an in-memory [`DataSet`](https://docs.rs/rust-data-processing/latest/rust_data_processing/types/struct.DataSet.html), plus Polars-backed pipelines, optional SQL, profiling, validation, map/reduce-style processing, **Phase 2** export (JSONL, train/test splits), UTF-8 privacy transforms and summaries, median aggregations, Arrow interop, and incremental ingest helpers.
 
@@ -8,19 +8,19 @@
 
 **Limits (masking / “PII”):** UTF-8 transforms and validation checks are **mechanical** helpers only; callers supply policy and must not treat outputs as legal guarantees. See `Planning/P2_E6_PRIVACY_POLICY.md` in the repository.
 
-This file is the **crate README** shown on [crates.io](https://crates.io/crates/rust-data-processing) and at the top of [docs.rs](https://docs.rs/rust-data-processing) (Rust-only). The [repository’s `README.md`](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/README.md) is the full monorepo overview (including Python).
+This file is the **crate README** shown on [crates.io](https://crates.io/crates/rust-data-processing) and at the top of [docs.rs](https://docs.rs/rust-data-processing) (Rust-only). The [repository’s `README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/README.md) is the full monorepo overview (including Python).
 
 ## Documentation
 
 | | Link |
 | --- | --- |
 | **Rust API (module tree)** | Use the **crate** index on this docs.rs page (left sidebar). |
-| **Repository** | [github.com/vihangdesai2018-png/rust-data-processing](https://github.com/vihangdesai2018-png/rust-data-processing) |
+| **Repository** | [github.com/rust-data-processing/rust-data-processing](https://github.com/rust-data-processing/rust-data-processing) |
 | **Markdown API overview** | [`API.md`](./API.md) (shipped in this crate) |
 | **Rust examples & cookbook** | [`docs/rust/README.md`](./docs/rust/README.md) |
 | **Python package (PyPI)** | [pypi.org/project/rust-data-processing](https://pypi.org/project/rust-data-processing/) |
-| **Python runnable examples (HTML)** | [GitHub Pages — examples](https://vihangdesai2018-png.github.io/rust-data-processing/python/examples.html) |
-| **HTML site (Rust + Python pages)** | [GitHub Pages — home](https://vihangdesai2018-png.github.io/rust-data-processing/) — **Rust (rustdoc):** [crate index on Pages](https://vihangdesai2018-png.github.io/rust-data-processing/rust/rust_data_processing/index.html) (or [docs.rs](https://docs.rs/rust-data-processing)); **Python (pdoc):** [module root](https://vihangdesai2018-png.github.io/rust-data-processing/python/rust_data_processing.html). [Setup](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/docs/DOCUMENTATION.md) if the site is empty. |
+| **Python runnable examples (HTML)** | [GitHub Pages — examples](https://rust-data-processing.github.io/rust-data-processing/python/examples.html) |
+| **HTML site (Rust + Python pages)** | [GitHub Pages — home](https://rust-data-processing.github.io/rust-data-processing/) — **Rust (rustdoc):** [crate index on Pages](https://rust-data-processing.github.io/rust-data-processing/rust/rust_data_processing/index.html) (or [docs.rs](https://docs.rs/rust-data-processing)); **Python (pdoc):** [module root](https://rust-data-processing.github.io/rust-data-processing/python/rust_data_processing.html). [Setup](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/DOCUMENTATION.md) if the site is empty. |
 
 ## Quick start (Rust)
 
@@ -50,4 +50,4 @@ Full list: [`Cargo.toml`](./Cargo.toml) `[features]`.
 
 ## License
 
-`MIT OR Apache-2.0` - see [LICENSE-MIT](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/vihangdesai2018-png/rust-data-processing/blob/main/LICENSE-APACHE).
+`MIT OR Apache-2.0` - see [LICENSE-MIT](https://github.com/rust-data-processing/rust-data-processing/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/rust-data-processing/rust-data-processing/blob/main/LICENSE-APACHE).

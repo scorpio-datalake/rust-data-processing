@@ -53,6 +53,11 @@
           grid-template-columns: 1fr 1fr;
         }
       }
+      @media (min-width: 52rem) {
+        ul.cards {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+      }
       ul.cards li {
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -106,7 +111,7 @@
   <body>
     <h1>rust-data-processing documentation</h1>
     <p class="lead">
-      Browse API reference for the Rust crate (rustdoc) and the Python bindings (pdoc). This site is generated on every push to
+      Browse API reference for the Rust crate (rustdoc), the Python bindings (pdoc), and JVM integration (Markdown → HTML). This site is generated on every push to
       <code>main</code>.
     </p>
 
@@ -120,6 +125,13 @@
         <p>
           PyO3 bindings: <code>ingest_from_path</code>, <code>DataFrame</code>, validation, profiling, and more.
           <a href="python/examples.html">Python examples</a> (same content as the <code>examples</code> module page).
+        </p>
+      </li>
+      <li>
+        <a class="main" href="java/examples.html">Java examples (JVM bindings)</a>
+        <p>
+          Panama FFM, <code>ffi_manifest.json</code>, and <code>rdp_parity_*</code> JSON exports — same topics as the Python tour where parity exists (including
+          <a href="java/examples.html#ordered-paths-and-directory-scans-incremental-batches">ordered paths &amp; incremental batches</a>).
         </p>
       </li>
     </ul>
@@ -147,6 +159,13 @@ schema = [
 ]
 ds = rdp.ingest_from_path("path/to/data.csv", schema, {"format": "csv"})
 print("rows", ds.row_count())</code></pre>
+
+      <h3>Java (parity JSON over Panama)</h3>
+      <pre><code>// After loading rdp_jvm_sys (RDP_JVM_SYS) — see java/examples.html
+JSONObject root = RdpNativeJson.invokeParityExport(
+    linker, lookup, arena, "rdp_parity_watermark_mirror");
+PytestMirrorAssertions.validateMirrorExport(
+    "rdp_parity_watermark_mirror", root);</code></pre>
     </section>
 
     <footer>
@@ -154,7 +173,7 @@ print("rows", ds.row_count())</code></pre>
         Published crate docs (Rust) also appear on
         <a href="https://docs.rs/rust-data-processing">docs.rs</a>
         after release. Repository:
-        <a href="https://github.com/vihangdesai2018-png/rust-data-processing">GitHub</a>.
+        <a href="https://github.com/rust-data-processing/rust-data-processing">GitHub</a>.
       </p>
     </footer>
   </body>

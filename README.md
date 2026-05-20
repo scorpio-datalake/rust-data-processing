@@ -7,11 +7,12 @@
 
 |                                                | Link                                                                                                                                                                                                                                     |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://vihangdesai2018-png.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).* |
+| **Combined Rust + Python (main branch, HTML)** | [GitHub Pages — rust-data-processing](https://rust-data-processing.github.io/rust-data-processing/) — *enable Pages → GitHub Actions in repo Settings if the site is not live yet; see [`docs/DOCUMENTATION.md`](docs/DOCUMENTATION.md).* |
 | **Rust crate on crates.io**                    | [docs.rs — rust-data-processing](https://docs.rs/rust-data-processing) *(populates after the first successful publish)*                                                                                                                  |
 | **Markdown API guides**                        | [`API.md`](API.md) (Rust); Python: [`python-wrapper/API.md`](python-wrapper/API.md)                                                                                                                                                      |
 | **Rust examples (this repo)**                  | [`docs/rust/README.md`](docs/rust/README.md) — `Cargo.toml`, ingestion, DataFrame/SQL, cookbook, execution, benchmarks                                                                                                                   |
 | **Python examples (this repo)**                | [`docs/python/README.md`](docs/python/README.md) — same topics via `rust_data_processing`                                                                                                                                                |
+| **JVM bindings (Phase 3: Maven + Gradle)**     | [`docs/java/README.md`](docs/java/README.md) — Panama / `bindings/jvm-sys` (`rdp_jvm_sys`) scaffold; tracker [`Planning/PHASE3_EPICS.md`](Planning/PHASE3_EPICS.md); CI **`jvm_bindings_ci.yml`**                                 |
 
 
 ## Quick start (Python)
@@ -58,7 +59,7 @@ Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or 
 
 ## Reporting bugs
 
-- Open a **[GitHub Issue](https://github.com/vihangdesai2018-png/rust-data-processing/issues)** and use **Bug Report** or **Feature Request** so we get version, OS, and repro steps.
+- Open a **[GitHub Issue](https://github.com/rust-data-processing/rust-data-processing/issues)** and use **Bug Report** or **Feature Request** so we get version, OS, and repro steps.
 - **Security:** do not file publicly — read [`SECURITY.md`](SECURITY.md).
 - How we triage and prioritize: [`docs/ISSUE_TRIAGE.md`](docs/ISSUE_TRIAGE.md).
 - **Status**: library APIs are in `src/lib.rs`; the binary (`src/main.rs`) is currently just a placeholder.
@@ -110,7 +111,7 @@ Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Pl
 
 Bindings live under **`python-wrapper/`** (**PyO3** + **maturin** + **uv**). User-facing docs: **`python-wrapper/README.md`**, **`python-wrapper/API.md`**, **`python-wrapper/README_DEV.md`**. The native module calls this crate; Polars stays on the Rust side.
 
-**JVM / Java:** not shipped yet; a **Maven-resolvable** Java layer over the same Rust core is **planned for Phase 3** so releases can stay focused on Rust and Python first. See **[CHANGELOG.md](CHANGELOG.md)** (Unreleased → Planned).
+**JVM / Java:** not shipped yet. **Phase 3** targets a **Maven Central–compatible** JVM layer (**Project Panama** / **FFM**) with **`jextract`**-style codegen from `C` headers, published for **Maven and Gradle** consumers (**dual build tooling and CI gates** — see **`Planning/PHASE3_EPICS.md`** and **`docs/adr/003-jvm-panama-ffi-spike.md`** for the phased plan and increment-1 spike).
 
 **Rust** examples (ingestion, DataFrame/SQL, transforms, profiling, execution, benchmarks): [`docs/rust/README.md`](docs/rust/README.md).
 

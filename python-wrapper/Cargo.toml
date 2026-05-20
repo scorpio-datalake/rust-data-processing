@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 description = "PyO3 extension for rust-data-processing (Python package build via maturin)."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/vihangdesai2018-png/rust-data-processing"
+repository = "https://github.com/rust-data-processing/rust-data-processing"
 publish = false
 
 [lib]
@@ -21,3 +21,8 @@ db = ["rust-data-processing/db_connectorx"]
 pyo3 = { version = "0.26", features = ["extension-module"] }
 rust-data-processing = { path = "..", default-features = true, features = ["excel"] }
 serde_json = "1"
+
+# Lighter link step for the Polars-heavy cdylib (avoids ld OOM/SIGBUS on constrained VMs).
+[profile.release]
+lto = false
+codegen-units = 16

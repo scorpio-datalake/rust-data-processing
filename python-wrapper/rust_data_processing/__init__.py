@@ -11,7 +11,6 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Mapping
 
 from . import cdc
-
 from ._rust_data_processing import (
     DataFrame,
     DataSet,
@@ -24,12 +23,12 @@ from ._rust_data_processing import (
     export_filter_rows_max_utf8_chars,
     export_train_test_row_indices,
     extension_version,
+    infer_schema_from_path,
     ingest_from_db,
     ingest_from_db_infer,
     ingest_from_ordered_paths,
     ingest_from_path,
     ingest_from_path_infer,
-    infer_schema_from_path,
     parse_partition_segment,
     paths_from_directory_scan,
     paths_from_explicit_list,

@@ -8,6 +8,8 @@ For the canonical, always-up-to-date API docs, use **Rustdoc**:
 
 ```powershell
 ./scripts/build_docs.ps1
+# Full stack (Rust + Python pdoc + Java examples HTML):
+pwsh -File scripts/build_all.ps1 -DocsOnly
 ```
 
 This generates HTML docs at `target/doc/rust_data_processing/index.html`.
@@ -30,8 +32,10 @@ This generates HTML docs at `target/doc/rust_data_processing/index.html`.
   - Monitoring: `ExecutionObserver`, `ExecutionEvent`, `ExecutionMetrics`
 - `rust_data_processing::error`
   - Errors/results: `IngestionError`, `IngestionResult<T>`
-- `rust_data_processing::sql` (feature: `sql`)
-  - Optional SQL module (Phase 1 placeholder)
+- `rust_data_processing::sql` (feature: `sql`, default)
+  - Polars SQL on registered table `df`: `sql::query`, `sql::Context` for JOINs
+- `rust_data_processing::pipeline_spec`
+  - Shared fixture bundles under `tests/fixtures/<bundle>/` (`PipelineBundle`: resolve pipelines, payloads, schemas — used by JVM/Python/Rust doc tests)
 
 ## What data can be consumed?
 
@@ -40,7 +44,8 @@ This generates HTML docs at `target/doc/rust_data_processing/index.html`.
 - **CSV**: `.csv`
 - **JSON**: `.json`, `.ndjson` (nested fields supported via dot paths like `user.name`)
 - **Parquet**: `.parquet`, `.pq`
-- **Excel/workbooks**: `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods`
+- **XML**: `.xml` (record elements; schema field names map to child tags)
+- **Excel/workbooks**: `.xlsx`, `.xls`, `.xlsm`, `.xlsb`, `.ods` (feature `excel` / `calamine`)
 
 ### Supported logical types
 
@@ -235,11 +240,62 @@ fn main() -> Result<(), rust_data_processing::IngestionError> {
 }
 ```
 
+## Ordered multi-path ingest and watermarks
+
+- `rust_data_processing::ingestion::ingest_from_ordered_paths(paths, schema, options) -> (DataSet, OrderedBatchMeta)`
+  - Reads paths in order, concatenates rows, then applies watermark options **once** on the combined dataset
+- `IngestionOptions::watermark_column` + `watermark_exclusive_above` — keep rows strictly above the floor (same keys as Python `options` dict and JVM payload `options` JSON)
+- `paths_from_directory_scan`, `paths_from_glob`, `discover_hive_partitioned_files` — incremental / Hive-style layouts
+
+## Export to files (orchestration helpers)
+
+- `export_dataset_to_parquet`, `export_dataset_to_xml` — write a `DataSet` after in-crate SQL/transforms (used by integration tests and `rdp_run_pipeline_json` sinks on JVM)
+
+## Fixture bundles (`pipeline_spec`)
+
+Language-neutral JSON under `tests/fixtures/<bundle>/` (see each bundle’s `SOURCES.md`):
+
+| Bundle | Typical use |
+| --- | --- |
+| `jvm_contract` | DataFrame-centric Polars SQL, single-table SQL |
+| `people` | CSV/JSON/Excel/Parquet path ingest + `csv_to_parquet` pipeline |
+| `ghcn` | JSON → XML → Parquet multi-schema pipeline |
+| `student_etl` | Legacy three-path ETL + ordered ingest |
+| `watermark` | Directory scan + watermark ordered ingest |
+| `sql_parity` | JOIN SQL fixtures |
+
+```rust
+use rust_data_processing::pipeline_spec::PipelineBundle;
+use std::collections::HashMap;
+
+let bundle = PipelineBundle::from_repo_fixture("jvm_contract");
+let sql = bundle
+    .pipeline_transform_sql("pipelines/dataframe_centric_sql.pipeline.json")
+    .unwrap();
+let payload = bundle
+    .resolve_pipeline_json(
+        "pipelines/dataframe_centric_sql.pipeline.json",
+        &HashMap::from([
+            ("SOURCE_PATH".into(), "/data/in.json".into()),
+            ("SINK_PATH".into(), "/tmp/out.parquet".into()),
+        ]),
+    )
+    .unwrap();
+```
+
+Rust integration tests: `tests/dataframe_centric_pipeline_fixtures.rs`, `tests/ghcn_json_xml_parquet_pipeline_fixtures.rs`, `tests/parquet_snippets_fixtures.rs`, and siblings. JVM: `docs/java/EXAMPLES.md`; Python: `python-wrapper/tests/test_*_fixtures.py`.
+
+## JVM / Python bindings
+
+- **Python:** `python-wrapper/API.md`, `PARITY.md` — PyO3 module `rust_data_processing`
+- **JVM:** `docs/java/FFI_MANIFEST_JAVA_USAGE.md` — Panama downcalls on `rdp_jvm_sys` (`rdp_ingest_*_path`, `rdp_ingest_ordered_paths_json`, `rdp_run_pipeline_json`, …); build with `cargo build --manifest-path bindings/jvm-sys/Cargo.toml --features full`
+
 ## Format-specific entrypoints (lower-level)
 
 - `rust_data_processing::ingestion::csv::ingest_csv_from_path`
 - `rust_data_processing::ingestion::json::ingest_json_from_path` / `ingest_json_from_str`
 - `rust_data_processing::ingestion::parquet::ingest_parquet_from_path`
+- `rust_data_processing::ingestion::xml::ingest_xml_from_path` / `export_dataset_to_xml`
 
 ## Cargo features
 

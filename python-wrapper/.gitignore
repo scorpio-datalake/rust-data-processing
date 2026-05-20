@@ -9,5 +9,9 @@ target/
 dist/
 wheels/
 
+# Maturin / PyO3 native modules (rebuild with `uv run maturin develop` — never commit)
+*.so
+*.pyd
+
 # Local pdoc scratch output (never commit)
 _pdoc_test*/

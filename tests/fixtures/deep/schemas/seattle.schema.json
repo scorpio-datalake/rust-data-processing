@@ -1,0 +1,10 @@
+{
+  "fields": [
+    { "name": "date", "data_type": "Utf8" },
+    { "name": "precipitation", "data_type": "Float64" },
+    { "name": "temp_max", "data_type": "Float64" },
+    { "name": "temp_min", "data_type": "Float64" },
+    { "name": "wind", "data_type": "Float64" },
+    { "name": "weather", "data_type": "Utf8" }
+  ]
+}

@@ -146,7 +146,7 @@ fn infer_schema_from_sheet_range(
     }
 
     let mut fields = Vec::with_capacity(header_cells.len());
-    for (name, st) in header_cells.into_iter().zip(states.into_iter()) {
+    for (name, st) in header_cells.into_iter().zip(states) {
         let name = name.trim().to_string();
         if name.is_empty() {
             continue;

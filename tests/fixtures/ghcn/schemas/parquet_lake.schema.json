@@ -1,0 +1,10 @@
+{
+  "fields": [
+    { "name": "station_id", "data_type": "Utf8" },
+    { "name": "geo_lat", "data_type": "Float64" },
+    { "name": "geo_lon", "data_type": "Float64" },
+    { "name": "elevation_meters", "data_type": "Float64" },
+    { "name": "station_label", "data_type": "Utf8" },
+    { "name": "region_code", "data_type": "Utf8" }
+  ]
+}

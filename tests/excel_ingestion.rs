@@ -6,7 +6,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rust_data_processing::ingestion::excel::{
     ingest_excel_from_path, ingest_excel_workbook_from_path,
 };
-use rust_data_processing::types::{DataType, Field, Schema, Value};
+use rust_data_processing::pipeline_spec::PipelineBundle;
+use rust_data_processing::types::{Schema, Value};
 
 fn tmp_file(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
@@ -17,12 +18,7 @@ fn tmp_file(name: &str) -> PathBuf {
 }
 
 fn people_schema() -> Schema {
-    Schema::new(vec![
-        Field::new("id", DataType::Int64),
-        Field::new("name", DataType::Utf8),
-        Field::new("score", DataType::Float64),
-        Field::new("active", DataType::Bool),
-    ])
+    PipelineBundle::from_repo_fixture("people").expect_schema("schemas/people_csv.schema.json")
 }
 
 fn write_people_xlsx(path: &PathBuf, include_active: bool, id_as_string: bool) {

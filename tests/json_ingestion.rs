@@ -1,13 +1,9 @@
 use rust_data_processing::ingestion::json::{ingest_json_from_path, ingest_json_from_str};
-use rust_data_processing::types::{DataType, Field, Schema, Value};
+use rust_data_processing::pipeline_spec::PipelineBundle;
+use rust_data_processing::types::{Schema, Value};
 
 fn people_schema_nested() -> Schema {
-    Schema::new(vec![
-        Field::new("id", DataType::Int64),
-        Field::new("user.name", DataType::Utf8),
-        Field::new("score", DataType::Float64),
-        Field::new("active", DataType::Bool),
-    ])
+    PipelineBundle::from_repo_fixture("people").expect_schema("schemas/people_json.schema.json")
 }
 
 #[test]

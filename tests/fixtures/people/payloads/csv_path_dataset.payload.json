@@ -1,0 +1,6 @@
+{
+  "paths": ["{{SOURCE_PATH}}"],
+  "schema_ref": "schemas/people_csv.schema.json",
+  "options": { "format": "csv" },
+  "response": { "mode": "dataset", "max_rows": 1000 }
+}

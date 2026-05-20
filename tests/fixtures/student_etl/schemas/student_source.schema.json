@@ -1,0 +1,10 @@
+{
+  "fields": [
+    { "name": "student_id", "data_type": "Int64" },
+    { "name": "legal_name", "data_type": "Utf8" },
+    { "name": "email", "data_type": "Utf8" },
+    { "name": "homeroom", "data_type": "Utf8" },
+    { "name": "gpa", "data_type": "Float64" },
+    { "name": "enrollment_year", "data_type": "Int64" }
+  ]
+}

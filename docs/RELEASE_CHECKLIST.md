@@ -43,6 +43,34 @@ cargo publish
 
 `cargo publish` fails if that version already exists — bump and repeat. If you use **CI** for this version, do not also run **`cargo publish`** locally.
 
+## 3b) JVM bindings (`rdp-jvm-sys` + Maven + Gradle) — Phase 3
+
+| Location | Bump / notes |
+| --- | --- |
+| **`bindings/java/VERSION`** | Single source — sync **`pom.xml`**, **`gradle.properties`** |
+| **`bindings/jvm-sys/Cargo.toml`** | Native crate semver (coordinate with FFI ABI **`rdp_ffi_abi_version`**) |
+| **`bindings/java/rust-data-processing-jvm/pom.xml`** | `<version>` after **`VERSION`** edit |
+
+**Consistency guard** (run before tagging):
+
+```bash
+python scripts/check_java_version_consistency.py
+python scripts/check_jvm_ffi_manifest.py
+```
+
+**Smoke build** (mirror CI):
+
+```bash
+cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml
+export RDP_JVM_SYS="$(pwd)/bindings/jvm-sys/target/release/librdp_jvm_sys.so"
+mvn -f bindings/java/rust-data-processing-jvm -q verify
+( cd bindings/java/rust-data-processing-jvm && ./gradlew check publishToMavenLocal --no-daemon )
+```
+
+Central publication onboarding: **[`docs/java/RELEASE.md`](java/RELEASE.md)**, **[`docs/java/MAVEN_CENTRAL_PUBLISHING.md`](java/MAVEN_CENTRAL_PUBLISHING.md)** (tokens, GPG, namespace).
+
+Workflow: **[`.github/workflows/jvm_bindings_ci.yml`](../.github/workflows/jvm_bindings_ci.yml)** (**Ubuntu / Windows / macOS** × JDK **21**).
+
 ## 4) Publish Python package (PyPI)
 
 ### One-time setup (GitHub secrets)

@@ -1,0 +1,14 @@
+{
+  "fields": [
+    { "name": "job_id", "data_type": "Int64" },
+    { "name": "creator_user_name", "data_type": "Utf8" },
+    { "name": "created_time", "data_type": "Int64" },
+    { "name": "settings.name", "data_type": "Utf8" },
+    { "name": "settings.tags.team", "data_type": "Utf8" },
+    { "name": "settings.tags.env", "data_type": "Utf8" },
+    { "name": "cluster.num_workers", "data_type": "Int64" },
+    { "name": "metrics.duration_ms", "data_type": "Float64" },
+    { "name": "metrics.success", "data_type": "Bool" },
+    { "name": "metrics.bytes_written", "data_type": "Int64" }
+  ]
+}

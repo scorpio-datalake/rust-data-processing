@@ -20,8 +20,6 @@ def test_sft_sample_alpaca_ndjson_ingest_and_export() -> None:
     ]
     ds = rdp.ingest_from_path(str(SAMPLE), schema)
     assert ds.row_count() == 4
-    lines = rdp.export_dataset_jsonl(
-        ds, ["instruction", "input", "output"]
-    ).strip().splitlines()
+    lines = rdp.export_dataset_jsonl(ds, ["instruction", "input", "output"]).strip().splitlines()
     assert len(lines) == 4
     assert "instruction" in lines[0] and "output" in lines[0]

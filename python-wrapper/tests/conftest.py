@@ -11,8 +11,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = REPO_ROOT / "tests" / "fixtures"
 
 
-def fixture_path(*parts: str) -> str:
-    return str(FIXTURES.joinpath(*parts))
+def fixture_path(*parts: str) -> Path:
+    return FIXTURES.joinpath(*parts)
 
 
 @pytest.fixture(scope="session")

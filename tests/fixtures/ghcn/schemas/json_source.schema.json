@@ -1,0 +1,10 @@
+{
+  "fields": [
+    { "name": "id", "data_type": "Utf8" },
+    { "name": "latitude", "data_type": "Float64" },
+    { "name": "longitude", "data_type": "Float64" },
+    { "name": "elevation", "data_type": "Float64" },
+    { "name": "name", "data_type": "Utf8" },
+    { "name": "state", "data_type": "Utf8" }
+  ]
+}

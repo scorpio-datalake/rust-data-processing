@@ -67,6 +67,30 @@ if (Test-Path $nested) {
 }
 
 Set-Location $repoRoot
+
+Write-Host "== Java examples (Pandoc) =="
+$javaSite = Join-Path $repoRoot '_site\java'
+New-Item -ItemType Directory -Force -Path $javaSite | Out-Null
+$pandocCmd = Get-Command pandoc -ErrorAction SilentlyContinue
+$javaExamplesMd = Join-Path $repoRoot 'docs\java\EXAMPLES.md'
+$pandocHeader = Join-Path $repoRoot 'docs\landing\java-examples-pandoc-header.html'
+$javaExamplesHtml = Join-Path $javaSite 'examples.html'
+if (-not $pandocCmd) {
+  Write-Warning "pandoc not on PATH; skipping _site/java/examples.html (install: https://pandoc.org)"
+} else {
+  & pandoc $javaExamplesMd `
+    -f markdown+smart `
+    -o $javaExamplesHtml `
+    --standalone `
+    --metadata title="Java examples - JVM bindings" `
+    -V lang=en `
+    -H $pandocHeader
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 Write-Host "Done."
 Write-Host "  Rust:  target/doc/rust_data_processing/index.html"
 Write-Host "  Python: _site/python/index.html (examples: _site/python/examples.html)"
+if (Test-Path $javaExamplesHtml) {
+  Write-Host "  Java:   _site/java/examples.html"
+}
