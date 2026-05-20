@@ -334,6 +334,21 @@ fn ordered_paths_impl(payload_json: &str) -> Result<serde_json::Value, String> {
                 ds = DataSet::new(ds.schema.clone(), rows);
             }
             let dataset = serde_json::to_value(&ds).map_err(|e| e.to_string())?;
+            let mut ordered_batch = serde_json::json!({
+                "paths": meta
+                    .paths
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect::<Vec<_>>(),
+                "last_path": meta
+                    .last_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string()),
+            });
+            if let Some(v) = &meta.max_watermark_value {
+                ordered_batch["max_watermark_value"] =
+                    serde_json::to_value(v).map_err(|e| e.to_string())?;
+            }
             Ok(serde_json::json!({
                 "kind": "ingest_ordered_paths_dataset",
                 "engine": "ingest_from_ordered_paths",
@@ -342,17 +357,7 @@ fn ordered_paths_impl(payload_json: &str) -> Result<serde_json::Value, String> {
                 "total_row_count": total_row_count,
                 "returned_row_count": ds.row_count(),
                 "truncated": truncated,
-                "ordered_batch": {
-                    "paths": meta
-                        .paths
-                        .iter()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .collect::<Vec<_>>(),
-                    "last_path": meta
-                        .last_path
-                        .as_ref()
-                        .map(|p| p.to_string_lossy().to_string()),
-                },
+                "ordered_batch": ordered_batch,
             }))
         }
         "parquet_temp" => {
@@ -491,6 +496,49 @@ mod people_payload_tests {
         let v = ordered_paths_impl(&payload).unwrap();
         assert_eq!(v["kind"], "ingest_ordered_paths_dataset");
         assert_eq!(v["returned_row_count"].as_i64(), Some(2));
+    }
+
+    #[test]
+    fn watermark_directory_scan_payload_includes_max_watermark_in_ordered_batch() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdp_jvm_wm_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let nested = dir.join("nested");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(dir.join("a.csv"), "id,ts\n1,50\n2,99\n").unwrap();
+        std::fs::write(nested.join("b.csv"), "id,ts\n3,150\n4,200\n").unwrap();
+
+        let paths = rust_data_processing::ingestion::paths_from_directory_scan(&dir, Some("**/*.csv"))
+            .unwrap();
+        let bundle = PipelineBundle::from_repo_fixture("watermark");
+        let mut body: serde_json::Value = serde_json::from_str(
+            &bundle
+                .resolve_payload_json("payloads/csv_watermark_ingest.body.json", &HashMap::new())
+                .unwrap(),
+        )
+        .unwrap();
+        let path_strings: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect();
+        body["paths"] = serde_json::Value::Array(
+            path_strings
+                .iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        );
+        let v = ordered_paths_impl(&serde_json::to_string(&body).unwrap()).unwrap();
+        assert_eq!(v["returned_row_count"].as_i64(), Some(2));
+        assert_eq!(
+            v["ordered_batch"]["max_watermark_value"]["Int64"].as_i64(),
+            Some(200)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

@@ -32,8 +32,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Contract tests: every symbol listed in {@code ffi_manifest.json} (classpath) must resolve in
  * {@code rdp_jvm_sys} and match the manifest ABI when applicable. Doc-aligned scenarios shared with
- * {@code io.github.scorpio_datalake.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest} live in
- * {@code io.github.scorpio_datalake.rust_data_processing.testsupport.JvmNativeContractScenarios}.
+ * {@code
+ * io.github.scorpio_datalake.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest}
+ * live in {@code
+ * io.github.scorpio_datalake.rust_data_processing.testsupport.JvmNativeContractScenarios}.
  */
 final class FfiExportedSymbolsContractTest {
 
@@ -215,12 +217,12 @@ final class FfiExportedSymbolsContractTest {
               JvmNativeContractScenarios.requireJvmContractFixture(
                   "ghcn/ghcn_stations_intermediate.xml");
           Path bundle =
-              io.github.scorpio_datalake.rust_data_processing.testsupport.PipelineFixtureSupport.resolveBundleRoot(
-                      "ghcn")
+              io.github.scorpio_datalake.rust_data_processing.testsupport.PipelineFixtureSupport
+                  .resolveBundleRoot("ghcn")
                   .orElseThrow();
           String schema =
-              io.github.scorpio_datalake.rust_data_processing.testsupport.PipelineFixtureSupport.loadSchemaJson(
-                  bundle, "schemas/xml_intermediate.schema.json");
+              io.github.scorpio_datalake.rust_data_processing.testsupport.PipelineFixtureSupport
+                  .loadSchemaJson(bundle, "schemas/xml_intermediate.schema.json");
           JSONObject root =
               RdpNativeJson.invokeIngestXmlPath(
                   linker, lookup, arena, xml.toString(), schema, "{}");

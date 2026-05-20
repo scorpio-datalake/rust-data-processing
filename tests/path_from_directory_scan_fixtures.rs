@@ -1,4 +1,4 @@
-//! Parity with `docs/java/examples/PathFromDirectoryScan.java` and `tests/fixtures/watermark/`.
+//! Parity with `docs/java/examples/OrderedPaths.java` and `tests/fixtures/watermark/`.
 
 use std::collections::HashMap;
 use std::fs;

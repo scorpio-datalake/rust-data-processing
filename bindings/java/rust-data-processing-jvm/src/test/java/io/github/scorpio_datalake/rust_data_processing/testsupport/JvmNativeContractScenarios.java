@@ -23,7 +23,8 @@ import org.junit.jupiter.api.Assumptions;
 
 /**
  * Shared native-call scenarios for {@code FfiExportedSymbolsContractTest} (manifest-driven symbol
- * checks) and {@code io.github.scorpio_datalake.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest}
+ * checks) and {@code
+ * io.github.scorpio_datalake.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest}
  * (doc-aligned integration tests).
  *
  * <p>Pipeline specs and schemas load from {@code tests/fixtures/<bundle>/} (see {@code
@@ -415,13 +416,15 @@ public final class JvmNativeContractScenarios {
   }
 
   /**
-   * {@code docs/java/examples/PathFromDirectoryScan}: glob scan + {@code
-   * csv_watermark_ingest.body.json} → {@code rdp_ingest_ordered_paths_json}.
+   * {@code docs/java/examples/OrderedPaths}: recursive directory scan ({@code
+   * pathsFromDirectoryScan} with a relative CSV glob) + {@code csv_watermark_ingest.body.json} →
+   * {@code rdp_ingest_ordered_paths_json} (parity with {@code
+   * tests/path_from_directory_scan_fixtures.rs}).
    */
-  public static void runPathFromDirectoryScanWatermarkContract(
+  public static void runOrderedPathsDirectoryScanWatermarkContract(
       Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
     Path bundle = requireBundle("watermark");
-    Path incoming = Files.createTempDirectory("rdp_contract_path_from_directory_scan_");
+    Path incoming = Files.createTempDirectory("rdp_contract_ordered_paths_");
     try {
       Path nested = incoming.resolve("nested");
       Files.createDirectories(nested);
@@ -430,14 +433,11 @@ public final class JvmNativeContractScenarios {
       Files.writeString(a, "id,ts\n1,50\n2,99\n");
       Files.writeString(b, "id,ts\n3,150\n4,200\n");
 
-      List<Path> scanned = new java.util.ArrayList<>();
-      try (var stream = Files.walk(incoming)) {
-        stream
-            .filter(Files::isRegularFile)
-            .filter(p -> p.toString().endsWith(".csv"))
-            .sorted()
-            .forEach(scanned::add);
-      }
+      List<Path> scanned = pathsFromDirectoryScanGlob(incoming, "**/*.csv");
+      assertEquals(2, scanned.size());
+      assertEquals("a.csv", scanned.get(0).getFileName().toString());
+      assertTrue(scanned.get(1).toString().replace('\\', '/').contains("nested/b.csv"));
+
       JSONArray pathJson = new JSONArray();
       for (Path p : scanned) {
         pathJson.put(p.toAbsolutePath().normalize().toString());
@@ -455,13 +455,54 @@ public final class JvmNativeContractScenarios {
       JSONObject inter = root.getJSONObject("interchange");
       assertEquals("ingest_ordered_paths_dataset", inter.getString("kind"));
       assertEquals(2, inter.getInt("returned_row_count"));
-      assertEquals(2, inter.getJSONObject("dataset").getJSONArray("rows").length());
+      JSONArray rows = inter.getJSONObject("dataset").getJSONArray("rows");
+      assertEquals(2, rows.length());
+      assertEquals(3L, rows.getJSONArray(0).getJSONObject(0).getLong("Int64"));
+      assertEquals(4L, rows.getJSONArray(1).getJSONObject(0).getLong("Int64"));
       JSONObject batch = inter.getJSONObject("ordered_batch");
       assertEquals(2, batch.getJSONArray("paths").length());
       assertTrue(batch.getString("last_path").contains("b.csv"));
+      assertTrue(batch.has("max_watermark_value"));
+      assertEquals(200L, batch.getJSONObject("max_watermark_value").getLong("Int64"));
     } finally {
       deleteTree(incoming);
     }
+  }
+
+  /** Back-compat name for {@link #runOrderedPathsDirectoryScanWatermarkContract}. */
+  public static void runPathFromDirectoryScanWatermarkContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    runOrderedPathsDirectoryScanWatermarkContract(linker, lookup, arena);
+  }
+
+  /** Same glob semantics as {@code docs/java/examples/OrderedPaths#pathsFromDirectoryScan}. */
+  private static List<Path> pathsFromDirectoryScanGlob(Path root, String relativeGlob)
+      throws Exception {
+    if (!Files.isDirectory(root)) {
+      throw new IllegalArgumentException("not a directory: " + root);
+    }
+    var fs = root.getFileSystem();
+    var matcher = fs.getPathMatcher("glob:" + relativeGlob);
+    java.nio.file.PathMatcher rootMatcher = null;
+    if (relativeGlob.startsWith("**/")) {
+      rootMatcher = fs.getPathMatcher("glob:" + relativeGlob.substring(3));
+    }
+    List<Path> out = new java.util.ArrayList<>();
+    java.nio.file.PathMatcher rootFileMatcher = rootMatcher;
+    try (var stream = Files.walk(root)) {
+      stream
+          .filter(Files::isRegularFile)
+          .forEach(
+              p -> {
+                Path rel = root.relativize(p);
+                if (matcher.matches(rel)
+                    || (rootFileMatcher != null && rootFileMatcher.matches(rel))) {
+                  out.add(p);
+                }
+              });
+    }
+    out.sort(java.util.Comparator.naturalOrder());
+    return out;
   }
 
   /**

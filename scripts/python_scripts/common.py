@@ -100,15 +100,27 @@ def run_jvm_manifest_checks() -> None:
     run([sys.executable, "scripts/check_java_version_consistency.py"], cwd=REPO_ROOT)
 
 
-def run_jvm_spotless(*, skip_gradle: bool = False, skip_maven: bool = False) -> None:
-    """Gradle (main module) + Maven Spotless on all JVM modules — matches JVM CI validate phase."""
+def run_jvm_spotless(
+    *, skip_gradle: bool = False, skip_maven: bool = False, apply: bool = False
+) -> None:
+    """Gradle (main module) + Maven Spotless on all JVM modules — matches JVM CI validate phase.
+
+    When ``apply`` is true, run ``spotless:apply`` / ``spotlessApply`` before ``check`` (local
+    fix-up; CI and default ``build_all`` use check-only).
+    """
     if not skip_gradle:
+        if apply:
+            banner("Java: Spotless apply (Gradle, main module)")
+            run(gradlew_argv("spotlessApply", "--no-daemon"), cwd=JVM_GRADLE_DIR)
         banner("Java: Spotless (Gradle, main module)")
         run(gradlew_argv("spotlessCheck", "--no-daemon"), cwd=JVM_GRADLE_DIR)
     if not skip_maven:
         ensure_maven()
         env = java_ci_env()
         for module, label in JVM_MAVEN_MODULE_SPECS:
+            if apply:
+                banner(f"Java: Spotless apply (Maven, {label})")
+                run(mvn_argv("spotless:apply"), cwd=module, env=env)
             banner(f"Java: Spotless (Maven, {label})")
             run(mvn_argv("spotless:check"), cwd=module, env=env)
 

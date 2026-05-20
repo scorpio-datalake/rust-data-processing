@@ -25,6 +25,7 @@ Orchestrator flags (passed through to build_all.py):
   --skip-rust | --skip-python | --skip-java | --skip-docs
   --docs-rust-only | --docs-python-only | --docs-java-only  (also via --docs-rust, etc.)
   --skip-fmt        Skip format checks (Rust, Python, Java)
+  --fix-fmt         Java: Spotless apply then check (all Maven modules + Gradle)
   --clean           Gradle clean during Java steps (shell already ran cargo clean)
   --rust-expanded-only
   --wait-seconds N  --rust-build-test-wait-seconds N

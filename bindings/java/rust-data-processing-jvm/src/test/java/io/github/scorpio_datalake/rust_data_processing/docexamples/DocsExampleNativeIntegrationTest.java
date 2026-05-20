@@ -167,11 +167,11 @@ final class DocsExampleNativeIntegrationTest {
   }
 
   /**
-   * Keeps {@code docs/java/examples/PathFromDirectoryScan.java} honest: directory glob + watermark
-   * payload from {@code tests/fixtures/watermark/}.
+   * Keeps {@code docs/java/examples/OrderedPaths.java} honest: directory scan + watermark payload
+   * from {@code tests/fixtures/watermark/} (parity with Rust/Python path-scan fixtures).
    */
   @Test
-  void pathFromDirectoryScanWatermarkMatchesDocsExample() throws Throwable {
+  void orderedPathsDirectoryScanWatermarkMatchesDocsExample() throws Throwable {
     Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
     Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
 
@@ -179,8 +179,18 @@ final class DocsExampleNativeIntegrationTest {
     try (Arena arena = Arena.ofConfined()) {
       SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
       RdpNativeJson.invokeAbiVersion(linker, lookup);
-      JvmNativeContractScenarios.runPathFromDirectoryScanWatermarkContract(linker, lookup, arena);
+      JvmNativeContractScenarios.runOrderedPathsDirectoryScanWatermarkContract(
+          linker, lookup, arena);
     }
+  }
+
+  /**
+   * Back-compat alias test for {@code docs/java/examples/PathFromDirectoryScan.java} (delegates to
+   * {@link OrderedPaths}).
+   */
+  @Test
+  void pathFromDirectoryScanWatermarkMatchesDocsExample() throws Throwable {
+    orderedPathsDirectoryScanWatermarkMatchesDocsExample();
   }
 
   /**

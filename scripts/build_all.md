@@ -67,6 +67,7 @@ Use the existing skip flags instead of a separate “fast” mode. Full `./scrip
 | Java only (JVM CI parity) | `./scripts/build_all.sh --java-only` |
 | Skip JVM entirely | `./scripts/build_all.sh --skip-java` or `--skip-java --skip-docs` |
 | Skip formatting only | add `--skip-fmt` (Rust, Python, and Java) |
+| Fix Java formatting (Spotless) | `./scripts/build_all.sh --java-only --fix-fmt` or `python3 scripts/python_scripts/java_build.py --fix-fmt` |
 | Keep compile artifacts | add `--no-clean` |
 | Shorter pauses between steps | `--wait-seconds 0 --rust-build-test-wait-seconds 0` |
 
@@ -84,6 +85,7 @@ Any unrecognized argument is forwarded to `scripts/python_scripts/build_all.py`:
 | `--skip-java` | Skip JVM build and tests |
 | `--skip-docs` | Skip doc generation |
 | `--skip-fmt` | Skip format checks (Rust, Python, Java) |
+| `--fix-fmt` | Java: `spotless:apply` then `spotless:check` on main, examples, and spark Maven modules + Gradle (not Rust/Python) |
 | `--clean` | Also run Gradle `clean` during Java steps (shell already ran `cargo clean` unless `--no-clean`) |
 | `--rust-expanded-only` | Rust clippy/build/test with `ci_expanded` only |
 | `--wait-seconds N` | Pause between major steps (default: 10) |
@@ -172,6 +174,7 @@ python3 scripts/python_scripts/docs_java.py
 | `Permission denied: .../gradlew` | Re-run (script chmods or uses `bash gradlew`); or `chmod +x bindings/java/rust-data-processing-jvm/gradlew` |
 | `Native library not found` (Java test) | Run `java_build.py` first or set `RDP_JVM_SYS` to the `.so` / `.dll` path |
 | Spotless fails on `jvm-examples` but `--java-only` passed | Run `java_build.py` without `--skip-fmt` (checks Maven Spotless on all modules) |
+| Maven Central / JVM CI Spotless on `FfiExportedSymbolsContractTest` | `python3 scripts/python_scripts/java_build.py --fix-fmt` then commit; same as `mvn -f bindings/java/rust-data-processing-jvm spotless:apply` on **all three** JVM Maven modules |
 | Windows CI Surefire exit `-1073741819` | JVM CI matrix includes Windows; local `--java-only` on Linux does not — push to CI or run on Windows |
 | `Required tool not on PATH: mvn` | Install Maven (`sudo apt install maven` on Debian/Ubuntu) |
 | `no matching package named ...` with `--offline` | Run once without `--offline`, or unset `BUILD_ALL_NO_CARGO_PREFETCH` |

@@ -1,4 +1,4 @@
-"""Parity with ``docs/java/examples/PathFromDirectoryScan.java`` and ``tests/fixtures/watermark/``."""
+"""Parity with ``docs/java/examples/OrderedPaths.java`` and ``tests/fixtures/watermark/``."""
 
 from __future__ import annotations
 

@@ -279,7 +279,7 @@ Committed JSON under `tests/fixtures/<bundle>/` mirrors Java `PipelineJsonFixtur
 | `test_excel_snippets_fixtures.py` | `ExcelSnippets.java` |
 | `test_json_parquet_excel_snippets_fixtures.py` | `JsonParquetExcelSnippets.java` |
 | `test_parquet_snippets_fixtures.py` | `ParquetSnippets.java` |
-| `test_path_from_directory_scan_fixtures.py` | `PathFromDirectoryScan.java` |
+| `test_path_from_directory_scan_fixtures.py` | `OrderedPaths.java` |
 | `test_student_etl_fixtures.py` | `RDPOnlyETLExample.java` |
 
 Full JVM orchestration (`rdp_run_pipeline_json`, temp-file sinks) is exercised in Rust `bindings/jvm-sys` tests and JUnit — not every path is exposed on the Python wheel yet.

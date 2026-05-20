@@ -85,6 +85,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip Spotless check (Gradle + Maven on all JVM modules).",
     )
     parser.add_argument(
+        "--fix-fmt",
+        action="store_true",
+        help="Run Spotless apply then check on all JVM modules (writes files; use before commit).",
+    )
+    parser.add_argument(
         "--fmt-only",
         action="store_true",
         help="Spotless + ffi/version checks only (no Cargo jvm-sys build).",
@@ -98,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         run_jvm_manifest_checks()
 
     if not args.skip_fmt:
-        run_jvm_spotless()
+        run_jvm_spotless(apply=args.fix_fmt)
 
     if args.fmt_only:
         return 0

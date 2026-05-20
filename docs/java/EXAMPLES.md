@@ -148,7 +148,8 @@ Source: [`docs/java/examples/*.java`](examples/). Each class has a `main` that e
 | [`ExcelSnippets.java`](examples/ExcelSnippets.java) | `rdp_ingest_ordered_paths_json`, `rdp_excel_ingest_path_sheet` | `people` | `excelSnippetsPeopleMatchesDocsExampleWhenFixturePresent`; Rust/Python `excel_snippets_fixtures` |
 | [`JsonParquetExcelSnippets.java`](examples/JsonParquetExcelSnippets.java) | `rdp_ingest_ordered_paths_json`, `rdp_ingest_*_path`, `rdp_run_pipeline_json` | `people` | `jsonParquetExcelSnippetsPeopleMatchesDocsExample` |
 | [`ParquetSnippets.java`](examples/ParquetSnippets.java) | `rdp_run_pipeline_json`, `rdp_export_parquet_temp`, `rdp_ingest_parquet_path` | `people` | `parquetSnippetsCsvToParquetRoundTripMatchesDocsExample`, `parquetSnippetsExportTempMatchesDocsExample` |
-| [`PathFromDirectoryScan.java`](examples/PathFromDirectoryScan.java) | `rdp_ingest_ordered_paths_json` | `watermark` | `pathFromDirectoryScanWatermarkMatchesDocsExample` |
+| [`OrderedPaths.java`](examples/OrderedPaths.java) | `rdp_ingest_ordered_paths_json` | `watermark` | `orderedPathsDirectoryScanWatermarkMatchesDocsExample` |
+| [`PathFromDirectoryScan.java`](examples/PathFromDirectoryScan.java) | (alias → `OrderedPaths`) | `watermark` | `pathFromDirectoryScanWatermarkMatchesDocsExample` |
 | [`RDPOnlyETLExample.java`](examples/RDPOnlyETLExample.java) | `rdp_ingest_ordered_paths_json`, legacy pipeline JSON | `student_etl` | `studentEtlLegacyThreePaths…`, `studentEtlOrderedIngestTwoParts…` |
 
 ### DataFrame-centric Polars SQL (`DataFrameCentricPipeline`)
@@ -182,9 +183,9 @@ No runtime download: the sample is committed under `tests/fixtures/ghcn/`.
 - **CSV → Parquet pipeline:** `people/pipelines/csv_to_parquet.pipeline.json` then verify with `people_flat.schema.json`.
 - **Excel:** `excel_sheet_dataset.payload.json` with `{{SOURCE_PATH}}` → `tests/fixtures/people.xlsx` (generate via `python scripts/write_people_xlsx_stdlib.py` if missing).
 
-### Watermark + directory scan (`PathFromDirectoryScan`)
+### Ordered paths + directory scan (`OrderedPaths`)
 
-Java lists files (glob) like Python `paths_from_directory_scan`; Rust ingests with watermark options from `watermark/payloads/csv_watermark_ingest.body.json`:
+Java lists files (glob) like Python `paths_from_directory_scan`; Rust ingests with watermark options from `watermark/payloads/csv_watermark_ingest.body.json`. Runnable: [`OrderedPaths.java`](examples/OrderedPaths.java) (`PathFromDirectoryScan.java` delegates to it for back-compat).
 
 ```json
 {

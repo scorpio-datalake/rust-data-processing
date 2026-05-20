@@ -61,7 +61,11 @@ python scripts/check_jvm_ffi_manifest.py
 **Smoke build** (mirror CI):
 
 ```bash
-cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml
+# Java formatting (same gate as Maven Central release `validate` / `mvn deploy`)
+mvn -f bindings/java/rust-data-processing-jvm spotless:check
+# on failure: mvn -f bindings/java/rust-data-processing-jvm spotless:apply
+
+cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
 export RDP_JVM_SYS="$(pwd)/bindings/jvm-sys/target/release/librdp_jvm_sys.so"
 mvn -f bindings/java/rust-data-processing-jvm -q verify
 ( cd bindings/java/rust-data-processing-jvm && ./gradlew check publishToMavenLocal --no-daemon )

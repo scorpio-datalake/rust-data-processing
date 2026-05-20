@@ -18,10 +18,11 @@ See **[MAVEN_CENTRAL_PUBLISHING.md](MAVEN_CENTRAL_PUBLISHING.md)** (**verified n
 **Activate signing / javadoc bundles** locally or in CI staging:
 
 ```bash
+mvn -f bindings/java/rust-data-processing-jvm spotless:check   # or spotless:apply if check fails
 mvn -DcentralRelease=true verify
 ```
 
-(Requires local GPG + credentials configured per maintainer.)
+(Requires local GPG + credentials configured per maintainer. **`spotless:check`** runs automatically in Maven **`validate`** before **`deploy`**; CI also runs it explicitly in **`jvm_maven_central_release.yml`**.)
 
 ## Native artefacts
 

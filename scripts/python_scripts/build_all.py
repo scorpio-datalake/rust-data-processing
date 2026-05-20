@@ -57,6 +57,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Rust cargo clean, Python wrapper artifact clean, Gradle clean.",
     )
     parser.add_argument("--skip-fmt", action="store_true", help="Skip Rust/Python/Java format checks.")
+    parser.add_argument(
+        "--fix-fmt",
+        action="store_true",
+        help="Java only: Spotless apply then check (all Maven modules + Gradle).",
+    )
     parser.add_argument("--skip-rust", action="store_true")
     parser.add_argument("--skip-python", action="store_true")
     parser.add_argument("--skip-java", action="store_true")
@@ -132,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
         rust_flags.append("--skip-fmt")
         python_args.append("--skip-fmt")
         java_args.append("--skip-fmt")
+    if args.fix_fmt:
+        java_args.append("--fix-fmt")
 
     if not args.skip_rust:
         _run_module(rust_build_main, rust_flags)

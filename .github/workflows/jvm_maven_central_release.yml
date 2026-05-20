@@ -147,6 +147,13 @@ jobs:
           python scripts/check_jvm_ffi_manifest.py
           python scripts/check_java_version_consistency.py
 
+      # Spotless runs in Maven `validate` before deploy; check early so release fails fast
+      # (Google Java Format) instead of after the native build.
+      - name: Maven Spotless check (main JVM bindings)
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: bindings/java/rust-data-processing-jvm
+        run: mvn -B spotless:check
+
       - name: Build native rdp_jvm_sys (tests, full Rust linkage)
         if: steps.gate.outputs.skip != 'true'
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
