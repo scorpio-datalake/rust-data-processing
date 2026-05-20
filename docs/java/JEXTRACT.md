@@ -4,8 +4,8 @@ Regenerate Panama stubs from **`bindings/jvm-sys/include/rdp_jvm_sys.h`**:
 
 ```bash
 # JDK 22+ provides `jextract` on PATH (tool exact path varies by distro).
-jextract --output bindings/java/rust-data-processing-jvm/src/main/java/io/github/rust_data_processing/internal/foreign \
-  --target-package io.github.rust_data_processing.internal.foreign \
+jextract --output bindings/java/rust-data-processing-jvm/src/main/java/io/github/scorpio_datalake/rust_data_processing/internal/foreign \
+  --target-package io.github.scorpio_datalake.rust_data_processing.internal.foreign \
   bindings/jvm-sys/include/rdp_jvm_sys.h
 ```
 

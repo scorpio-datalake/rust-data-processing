@@ -11,7 +11,7 @@ REPO = Path(__file__).resolve().parents[1]
 MANIFEST = REPO / "bindings/jvm-sys/ffi_manifest.json"
 JVM_BUNDLED_MANIFEST = REPO / (
     "bindings/java/rust-data-processing-jvm/src/main/resources/"
-    "io/github/rust_data_processing/ffi_manifest.json"
+    "io/github/scorpio_datalake/rust_data_processing/ffi_manifest.json"
 )
 HEADER = REPO / "bindings/jvm-sys/include/rdp_jvm_sys.h"
 LIB_RS = REPO / "bindings/jvm-sys/src/lib.rs"

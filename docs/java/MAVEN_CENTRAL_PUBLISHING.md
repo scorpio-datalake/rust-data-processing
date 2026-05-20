@@ -15,7 +15,7 @@ Short answers for **open-source** projects publishing to **[Maven Central](https
 
 **Yes, for uploads from CI.**
 
-1. **Namespace (`groupId`)** — Prove you control **`io.github.your-org`** etc. Follow **[Register a Namespace](https://central.sonatype.org/register/namespace/)**.
+1. **Namespace (`groupId`)** — Prove you control **`io.github.scorpio-datalake`** (GitHub org **`scorpio-datalake`**). This repo publishes under the sub-group **`io.github.scorpio-datalake.rust-data-processing`**. Follow **[Register a Namespace](https://central.sonatype.org/register/namespace/)** and **`SONATYPE_NAMESPACE_CHECKLIST.md`**.
 2. **User Token (recommended for automation)** — In the Portal, **[Generate User Token](https://central.sonatype.org/publish/generate-portal-token/)**. Maven/Gradle authenticate with **`username`** + **`password`** (= token). Treat it like any API secret (**GitHub Actions secrets**, not in git).
 3. **GPG signing** — Central expects **cryptographically signed** artifacts for publication (configure in `pom.xml` / Gradle; keys via maintainers—not covered in depth here).
 
@@ -41,6 +41,19 @@ Configure these **repository secrets**:
 | **`MAVEN_GPG_PASSPHRASE`** | Passphrase for that key (used by the import-GPG action) |
 
 **Release alignment:** `bindings/java/VERSION` must be a **release** version (**no `-SNAPSHOT`**). The GitHub Release **tag** must be **`v` + VERSION** (example: VERSION `0.1.0` → tag **`v0.1.0`**). Other releases (for example a Rust-only tag) **skip** Maven deploy automatically.
+
+### Trigger (CI/CD)
+
+1. Bump **`bindings/java/VERSION`** and mirror **`pom.xml`** / **`gradle.properties`** (run **`python scripts/check_java_version_consistency.py`**).
+2. Merge to **`main`**; ensure JVM CI is green.
+3. Create a **GitHub Release** on **`main`** with tag **`v{VERSION}`** (Publish release, not draft).
+4. Workflow **[`.github/workflows/jvm_maven_central_release.yml`](../../.github/workflows/jvm_maven_central_release.yml)** runs automatically:
+   - Confirms the tag is on **`main`**
+   - Builds **`rdp_jvm_sys`**, runs JVM tests + manifest checks
+   - **`mvn -DcentralRelease=true deploy`** → Central Publisher Portal → **`autoPublish`** + **`waitUntil=published`**
+5. After success, artifacts appear as **`io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm:{VERSION}`** on [Maven Central](https://central.sonatype.com/).
+
+**GPG:** Upload the signing public key to a supported keyserver ([Central GPG requirements](https://central.sonatype.org/publish/requirements/gpg/)) so consumers can validate signatures.
 
 ---
 

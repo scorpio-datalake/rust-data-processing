@@ -1,6 +1,6 @@
 # JVM examples (pytest mirrors)
 
-Runnable programs under `io.github.rust_data_processing.examples` exercise the same Panama +
+Runnable programs under `io.github.scorpio_datalake.rust_data_processing.examples` exercise the same Panama +
 JSON contracts as `rust-data-processing-jvm` unit tests (`PytestMirrorAssertions`), aligned with
 `python-wrapper/tests/*.py`.
 
@@ -44,9 +44,9 @@ Quick walkthrough (after `mvn -q -DskipTests package` in this module, with `rust
 export RDP_JVM_SYS=/absolute/path/to/librdp_jvm_sys.so   # or .dll / .dylib
 export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
 java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar" \
-  io.github.rust_data_processing.examples.ParityScenariosWalkthrough
+  io.github.scorpio_datalake.rust_data_processing.examples.ParityScenariosWalkthrough
 java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar" \
-  io.github.rust_data_processing.examples.ParquetTempExportExample
+  io.github.scorpio_datalake.rust_data_processing.examples.ParquetTempExportExample
 ```
 
 These examples are **not** the Python `examples/` tree nor Rust book examples — they live only under this Maven module.

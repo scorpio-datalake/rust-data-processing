@@ -44,6 +44,6 @@ Add generated sources locally (committed **after** codegen policy in **P3-E1-S1b
 ```bash
 export RDP_HEADERS="$PWD/../../../jvm-sys/include"
 jextract --output src/main/java/generated \
-  --target-package io.github.rust_data_processing.internal.foreign \
+  --target-package io.github.scorpio_datalake.rust_data_processing.internal.foreign \
   "$RDP_HEADERS/rdp_jvm_sys.h"
 ```

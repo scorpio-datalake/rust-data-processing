@@ -11,7 +11,9 @@ Extend root **`docs/RELEASE_CHECKLIST.md`**. Bump **Rust / Python / JVM** versio
 
 ## Maven Central checklist
 
-See **[MAVEN_CENTRAL_PUBLISHING.md](MAVEN_CENTRAL_PUBLISHING.md)** (**free portal account**, **`groupId`/namespace**, **publisher user token**, **GPG**).
+See **[MAVEN_CENTRAL_PUBLISHING.md](MAVEN_CENTRAL_PUBLISHING.md)** (**verified namespace** `io.github.scorpio-datalake`, publish **`groupId`** `io.github.scorpio-datalake.rust-data-processing`, **publisher user token**, **GPG**).
+
+**CI publish:** push a GitHub Release with tag **`v{VERSION}`** after bumping **`bindings/java/VERSION`** off `-SNAPSHOT` — workflow **`jvm_maven_central_release.yml`** deploys automatically when the tag matches VERSION.
 
 **Activate signing / javadoc bundles** locally or in CI staging:
 

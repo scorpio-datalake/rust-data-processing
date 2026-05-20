@@ -19,7 +19,7 @@ spotless {
 val rdpVersion =
     layout.projectDirectory.file("../VERSION").asFile.readText(Charsets.UTF_8).trim()
 
-group = "io.github.rust_data_processing"
+group = "io.github.scorpio-datalake.rust-data-processing"
 version = rdpVersion
 
 java {
@@ -98,9 +98,15 @@ publishing {
             pom {
                 name.set("rust-data-processing-jvm")
                 description.set("JVM bindings for rust-data-processing (Phase 3 — Panama)")
+                url.set("https://github.com/scorpio-datalake/rust-data-processing")
                 licenses {
                     license {
-                        name.set("MIT OR Apache-2.0")
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                    license {
+                        name.set("Apache License, Version 2.0")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
                     }
                 }
             }

@@ -1,6 +1,6 @@
-import io.github.rust_data_processing.fixture.PipelineJsonFixtures;
-import io.github.rust_data_processing.ffi.RdpNativeJson;
-import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
+import io.github.scorpio_datalake.rust_data_processing.fixture.PipelineJsonFixtures;
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
+import io.github.scorpio_datalake.rust_data_processing.scenario.PytestMirrorAssertions;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;

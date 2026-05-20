@@ -118,7 +118,7 @@ Every runnable class under [`docs/java/examples/`](examples/) loads committed JS
 
 ### Loading fixtures from Java
 
-[`PipelineJsonFixtures`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/main/java/io/github/rust_data_processing/fixture/PipelineJsonFixtures.java) resolves `tests/fixtures` by walking up from the working directory until `people.csv` exists (or uses `GITHUB_WORKSPACE` in CI):
+[`PipelineJsonFixtures`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/main/java/io/github/scorpio_datalake/rust_data_processing/fixture/PipelineJsonFixtures.java) resolves `tests/fixtures` by walking up from the working directory until `people.csv` exists (or uses `GITHUB_WORKSPACE` in CI):
 
 ```java
 Path fixtures = PipelineJsonFixtures.resolveTestsFixturesDir().orElseThrow();
@@ -206,7 +206,7 @@ Loads **legacy control-plane** JSON (`student_etl/pipelines/legacy_student_etl.p
 
 ## JUnit tests for doc examples {#junit-tests-for-doc-examples}
 
-[`DocsExampleNativeIntegrationTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) and [`XmlGhcnPipelineContractTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/rust_data_processing/XmlGhcnPipelineContractTest.java) call the same helpers as the doc classes (`JvmNativeContractScenarios`). They **assume** a built native library:
+[`DocsExampleNativeIntegrationTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) and [`XmlGhcnPipelineContractTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/XmlGhcnPipelineContractTest.java) call the same helpers as the doc classes (`JvmNativeContractScenarios`). They **assume** a built native library:
 
 ```bash
 # From repository root (Linux/macOS; adjust extension on Windows)
@@ -214,8 +214,8 @@ cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features ful
 export RDP_JVM_SYS=$PWD/bindings/jvm-sys/target/release/librdp_jvm_sys.so
 export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
 cd bindings/java/rust-data-processing-jvm
-./gradlew test --tests 'io.github.rust_data_processing.docexamples.*' \
-  --tests 'io.github.rust_data_processing.XmlGhcnPipelineContractTest'
+./gradlew test --tests 'io.github.scorpio_datalake.rust_data_processing.docexamples.*' \
+  --tests 'io.github.scorpio_datalake.rust_data_processing.XmlGhcnPipelineContractTest'
 # or: mvn -q test -Dtest=DocsExampleNativeIntegrationTest,XmlGhcnPipelineContractTest
 ```
 
@@ -246,11 +246,11 @@ For **mirrors** that mostly return **metrics, counts, flags, or small JSON** (bi
 
 Rust writes a **small sample** `DataSet` (two rows: id/name) to a file under the OS temp directory (`…/rdp_jvm_parquet/rdp_export_<nanos>.parquet`) and returns a **small JSON envelope** (`interchange.kind` = `parquet_export_temp`, `path`, `row_count`, `schema`). No giant `rows` array crosses the boundary.
 
-From Java, call **`RdpNativeJson.invokeExportParquetTemp`**, then read the path with **Spark in `local[*]` mode** (or any Parquet reader), then delete the file. Helpers: **`io.github.rust_data_processing.integration.RdpParquetTemp`**. Runnable: **`ParquetTempExportExample`**.
+From Java, call **`RdpNativeJson.invokeExportParquetTemp`**, then read the path with **Spark in `local[*]` mode** (or any Parquet reader), then delete the file. Helpers: **`io.github.scorpio_datalake.rust_data_processing.integration.RdpParquetTemp`**. Runnable: **`ParquetTempExportExample`**.
 
 ```java
-import io.github.rust_data_processing.ffi.RdpNativeJson;
-import io.github.rust_data_processing.integration.RdpParquetTemp;
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
+import io.github.scorpio_datalake.rust_data_processing.integration.RdpParquetTemp;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -269,7 +269,7 @@ The crate also exposes **`rust_data_processing::ingestion::export_dataset_to_par
 ## Prerequisites
 
 - **JDK 21+** (Panama FFM). Some builds use preview features on newer JDKs; see the module `pom.xml`.
-- **Artifact:** `io.github.rust_data_processing:rust-data-processing-jvm` (same version as [`bindings/java/VERSION`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/VERSION)).
+- **Artifact:** `io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm` (same version as [`bindings/java/VERSION`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/VERSION)).
 - **Native library:** build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/rust-data-processing/rust-data-processing/tree/main/bindings/jvm-sys) (CI: `cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full`). Point Java at the absolute path:
   - Environment variable **`RDP_JVM_SYS`**, or
   - System property **`-Drdp.jvm.sys.library=…`**
@@ -280,7 +280,7 @@ The crate also exposes **`rust_data_processing::ingestion::export_dataset_to_par
 The JAR bundles **`ffi_manifest.json`** (same content as [`bindings/jvm-sys/ffi_manifest.json`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/jvm-sys/ffi_manifest.json)). Read it from the classpath to list **`exported_symbols`** and compare **`abi_version_constant`** with a live **`rdp_ffi_abi_version`** downcall.
 
 ```java
-import io.github.rust_data_processing.ffi.RdpNativeJson;
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
@@ -292,15 +292,15 @@ try (InputStream in = RdpNativeJson.class.getResourceAsStream(RdpNativeJson.FFI_
 }
 ```
 
-Runnable: **`io.github.rust_data_processing.examples.LoadFfiManifestExample`**.
+Runnable: **`io.github.scorpio_datalake.rust_data_processing.examples.LoadFfiManifestExample`**.
 
 ## Calling `rdp_parity_*` from Java
 
 Parity exports take no Java arguments: Rust builds the scenario (fixtures, options), runs the engine, and writes a JSON envelope into an **`RdpJsonSlice`**. Use **`RdpNativeJson.invokeParityExport`** so the slice is freed correctly.
 
 ```java
-import io.github.rust_data_processing.ffi.RdpNativeJson;
-import io.github.rust_data_processing.scenario.PytestMirrorAssertions;
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
+import io.github.scorpio_datalake.rust_data_processing.scenario.PytestMirrorAssertions;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
@@ -319,7 +319,7 @@ try (Arena arena = Arena.ofConfined()) {
 }
 ```
 
-Runnable: **`io.github.rust_data_processing.examples.RunPytestMirrorExample`** — pass the export name as the only CLI argument.
+Runnable: **`io.github.scorpio_datalake.rust_data_processing.examples.RunPytestMirrorExample`** — pass the export name as the only CLI argument.
 
 For **how large `dataset` JSON fits into a production architecture**, see [Rust-first ETL vs JVM consumption](#rust-first-etl-vs-jvm-consumption).
 
@@ -389,13 +389,13 @@ For production-sized Polars outputs, prefer **Rust-side** materialization to **P
 
 ## Runnable walkthrough class
 
-**`io.github.rust_data_processing.examples.ParityScenariosWalkthrough`** runs a curated list of exports (including types, bindings, mapping, transform, processing, SQL, validation, benchmark smoke) and prints short summaries — useful to **see** several `interchange` shapes in one JVM process.
+**`io.github.scorpio_datalake.rust_data_processing.examples.ParityScenariosWalkthrough`** runs a curated list of exports (including types, bindings, mapping, transform, processing, SQL, validation, benchmark smoke) and prints short summaries — useful to **see** several `interchange` shapes in one JVM process.
 
 ```bash
 export RDP_JVM_SYS=/absolute/path/to/librdp_jvm_sys.so
 export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
 java -cp "rust-data-processing-jvm-examples-…jar:rust-data-processing-jvm-…jar" \
-  io.github.rust_data_processing.examples.ParityScenariosWalkthrough
+  io.github.scorpio_datalake.rust_data_processing.examples.ParityScenariosWalkthrough
 ```
 
 (Exact `-cp` lines: [`bindings/java/rust-data-processing-jvm-examples/README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm-examples/README.md).)

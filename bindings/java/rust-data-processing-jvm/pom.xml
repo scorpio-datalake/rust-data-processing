@@ -4,11 +4,41 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.github.rust_data_processing</groupId>
+  <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
   <artifactId>rust-data-processing-jvm</artifactId>
   <version>0.1.0-SNAPSHOT</version>
-  <name>rust-data-processing JVM bindings</name>
-  <description>Maven module — Panama bindings to bindings/jvm-sys (Phase 3). See ../../docs/java/.</description>
+  <name>rust-data-processing-jvm</name>
+  <description>JVM bindings for rust-data-processing (Panama FFM to rdp_jvm_sys). See docs/java/.</description>
+  <url>https://github.com/scorpio-datalake/rust-data-processing</url>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>scorpio-datalake</name>
+      <organization>scorpio-datalake</organization>
+      <organizationUrl>https://github.com/scorpio-datalake</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:git://github.com/scorpio-datalake/rust-data-processing.git</connection>
+    <developerConnection>scm:git:ssh://github.com:scorpio-datalake/rust-data-processing.git</developerConnection>
+    <url>https://github.com/scorpio-datalake/rust-data-processing</url>
+    <tag>v${project.version}</tag>
+  </scm>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
@@ -82,7 +112,7 @@
         <version>3.4.2</version>
         <configuration>
           <excludes>
-            <exclude>io/github/rust_data_processing/jmh/**</exclude>
+            <exclude>io/github/scorpio_datalake/rust_data_processing/jmh/**</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -129,7 +159,7 @@
                 <argument>1</argument>
                 <argument>-t</argument>
                 <argument>1</argument>
-                <argument>io.github.rust_data_processing.jmh.RdpAbiVersionBenchmark</argument>
+                <argument>io.github.scorpio_datalake.rust_data_processing.jmh.RdpAbiVersionBenchmark</argument>
               </arguments>
             </configuration>
           </execution>
@@ -253,6 +283,7 @@
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
+              <deploymentName>rust-data-processing-jvm-${project.version}</deploymentName>
               <autoPublish>true</autoPublish>
               <waitUntil>published</waitUntil>
             </configuration>

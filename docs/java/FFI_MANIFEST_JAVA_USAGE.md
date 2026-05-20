@@ -5,7 +5,7 @@ The file **`bindings/jvm-sys/ffi_manifest.json`** is the **source of truth** for
 | Location | Role |
 | --- | --- |
 | **`bindings/jvm-sys/ffi_manifest.json`** | Canonical manifest (Rust build / reviews) |
-| **`rust-data-processing-jvm` JAR** | Classpath resource **`RdpNativeJson.FFI_MANIFEST_RESOURCE`** (`/io/github/rust_data_processing/ffi_manifest.json`) |
+| **`rust-data-processing-jvm` JAR** | Classpath resource **`RdpNativeJson.FFI_MANIFEST_RESOURCE`** (`/io/github/scorpio_datalake/rust_data_processing/ffi_manifest.json`) |
 | **`RdpNativeJson`** | High-level calls: `invokeAbiVersion`, `invokeParityExport` (JSON `RdpJsonSlice` protocol) |
 
 **CI** enforces that the bundled copy matches `bindings/jvm-sys/ffi_manifest.json` (`python scripts/check_jvm_ffi_manifest.py`).
@@ -18,7 +18,7 @@ Use the same **`groupId`** / **`artifactId`** / **`version`** as the published m
 
 ```xml
 <dependency>
-  <groupId>io.github.rust_data_processing</groupId>
+  <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
   <artifactId>rust-data-processing-jvm</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
@@ -57,7 +57,7 @@ The examples module uses the same resolution as tests (`ExamplesNativeLibrary`).
 Use a class from **`rust-data-processing-jvm`** so the resource loads from that JAR:
 
 ```java
-import io.github.rust_data_processing.ffi.RdpNativeJson;
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
@@ -84,7 +84,7 @@ Every name in **`exported_symbols`** except **`rdp_json_slice_free`** (free help
 Minimal usage:
 
 ```java
-import io.github.rust_data_processing.ffi.RdpNativeJson;
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
 import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
@@ -124,9 +124,9 @@ From **`rust-data-processing-jvm-examples`** after `mvn -DskipTests package` (wi
 export RDP_JVM_SYS=/path/to/librdp_jvm_sys.so
 export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
 java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar" \
-  io.github.rust_data_processing.examples.LoadFfiManifestExample
+  io.github.scorpio_datalake.rust_data_processing.examples.LoadFfiManifestExample
 java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar" \
-  io.github.rust_data_processing.examples.RunPytestMirrorExample rdp_parity_bindings_mirror
+  io.github.scorpio_datalake.rust_data_processing.examples.RunPytestMirrorExample rdp_parity_bindings_mirror
 ```
 
 On Windows, use `;` instead of `:` in `-cp` and absolute paths.
@@ -173,7 +173,7 @@ These symbols are listed in **`exported_symbols`** and covered by **`FfiExported
 | `rdp_export_arrow_ipc_temp` | Temp Arrow IPC file handoff |
 | `rdp_export_polars_parquet_temp` | Temp Parquet via Polars writer |
 
-**Fixture JSON** lives under `tests/fixtures/<bundle>/` (`schemas/`, `pipelines/`, `payloads/`). Java: **`io.github.rust_data_processing.fixture.PipelineJsonFixtures`**; resolve templates before calling native code. Tour: **[EXAMPLES.md](EXAMPLES.md)**; runnable sources: **`docs/java/examples/*.java`**.
+**Fixture JSON** lives under `tests/fixtures/<bundle>/` (`schemas/`, `pipelines/`, `payloads/`). Java: **`io.github.scorpio_datalake.rust_data_processing.fixture.PipelineJsonFixtures`**; resolve templates before calling native code. Tour: **[EXAMPLES.md](EXAMPLES.md)**; runnable sources: **`docs/java/examples/*.java`**.
 
 **Build / test locally:**
 

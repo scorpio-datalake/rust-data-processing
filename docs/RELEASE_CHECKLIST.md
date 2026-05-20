@@ -67,7 +67,7 @@ mvn -f bindings/java/rust-data-processing-jvm -q verify
 ( cd bindings/java/rust-data-processing-jvm && ./gradlew check publishToMavenLocal --no-daemon )
 ```
 
-Central publication onboarding: **[`docs/java/RELEASE.md`](java/RELEASE.md)**, **[`docs/java/MAVEN_CENTRAL_PUBLISHING.md`](java/MAVEN_CENTRAL_PUBLISHING.md)** (tokens, GPG, namespace).
+Central publication: **[`docs/java/MAVEN_CENTRAL_PUBLISHING.md`](java/MAVEN_CENTRAL_PUBLISHING.md)** (namespace **`io.github.scorpio-datalake`**, tokens, GPG). CI publish: **[`.github/workflows/jvm_maven_central_release.yml`](../.github/workflows/jvm_maven_central_release.yml)** — runs when a **GitHub Release** is published and tag **`v{bindings/java/VERSION}`** matches a **non-SNAPSHOT** VERSION.
 
 Workflow: **[`.github/workflows/jvm_bindings_ci.yml`](../.github/workflows/jvm_bindings_ci.yml)** (**Ubuntu / Windows / macOS** × JDK **21**).
 

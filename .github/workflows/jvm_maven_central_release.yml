@@ -6,8 +6,12 @@
 #   MAVEN_GPG_PRIVATE_KEY   ASCII-armored GPG private key (signing)
 #   MAVEN_GPG_PASSPHRASE    Passphrase for that key
 #
+# Publishes io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm to Maven Central
+# (namespace io.github.scorpio-datalake must be Verified on central.sonatype.com).
+#
 # Before releasing: set bindings/java/VERSION (and mirrored pom/gradle) to a release
-# version (no -SNAPSHOT). Release tag must be v{VERSION}, e.g. VERSION 0.1.0 → tag v0.1.0.
+# version (no -SNAPSHOT). GitHub Release tag must be v{VERSION}, e.g. VERSION 0.1.0 → tag v0.1.0.
+# Rust-only tags (e.g. v0.2.2 when VERSION is 0.1.0) skip deploy via the gate step.
 
 name: JVM (Maven Central release)
 
@@ -117,6 +121,19 @@ jobs:
           </settings>
           EOF
 
+      - name: Check GPG signing secrets
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${MAVEN_GPG_PRIVATE_KEY:-}" ] || [ -z "${MAVEN_GPG_PASSPHRASE:-}" ]; then
+            echo "::error::Set repository secrets MAVEN_GPG_PRIVATE_KEY and MAVEN_GPG_PASSPHRASE (Central requires signed artifacts)."
+            exit 1
+          fi
+
       - name: Import GPG key for artifact signing
         if: steps.gate.outputs.skip != 'true'
         uses: crazy-max/ghaction-import-gpg@v6
@@ -145,4 +162,4 @@ jobs:
       - name: Deploy to Maven Central (Central Publisher plugin)
         if: steps.gate.outputs.skip != 'true'
         working-directory: bindings/java/rust-data-processing-jvm
-        run: mvn -B -DcentralRelease=true deploy
+        run: mvn -B -DcentralRelease=true -Drdp.jmh.skip=true deploy
