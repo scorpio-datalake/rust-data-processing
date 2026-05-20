@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase 2 (batch):** `ReduceOp::Median` / `Agg::Median`; UTF-8 privacy `TransformStep`s (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`); validation `Check::Utf8LenCharsBetween`; modules **`export`** (JSONL + deterministic train/test indices), **`privacy`** (UTF-8 diff summaries), **`reports`** (byte-safe truncation); Arrow **`record_batches_to_dataset`** + `LargeUtf8` support; Python bindings `export_dataset_jsonl`, `privacy_summarize_utf8_changes_json`, `reports_truncate_utf8_bytes`.
 - **Docs & examples:** lake read ADR + user guide, SFT format guide, outreach shortlist, ML reduce gap audit, P2-E6 policy + P2-E7 deferral notes, vector export recipe, `examples/{dbt,airflow,tabular_nn,llm_prep}/`, `notebooks/` index + starter notebooks.
 
+## [0.3.0] - 2026-05-20
+
+### Changed
+
+- (summarize this release)
+
 ## [0.2.2] - 2026-05-04
 
 ### Changed
@@ -111,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `profiling`, `validation`, `outliers`, `transform` (TransformSpec), `cdc` boundary types.
 - Optional `db_connectorx` for DB → Arrow → `DataSet` ingestion.
 
+[0.3.0]: https://github.com/rust-data-processing/rust-data-processing/releases/tag/v0.3.0
 [0.2.2]: https://github.com/rust-data-processing/rust-data-processing/releases/tag/v0.2.2
 [0.2.1]: https://github.com/rust-data-processing/rust-data-processing/releases/tag/v0.2.1
 [0.2.0]: https://github.com/rust-data-processing/rust-data-processing/releases/tag/v0.2.0
