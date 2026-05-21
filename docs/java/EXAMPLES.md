@@ -4,15 +4,15 @@ title: "Java examples — JVM bindings (Panama + JSON parity)"
 
 # Java quick start and examples
 
-This page is the **JVM counterpart** to the Python tour published as **`python/examples.html`** on the docs site (Markdown source: [`docs/python/README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/python/README.md)). The Python package calls Rust through **PyO3** with a rich in-process API. On the JVM, Phase 3 exposes a **narrower surface**: a native **`rdp_jvm_sys`** library, an **`ffi_manifest.json`** list of `extern "C"` symbols, and **JSON parity exports** (`rdp_parity_*`) you call with **Panama (FFM)** from Java.
+This page is the **JVM counterpart** to the Python tour published as **`python/examples.html`** on the docs site (Markdown source: [`docs/python/README.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/python/README.md)). The Python package calls Rust through **PyO3** with a rich in-process API. On the JVM, Phase 3 exposes a **narrower surface**: a native **`rdp_jvm_sys`** library, an **`ffi_manifest.json`** list of `extern "C"` symbols, and **JSON parity exports** (`rdp_parity_*`) you call with **Panama (FFM)** from Java.
 
-**Canonical API detail** for symbols and calling convention: [`FFI_MANIFEST_JAVA_USAGE.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/FFI_MANIFEST_JAVA_USAGE.md), [`FFI_API_SLICE.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/FFI_API_SLICE.md), and [`Planning/PHASE3_EPICS.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/Planning/PHASE3_EPICS.md).
+**Canonical API detail** for symbols and calling convention: [`FFI_MANIFEST_JAVA_USAGE.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/java/FFI_MANIFEST_JAVA_USAGE.md), [`FFI_API_SLICE.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/java/FFI_API_SLICE.md), and [`Planning/PHASE3_EPICS.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/Planning/PHASE3_EPICS.md).
 
-**Runnable code** in the repository: [`bindings/java/rust-data-processing-jvm-examples/README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm-examples/README.md) (`LoadFfiManifestExample`, `RunPytestMirrorExample`, `ParityScenariosWalkthrough`, …).
+**Runnable code** in the repository: [`bindings/java/rust-data-processing-jvm-examples/README.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm-examples/README.md) (`LoadFfiManifestExample`, `RunPytestMirrorExample`, `ParityScenariosWalkthrough`, …).
 
 ## What this page covers
 
-Use this as a **tour of how Java integrates today** (parity JSON over FFI), not a line-for-line duplicate of every Python method. For full signatures and options on the Python side, see [`python-wrapper/API.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/python-wrapper/API.md).
+Use this as a **tour of how Java integrates today** (parity JSON over FFI), not a line-for-line duplicate of every Python method. For full signatures and options on the Python side, see [`python-wrapper/API.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/python-wrapper/API.md).
 
 | Topic | Where below |
 | --- | --- |
@@ -53,7 +53,7 @@ The JVM module is deliberately **thin**: Java does not re-implement CSV parsing,
 
 ## Shared JSON fixtures (`tests/fixtures/`) {#shared-json-fixtures-testsfixtures}
 
-Every runnable class under [`docs/java/examples/`](examples/) loads committed JSON from the repo — **not** strings embedded in Java source. Layout (see also [`tests/fixtures/README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/tests/fixtures/README.md)):
+Every runnable class under [`docs/java/examples/`](examples/) loads committed JSON from the repo — **not** strings embedded in Java source. Layout (see also [`tests/fixtures/README.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/tests/fixtures/README.md)):
 
 | Bundle | Schemas | Pipelines / payloads | Data files |
 | --- | --- | --- | --- |
@@ -118,7 +118,7 @@ Every runnable class under [`docs/java/examples/`](examples/) loads committed JS
 
 ### Loading fixtures from Java
 
-[`PipelineJsonFixtures`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/main/java/io/github/scorpio_datalake/rust_data_processing/fixture/PipelineJsonFixtures.java) resolves `tests/fixtures` by walking up from the working directory until `people.csv` exists (or uses `GITHUB_WORKSPACE` in CI):
+[`PipelineJsonFixtures`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/main/java/io/github/scorpio_datalake/rust_data_processing/fixture/PipelineJsonFixtures.java) resolves `tests/fixtures` by walking up from the working directory until `people.csv` exists (or uses `GITHUB_WORKSPACE` in CI):
 
 ```java
 Path fixtures = PipelineJsonFixtures.resolveTestsFixturesDir().orElseThrow();
@@ -207,7 +207,7 @@ Loads **legacy control-plane** JSON (`student_etl/pipelines/legacy_student_etl.p
 
 ## JUnit tests for doc examples {#junit-tests-for-doc-examples}
 
-[`DocsExampleNativeIntegrationTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) and [`XmlGhcnPipelineContractTest`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/XmlGhcnPipelineContractTest.java) call the same helpers as the doc classes (`JvmNativeContractScenarios`). They **assume** a built native library:
+[`DocsExampleNativeIntegrationTest`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) and [`XmlGhcnPipelineContractTest`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/XmlGhcnPipelineContractTest.java) call the same helpers as the doc classes (`JvmNativeContractScenarios`). They **assume** a built native library:
 
 ```bash
 # From repository root (Linux/macOS; adjust extension on Windows)
@@ -270,15 +270,15 @@ The crate also exposes **`rust_data_processing::ingestion::export_dataset_to_par
 ## Prerequisites
 
 - **JDK 21+** (Panama FFM). Some builds use preview features on newer JDKs; see the module `pom.xml`.
-- **Artifact:** `io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm` (same version as [`bindings/java/VERSION`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/VERSION)).
-- **Native library:** build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/rust-data-processing/rust-data-processing/tree/main/bindings/jvm-sys) (CI: `cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full`). Point Java at the absolute path:
+- **Artifact:** `io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm` (same version as [`bindings/java/VERSION`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/VERSION)).
+- **Native library:** build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/scorpio-datalake/rust-data-processing/tree/main/bindings/jvm-sys) (CI: `cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full`). Point Java at the absolute path:
   - Environment variable **`RDP_JVM_SYS`**, or
   - System property **`-Drdp.jvm.sys.library=…`**
 - **JVM flag:** `--enable-native-access=ALL-UNNAMED` (or a tighter module policy if you wire one).
 
 ## FFI manifest and ABI
 
-The JAR bundles **`ffi_manifest.json`** (same content as [`bindings/jvm-sys/ffi_manifest.json`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/jvm-sys/ffi_manifest.json)). Read it from the classpath to list **`exported_symbols`** and compare **`abi_version_constant`** with a live **`rdp_ffi_abi_version`** downcall.
+The JAR bundles **`ffi_manifest.json`** (same content as [`bindings/jvm-sys/ffi_manifest.json`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/jvm-sys/ffi_manifest.json)). Read it from the classpath to list **`exported_symbols`** and compare **`abi_version_constant`** with a live **`rdp_ffi_abi_version`** downcall.
 
 ```java
 import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
@@ -337,7 +337,7 @@ For copy-pasteable classes with committed fixtures, see [JSON-first doc examples
 
 <h2 id="ordered-paths-and-directory-scans-incremental-batches">Ordered paths and directory scans (incremental batches)</h2>
 
-In Python, incremental batch patterns use **`paths_from_directory_scan`**, **`ingest_from_ordered_paths`**, watermark options, and Hive-style layout helpers — see [the same heading in the Python examples](../python/examples.html#ordered-paths-and-directory-scans-incremental-batches) on this site and [`docs/python/PHASE2_EXAMPLES.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/python/PHASE2_EXAMPLES.md) § 10.
+In Python, incremental batch patterns use **`paths_from_directory_scan`**, **`ingest_from_ordered_paths`**, watermark options, and Hive-style layout helpers — see [the same heading in the Python examples](../python/examples.html#ordered-paths-and-directory-scans-incremental-batches) on this site and [`docs/python/PHASE2_EXAMPLES.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/python/PHASE2_EXAMPLES.md) § 10.
 
 **On the JVM today** there are no Java methods with those names; the same **Rust capabilities** are covered by parity exports you call over FFI:
 
@@ -399,11 +399,11 @@ java -cp "rust-data-processing-jvm-examples-…jar:rust-data-processing-jvm-…j
   io.github.scorpio_datalake.rust_data_processing.examples.ParityScenariosWalkthrough
 ```
 
-(Exact `-cp` lines: [`bindings/java/rust-data-processing-jvm-examples/README.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm-examples/README.md).)
+(Exact `-cp` lines: [`bindings/java/rust-data-processing-jvm-examples/README.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm-examples/README.md).)
 
 ## See also
 
-- [`FFI_MANIFEST_JAVA_USAGE.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/FFI_MANIFEST_JAVA_USAGE.md) — Maven, `java -cp`, manifest resource path.
-- [`README.md` (JVM doc index)](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/README.md) — Phase 3 links.
+- [`FFI_MANIFEST_JAVA_USAGE.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/java/FFI_MANIFEST_JAVA_USAGE.md) — Maven, `java -cp`, manifest resource path.
+- [`README.md` (JVM doc index)](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/java/README.md) — Phase 3 links.
 - [Python examples (`../python/examples.html`)](../python/examples.html) — full API tour on the same docs site.
-- [`ARROW_FFI_JVM.md`](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/java/ARROW_FFI_JVM.md) — future Arrow IPC direction.
+- [`ARROW_FFI_JVM.md`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/java/ARROW_FFI_JVM.md) — future Arrow IPC direction.

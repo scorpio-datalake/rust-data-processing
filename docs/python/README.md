@@ -2,7 +2,7 @@
 
 ![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](../images/phase-2-scope-overview.png)
 
-The same Markdown is **included in the HTML docs** (pdoc) as [`rust_data_processing.examples`](https://rust-data-processing.github.io/rust-data-processing/python/examples.html) — see `python-wrapper/rust_data_processing/examples.py`.
+The same Markdown is **included in the HTML docs** (pdoc) as [`rust_data_processing.examples`](https://scorpio-datalake.github.io/rust-data-processing/python/examples.html) — see `python-wrapper/rust_data_processing/examples.py`.
 
 This page collects **Python** snippets for the `rust-data-processing` package (PyO3 extension). The [repository README](../../README.md) leads with a short Python quick start; the canonical API reference is [`python-wrapper/API.md`](../../python-wrapper/API.md). Rust snippets live in [`docs/rust/README.md`](../rust/README.md).
 
@@ -28,7 +28,7 @@ Copy-paste snippets live in **[`PHASE2_EXAMPLES.md`](PHASE2_EXAMPLES.md)** (same
 
 ### What this page covers
 
-Use this as a **tour of the Python API** (the same page is rendered on [GitHub Pages](https://rust-data-processing.github.io/rust-data-processing/python/examples.html)). For every function signature and option, see [`python-wrapper/API.md`](../../python-wrapper/API.md).
+Use this as a **tour of the Python API** (the same page is rendered on [GitHub Pages](https://scorpio-datalake.github.io/rust-data-processing/python/examples.html)). For every function signature and option, see [`python-wrapper/API.md`](../../python-wrapper/API.md).
 
 | Topic | Where below |
 | --- | --- |

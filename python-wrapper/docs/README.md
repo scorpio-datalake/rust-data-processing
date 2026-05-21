@@ -9,9 +9,9 @@
 
 CI builds browsable HTML on each push to `main` (combined with Rust rustdoc). Entry point:
 
-- [GitHub Pages — Python API (pdoc)](https://rust-data-processing.github.io/rust-data-processing/python/) — landing + Rust rustdoc: [site root](https://rust-data-processing.github.io/rust-data-processing/)
+- [GitHub Pages — Python API (pdoc)](https://scorpio-datalake.github.io/rust-data-processing/python/) — landing + Rust rustdoc: [site root](https://scorpio-datalake.github.io/rust-data-processing/)
 - **Examples** in pdoc come from the repo’s [`docs/python/README.md`](../../docs/python/README.md) (included via `rust_data_processing.examples`). Published URL: `python/examples.html` (copy of the module page).
-- **Java examples** (JVM / Panama parity tour, including incremental ETL anchors): [`docs/java/EXAMPLES.md`](../../docs/java/EXAMPLES.md) — published on the same site as [`java/examples.html`](https://rust-data-processing.github.io/rust-data-processing/java/examples.html).
+- **Java examples** (JVM / Panama parity tour, including incremental ETL anchors): [`docs/java/EXAMPLES.md`](../../docs/java/EXAMPLES.md) — published on the same site as [`java/examples.html`](https://scorpio-datalake.github.io/rust-data-processing/java/examples.html).
 
 Local build (from `python-wrapper/` after `uv sync --group dev`):
 

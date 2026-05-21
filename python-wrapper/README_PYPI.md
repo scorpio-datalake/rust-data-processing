@@ -1,12 +1,12 @@
 # rust-data-processing
 
-![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/rust-data-processing/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
+![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/scorpio-datalake/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
 
 Python bindings for the **[rust-data-processing](https://docs.rs/rust-data-processing)** crate: schema-first ingestion from CSV, JSON, Parquet, and Excel into an in-memory **`DataSet`**, with profiling, validation, Polars-backed pipelines, SQL, and **Phase 2** JSONL export, privacy transforms and summaries, median, Arrow interop, and incremental ingest helpers.
 
 *Infographic: Phase 2 — Phase 1 flow plus export, privacy, median, Arrow, incremental ETL; JVM planned Phase 3.*
 
-This page is the **PyPI** project description (Python-only). Clone the [repository](https://github.com/rust-data-processing/rust-data-processing) for developer setup, Rust sources, and the full monorepo README.
+This page is the **PyPI** project description (Python-only). Clone the [repository](https://github.com/scorpio-datalake/rust-data-processing) for developer setup, Rust sources, and the full monorepo README.
 
 ## Install
 
@@ -40,20 +40,20 @@ print("checks", validation["summary"]["total_checks"])
 
 ## Phase 2 (export, privacy, JSONL, median, Delta handoff)
 
-Copy-paste snippets: **[Phase 2 Python examples (Markdown in repo)](https://github.com/rust-data-processing/rust-data-processing/blob/main/docs/python/PHASE2_EXAMPLES.md)**. These APIs are also summarized in **[API.md](https://github.com/rust-data-processing/rust-data-processing/blob/main/python-wrapper/API.md)** (section **Export, privacy summaries, truncation (Phase 2)**).
+Copy-paste snippets: **[Phase 2 Python examples (Markdown in repo)](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/python/PHASE2_EXAMPLES.md)**. These APIs are also summarized in **[API.md](https://github.com/scorpio-datalake/rust-data-processing/blob/main/python-wrapper/API.md)** (section **Export, privacy summaries, truncation (Phase 2)**).
 
 ## Documentation
 
 | | Link |
 | --- | --- |
 | **This package on PyPI** | [pypi.org/project/rust-data-processing](https://pypi.org/project/rust-data-processing/) |
-| **Python examples (HTML, pdoc)** | [GitHub Pages — examples](https://rust-data-processing.github.io/rust-data-processing/python/examples.html) |
-| **Python API (HTML, pdoc)** | [GitHub Pages — Python](https://rust-data-processing.github.io/rust-data-processing/python/) |
-| **Python API (markdown)** | [API.md in the repository](https://github.com/rust-data-processing/rust-data-processing/blob/main/python-wrapper/API.md) |
-| **Combined site (landing + Rust rustdoc)** | [GitHub Pages — home](https://rust-data-processing.github.io/rust-data-processing/) |
+| **Python examples (HTML, pdoc)** | [GitHub Pages — examples](https://scorpio-datalake.github.io/rust-data-processing/python/examples.html) |
+| **Python API (HTML, pdoc)** | [GitHub Pages — Python](https://scorpio-datalake.github.io/rust-data-processing/python/) |
+| **Python API (markdown)** | [API.md in the repository](https://github.com/scorpio-datalake/rust-data-processing/blob/main/python-wrapper/API.md) |
+| **Combined site (landing + Rust rustdoc)** | [GitHub Pages — home](https://scorpio-datalake.github.io/rust-data-processing/) |
 | **Rust crate API** | [docs.rs/rust-data-processing](https://docs.rs/rust-data-processing) |
-| **Repository** | [github.com/rust-data-processing/rust-data-processing](https://github.com/rust-data-processing/rust-data-processing) |
+| **Repository** | [github.com/scorpio-datalake/rust-data-processing](https://github.com/scorpio-datalake/rust-data-processing) |
 
 ## License
 
-MIT OR Apache-2.0 - see [LICENSE-MIT](https://github.com/rust-data-processing/rust-data-processing/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/rust-data-processing/rust-data-processing/blob/main/LICENSE-APACHE) in the repository.
+MIT OR Apache-2.0 - see [LICENSE-MIT](https://github.com/scorpio-datalake/rust-data-processing/blob/main/LICENSE-MIT) and [LICENSE-APACHE](https://github.com/scorpio-datalake/rust-data-processing/blob/main/LICENSE-APACHE) in the repository.

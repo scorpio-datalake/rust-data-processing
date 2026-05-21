@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 description = "Phase 3: cdylib FFI for Maven + Gradle JVM bindings (Project Panama)."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/rust-data-processing/rust-data-processing"
+repository = "https://github.com/scorpio-datalake/rust-data-processing"
 
 [lib]
 name = "rdp_jvm_sys"

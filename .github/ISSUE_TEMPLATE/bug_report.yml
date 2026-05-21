@@ -8,7 +8,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report this. Structured reports help us reproduce and fix issues faster.
-        **Security issues:** do not file here—see [SECURITY.md](https://github.com/rust-data-processing/rust-data-processing/blob/main/SECURITY.md) for how to report them privately.
+        **Security issues:** do not file here—see [SECURITY.md](https://github.com/scorpio-datalake/rust-data-processing/blob/main/SECURITY.md) for how to report them privately.
 
   - type: textarea
     id: summary

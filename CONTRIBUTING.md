@@ -4,7 +4,7 @@ Thank you for your interest in **rust-data-processing**.
 
 ## Issues and security
 
-- **Bugs and features:** use [GitHub Issues](https://github.com/rust-data-processing/rust-data-processing/issues) with the **Bug Report** or **Feature Request** form when possible.
+- **Bugs and features:** use [GitHub Issues](https://github.com/scorpio-datalake/rust-data-processing/issues) with the **Bug Report** or **Feature Request** form when possible.
 - **Security vulnerabilities:** read [`SECURITY.md`](SECURITY.md) and **do not** open a public issue.
 
 Triage cadence, labels, and how we use “popular” signals: [`docs/ISSUE_TRIAGE.md`](docs/ISSUE_TRIAGE.md).
