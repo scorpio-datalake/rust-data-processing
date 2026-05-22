@@ -1,0 +1,19 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": [],
+    "schema_ref": "schemas/id_name.schema.json",
+    "options": { "format": "json" },
+    "object_store_uris": [
+      "file://{{FILE_BASE}}/data/two_rows.json",
+      "file://{{FILE_BASE}}/cloud/s3-style/incoming/two_rows.json",
+      "file://{{FILE_BASE}}/cloud/azure-style/incoming/two_rows.json"
+    ]
+  },
+  "sinks": [
+    {
+      "kind": "parquet_file",
+      "path": "{{SINK_PATH}}"
+    }
+  ]
+}
