@@ -24,6 +24,10 @@ use rust_data_processing::ingestion::{
     paths_from_directory_scan as paths_from_directory_scan_rs,
     paths_from_explicit_list as paths_from_explicit_list_rs, paths_from_glob as paths_from_glob_rs,
 };
+#[cfg(feature = "cloud")]
+use rust_data_processing::ingestion::{
+    export_dataset_to_object_store_uri, ingest_from_object_store_uri,
+};
 use rust_data_processing::outliers::{
     detect_outliers_dataset, render_outlier_report_json, render_outlier_report_markdown,
 };
@@ -764,6 +768,31 @@ fn ingest_from_db_infer_py(
         .map_err(ingestion_err_to_py)
 }
 
+/// Read one object from `s3://`, `gs://`, `abfss://`, `file://`, … into a `DataSet` (feature `cloud`).
+#[cfg(feature = "cloud")]
+#[pyfunction(name = "ingest_from_object_store_uri")]
+#[pyo3(signature = (uri, schema, options=None))]
+fn ingest_from_object_store_uri_py(
+    _py: Python<'_>,
+    uri: &str,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(schema)?;
+    let opts = merge_ingestion_options(_py, options)?;
+    ingest_from_object_store_uri(uri, &schema, &opts)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+/// Write a `DataSet` as one Parquet object at `uri` (feature `cloud`).
+#[cfg(feature = "cloud")]
+#[pyfunction(name = "export_dataset_to_object_store_uri")]
+#[pyo3(signature = (uri, ds))]
+fn export_dataset_to_object_store_uri_py(uri: &str, ds: &PyDataSet) -> PyResult<()> {
+    export_dataset_to_object_store_uri(uri, &ds.inner).map_err(ingestion_err_to_py)
+}
+
 #[pyfunction]
 fn sql_query_dataset(ds: &PyDataSet, sql: &str) -> PyResult<PyDataSet> {
     let df = DataFrame::from_dataset(&ds.inner).map_err(ingestion_err_to_py)?;
@@ -1136,6 +1165,11 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ingest_from_path_infer_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_infer_py, m)?)?;
+    #[cfg(feature = "cloud")]
+    {
+        m.add_function(wrap_pyfunction!(ingest_from_object_store_uri_py, m)?)?;
+        m.add_function(wrap_pyfunction!(export_dataset_to_object_store_uri_py, m)?)?;
+    }
     m.add_function(wrap_pyfunction!(sql_query_dataset, m)?)?;
     m.add_function(wrap_pyfunction!(transform_apply_json, m)?)?;
     m.add_function(wrap_pyfunction!(export_dataset_jsonl_py, m)?)?;

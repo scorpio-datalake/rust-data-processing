@@ -66,6 +66,16 @@ cargo build --release --features db
 
 Without it, `ingest_from_db` / `ingest_from_db_infer` are still exported but return the same “disabled” error as Rust unless you rebuild with `db`.
 
+### Optional: Cloud object store (`cloud`)
+
+Feature **`cloud`** enables `ingest_from_object_store_uri` / `export_dataset_to_object_store_uri` (same URLs as JVM `sources.object_store_uris`). See [`docs/CONNECTORS.md`](../docs/CONNECTORS.md).
+
+```bash
+uv run maturin develop --release --features cloud
+```
+
+Set `AWS_*`, `GOOGLE_APPLICATION_CREDENTIALS`, or Azure env vars for real `s3://` / `gs://` / `abfss://` URIs; use `file://` for local smoke tests.
+
 ### Ingestion observers (Python)
 
 Path-based ingest `options` may include `watermark_column` / `watermark_exclusive_above`, `observer` (`on_success`, `on_failure`, `on_alert`), and `alert_at_or_above`, matching `IngestionOptions` in Rust. Hive partition helpers (`discover_hive_partitioned_files`, …) are exported at package root. See `API.md`.

@@ -12,17 +12,20 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration tests aligned with {@code docs/java/examples/*.java}: same fixtures and assertions as
- * the doc snippets, run under JUnit when {@code rdp_jvm_sys} is discoverable. FFI manifest drift
- * and per-symbol smoke checks live in {@code
- * io.github.scorpio_datalake.rust_data_processing.FfiExportedSymbolsContractTest}.
+ * Integration tests that keep {@code docs/java/examples/*.java} honest in CI.
  *
- * <p><strong>RDP vs “plain Java”</strong> — these tests never parse CSV/JSON/Excel in Java. They
- * load the native library from {@code RDP_JVM_SYS} / {@code rdp.jvm.sys.library}, then call {@link
- * RdpNativeJson} helpers that use Panama {@link Linker#downcallHandle} on symbols exported by Rust
- * (for example {@code rdp_excel_ingest_path_sheet}, {@code rdp_run_pipeline_json}). Java builds
- * UTF-8 path strings and parses the returned JSON envelope; ingestion, Polars SQL, and Excel
- * reading run inside {@code rdp_jvm_sys}.
+ * <p><strong>Why these tests exist.</strong> Documentation examples are copy-paste sources; they are
+ * not compiled into the JAR. Without JUnit, a Rust FFI or fixture change could break every {@code main}
+ * on the docs site while unit tests still pass. Each method here names the doc file it guards (see
+ * {@code JvmNativeContractScenarios} for assertions).
+ *
+ * <p><strong>What they prove.</strong> Given {@code RDP_JVM_SYS}, Panama can load symbols, Rust returns
+ * {@code ok: true}, and interchange fields match committed fixtures (row counts, kinds, temp Parquet
+ * paths). They do <em>not</em> re-test every symbol — see {@code FfiExportedSymbolsContractTest} for
+ * manifest-wide smoke.
+ *
+ * <p><strong>RDP vs “plain Java”</strong> — tests never parse CSV/JSON/Excel in Java. Java builds UTF-8
+ * JSON payloads; ingestion, Polars SQL, and Excel run in {@code rdp_jvm_sys}.
  */
 final class DocsExampleNativeIntegrationTest {
 
@@ -240,5 +243,118 @@ final class DocsExampleNativeIntegrationTest {
       RdpNativeJson.invokeAbiVersion(linker, lookup);
       JvmNativeContractScenarios.runParquetSnippetsExportTempContract(linker, lookup, arena);
     }
+  }
+
+  /**
+   * Guards {@code ExportJsonlTrainTest.java}: JSONL lines and train/test index demo from {@code
+   * rdp_parity_export_privacy_reports} (Phase 2 §1).
+   */
+  @Test
+  void exportJsonlTrainTestMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPhase2ExportJsonlTrainTestContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Guards {@code PrivacyDiffReports.java}: {@code privacy_report_json} shape after UTF-8 column diff
+   * (Phase 2 §3).
+   */
+  @Test
+  void privacyDiffReportsMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPhase2PrivacyDiffReportsContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Guards {@code ReportsTruncateUtf8.java}: {@code reports_truncated_sample} byte cap (Phase 2 §4).
+   */
+  @Test
+  void reportsTruncateUtf8MatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPhase2ReportsTruncateUtf8Contract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Guards {@code TransformUtf8Masking.java}: {@code rdp_parity_transform} dataset interchange (Phase 2
+   * §5; Utf8 masking still Python-first).
+   */
+  @Test
+  void transformUtf8MaskingMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPhase2TransformUtf8MaskingContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Guards {@code ValidationUtf8Length.java}: validation summary over FFI (Phase 2 §6).
+   */
+  @Test
+  void validationUtf8LengthMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPhase2ValidationUtf8LengthContract(linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Guards {@code IngestValidateJsonlEndToEnd.java}: {@code people.csv} ingest + validation + JSONL
+   * preview chain (Phase 2 §9).
+   */
+  @Test
+  void ingestValidateJsonlEndToEndMatchesDocsExample() throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      JvmNativeContractScenarios.runPhase2IngestValidateJsonlEndToEndContract(
+          linker, lookup, arena);
+    }
+  }
+
+  /**
+   * Guards {@code DeltaLakeHandoff.java}: no live lake in CI — verifies handoff docs and Parquet ingest
+   * fixtures exist (Phase 2 §8).
+   */
+  @Test
+  void deltaLakeHandoffPrerequisitesMatchDocsExample() throws Exception {
+    Assumptions.assumeTrue(
+        RdpJvmSysTestSupport.resolveTestsFixturesDir().isPresent(),
+        "tests/fixtures not discoverable — run from repository checkout");
+    JvmNativeContractScenarios.runPhase2DeltaLakeHandoffPrerequisitesContract();
   }
 }

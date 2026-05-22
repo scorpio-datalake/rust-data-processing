@@ -72,6 +72,56 @@ pub mod excel {
         Err(disabled())
     }
 }
+#[cfg(feature = "object_store")]
+pub mod object_store;
+#[cfg(not(feature = "object_store"))]
+pub mod object_store {
+    use crate::error::{IngestionError, IngestionResult};
+    use crate::types::{DataSet, Schema};
+    use super::IngestionOptions;
+
+    fn disabled() -> IngestionError {
+        IngestionError::SchemaMismatch {
+            message: "object_store support disabled; enable Cargo feature 'object_store'".to_string(),
+        }
+    }
+
+    pub fn ingest_from_object_store_uri(
+        _uri: &str,
+        _schema: &Schema,
+        _options: &IngestionOptions,
+    ) -> IngestionResult<DataSet> {
+        Err(disabled())
+    }
+
+    pub fn export_dataset_to_object_store_uri(_uri: &str, _ds: &DataSet) -> IngestionResult<()> {
+        Err(disabled())
+    }
+}
+
+#[cfg(feature = "delta_lake")]
+pub mod delta_lake;
+#[cfg(not(feature = "delta_lake"))]
+pub mod delta_lake {
+    use crate::error::{IngestionError, IngestionResult};
+    use crate::types::DataSet;
+
+    pub fn delta_table_uri(warehouse: &str, namespace: Option<&str>, table: &str) -> String {
+        let base = warehouse.trim_end_matches('/');
+        match namespace.filter(|n| !n.is_empty()) {
+            Some(ns) => format!("{base}/{ns}/{table}"),
+            None => format!("{base}/{table}"),
+        }
+    }
+
+    pub fn write_dataset_to_delta_table(_table_uri: &str, _ds: &DataSet) -> IngestionResult<usize> {
+        Err(IngestionError::SchemaMismatch {
+            message: "delta_lake support disabled; enable Cargo feature 'delta_lake'".to_string(),
+        })
+    }
+}
+
+pub mod snowflake;
 #[cfg(feature = "db_connectorx")]
 pub mod db;
 pub mod json;
@@ -131,6 +181,9 @@ pub use unified::{
     export_dataset_to_xml, infer_schema_from_path, ingest_from_ordered_paths, ingest_from_path,
     ingest_from_path_infer,
 };
+pub use object_store::{export_dataset_to_object_store_uri, ingest_from_object_store_uri};
+pub use delta_lake::{delta_table_uri, write_dataset_to_delta_table};
+pub use snowflake::{copy_into_table_from_stage, write_dataset_to_snowflake_stage};
 pub use watermark::{
     apply_watermark_after_ingest, apply_watermark_filter, max_value_in_column,
     validate_watermark_config,

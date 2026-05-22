@@ -7,10 +7,10 @@
 //! Rust keeps the working frame in Polars; only **sink results** and summaries cross FFI — not
 //! bulk row JSON unless a sink explicitly requests it later.
 //!
-//! Object-store source URIs (`s3://`, …) are rejected with a clear error until object-store wiring
-//! lands in this crate. **Delta Lake / Iceberg** sinks return structured `connector_pending` with
-//! stable **`error_code`** until native table writers are linked (**`Planning/PHASE3_EPICS.md`**
-//! **P3-E1-S10**). **PostgreSQL** runs a `COPY` load when `rdp-jvm-sys` is built with
+//! Object-store URIs belong in **`sources.object_store_uris`**; remote SQL belongs in **`sources.db_reads`**
+//! (ConnectorX URLs, feature **`db_connectorx`**). Local **`sources.paths`** are filesystem paths. Rust
+//! reads/writes cloud URIs via **`object_store`** when built with **`cloud_connectors`**. **Iceberg** sinks
+//! remain **`connector_pending`**. **PostgreSQL** runs a `COPY` load when `rdp-jvm-sys` is built with
 //! **`--features sink_postgres`**. **`jdbc`** sinks are rejected in-tree — use **`postgresql`**
 //! with **`postgresql://`** (libpq), not **`jdbc:`** URLs.
 //!
@@ -41,11 +41,24 @@ fn default_empty_object() -> serde_json::Value {
 }
 
 #[derive(Debug, Deserialize)]
+struct DbReadSpec {
+    /// ConnectorX URL (`postgresql://`, `oracle://`, `mssql://`, `mysql://`) — not `jdbc:`.
+    url: String,
+    query: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct SourcesSpec {
     paths: Vec<String>,
     schema: rust_data_processing::types::Schema,
     #[serde(default = "default_empty_object")]
     options: serde_json::Value,
+    /// Cloud object-store read URIs (`s3://`, `gs://`, `gcs://`, `abfss://`, `azure://`, `file://`).
+    #[serde(default)]
+    object_store_uris: Vec<String>,
+    /// Remote SQL reads via ConnectorX (feature `db_connectorx` on `rdp_jvm_sys`).
+    #[serde(default)]
+    db_reads: Vec<DbReadSpec>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -109,6 +122,55 @@ enum SinkSpec {
     Jdbc {
         url: String,
         table: String,
+        #[serde(default)]
+        sql: Option<String>,
+    },
+    /// Snowflake table load (account URL + stage); connector not linked in-tree yet.
+    Snowflake {
+        account_url: String,
+        #[serde(default)]
+        warehouse: Option<String>,
+        #[serde(default)]
+        database: Option<String>,
+        #[serde(default)]
+        schema: Option<String>,
+        table: String,
+        #[serde(default)]
+        stage_uri: Option<String>,
+        #[serde(default)]
+        role: Option<String>,
+        #[serde(default)]
+        sql: Option<String>,
+    },
+    /// Databricks / Unity Catalog Delta write; connector not linked in-tree yet.
+    Databricks {
+        workspace_url: String,
+        #[serde(default)]
+        catalog_uri: Option<String>,
+        #[serde(default)]
+        warehouse: Option<String>,
+        #[serde(default)]
+        namespace: Option<String>,
+        table: String,
+        #[serde(default)]
+        sql: Option<String>,
+    },
+    /// Spark cluster handoff metadata (read path for `spark.read.*`); connector not linked in-tree yet.
+    Spark {
+        #[serde(default)]
+        master: Option<String>,
+        #[serde(default)]
+        app_name: Option<String>,
+        /// Where Spark should read after Rust staging (`file://`, `s3://`, …).
+        handoff_uri: String,
+        #[serde(default)]
+        sql: Option<String>,
+    },
+    /// Write Polars output to cloud object storage (`s3://`, `gs://`, `abfss://`, …); not linked yet.
+    ObjectStore {
+        uri: String,
+        #[serde(default)]
+        format: Option<String>,
         #[serde(default)]
         sql: Option<String>,
     },
@@ -236,6 +298,8 @@ fn legacy_student_etl_to_v1(spec: LegacyStudentEtlSpec) -> Result<(RunPipelineRe
                 paths: spec.json_source_paths,
                 schema: spec.schema_student_json,
                 options: serde_json::json!({"format": "json"}),
+                object_store_uris: Vec::new(),
+                db_reads: Vec::new(),
             },
             transform: None,
             sinks,
@@ -244,22 +308,229 @@ fn legacy_student_etl_to_v1(spec: LegacyStudentEtlSpec) -> Result<(RunPipelineRe
     ))
 }
 
-fn object_store_path_error(p: &str) -> Option<String> {
+fn is_object_store_uri(p: &str) -> bool {
     let lower = p.to_ascii_lowercase();
-    if lower.starts_with("s3://")
+    lower.starts_with("s3://")
         || lower.starts_with("gs://")
         || lower.starts_with("gcs://")
         || lower.starts_with("abfs://")
+        || lower.starts_with("abfss://")
         || lower.starts_with("azure://")
-        || lower.starts_with("http://")
+        || lower.starts_with("az://")
+        || lower.starts_with("file://")
         || lower.starts_with("https://")
-    {
+        || lower.starts_with("http://")
+}
+
+fn object_store_scheme(p: &str) -> &'static str {
+    let lower = p.to_ascii_lowercase();
+    if lower.starts_with("s3://") {
+        "s3"
+    } else if lower.starts_with("gs://") || lower.starts_with("gcs://") {
+        "gcs"
+    } else if lower.starts_with("abfss://") || lower.starts_with("abfs://") {
+        "abfs"
+    } else if lower.starts_with("azure://") || lower.starts_with("az://") {
+        "azure"
+    } else if lower.starts_with("file://") {
+        "file"
+    } else {
+        "http"
+    }
+}
+
+fn object_store_path_error(p: &str) -> Option<String> {
+    if is_object_store_uri(p) {
         Some(format!(
-            "sources.paths entry `{p}` uses an object-store or HTTP URI; only local filesystem paths are supported in this build"
+            "sources.paths entry `{p}` uses an object-store or HTTP URI; use local filesystem paths for ingest and declare cloud URIs in sources.object_store_uris"
         ))
     } else {
         None
     }
+}
+
+fn db_read_url_error(url: &str) -> Option<String> {
+    let lower = url.to_ascii_lowercase();
+    if lower.starts_with("jdbc:") {
+        return Some(format!(
+            "sources.db_reads.url must use ConnectorX form (oracle://, mssql://, postgresql://, mysql://), not JDBC `{url}`"
+        ));
+    }
+    if lower.starts_with("postgresql://")
+        || lower.starts_with("oracle://")
+        || lower.starts_with("mssql://")
+        || lower.starts_with("mysql://")
+    {
+        None
+    } else {
+        Some(format!(
+            "sources.db_reads.url `{url}` has unsupported scheme; expected postgresql://, oracle://, mssql://, or mysql://"
+        ))
+    }
+}
+
+#[cfg(feature = "link-main")]
+fn export_dataset_to_handoff_uri(uri: &str, ds: &rust_data_processing::types::DataSet) -> Result<usize, PipelineErr> {
+    use rust_data_processing::ingestion::{
+        export_dataset_to_object_store_uri, export_dataset_to_parquet,
+    };
+
+    let rows = ds.row_count();
+    if is_object_store_uri(uri) {
+        export_dataset_to_object_store_uri(uri, ds).map_err(|e| {
+            PipelineErr::structured("OBJECT_STORE_SINK_FAILED", format!("{e}"), "sink")
+        })?;
+    } else if let Some(path) = uri.strip_prefix("file://") {
+        let p = Path::new(path);
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                PipelineErr::structured("PARQUET_SINK_IO_FAILED", e.to_string(), "sink")
+            })?;
+        }
+        export_dataset_to_parquet(p, ds).map_err(|e| {
+            PipelineErr::structured("PARQUET_SINK_WRITE_FAILED", format!("{e}"), "sink")
+        })?;
+    } else {
+        let p = Path::new(uri);
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                PipelineErr::structured("PARQUET_SINK_IO_FAILED", e.to_string(), "sink")
+            })?;
+        }
+        export_dataset_to_parquet(p, ds).map_err(|e| {
+            PipelineErr::structured("PARQUET_SINK_WRITE_FAILED", format!("{e}"), "sink")
+        })?;
+    }
+    Ok(rows)
+}
+
+#[cfg(feature = "link-main")]
+fn ingest_db_reads(
+    db_reads: &[DbReadSpec],
+    schema: &rust_data_processing::types::Schema,
+    opts: &rust_data_processing::ingestion::IngestionOptions,
+) -> Result<(Vec<serde_json::Value>, Vec<Vec<rust_data_processing::types::Value>>), PipelineErr> {
+    if db_reads.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    #[cfg(not(feature = "db_connectorx"))]
+    {
+        let _ = (schema, opts);
+        return Err(PipelineErr::structured(
+            "DB_CONNECTORX_NOT_BUILT",
+            "sources.db_reads requires rdp_jvm_sys built with --features db_connectorx (or full)",
+            "ingest",
+        ));
+    }
+    #[cfg(feature = "db_connectorx")]
+    {
+        use rust_data_processing::ingestion::ingest_from_db;
+
+        let mut results = Vec::new();
+        let mut rows = Vec::new();
+        for db in db_reads {
+            match ingest_from_db(&db.url, &db.query, schema, opts) {
+                Ok(ds) => {
+                    results.push(serde_json::json!({
+                        "url": db.url,
+                        "status": "ok",
+                        "row_count": ds.row_count(),
+                    }));
+                    rows.extend(ds.rows);
+                }
+                Err(e) => {
+                    return Err(PipelineErr::structured(
+                        "DB_SOURCE_FAILED",
+                        format!("ingest db `{}`: {e}", db.url),
+                        "ingest",
+                    ));
+                }
+            }
+        }
+        Ok((results, rows))
+    }
+}
+
+#[cfg(feature = "link-main")]
+fn ingest_pipeline_sources(
+    local_paths: Vec<PathBuf>,
+    object_store_uris: &[String],
+    db_reads: &[DbReadSpec],
+    schema: &rust_data_processing::types::Schema,
+    opts: &rust_data_processing::ingestion::IngestionOptions,
+) -> Result<
+    (
+        rust_data_processing::types::DataSet,
+        rust_data_processing::ingestion::OrderedBatchIngestMetadata,
+        Vec<serde_json::Value>,
+        Vec<serde_json::Value>,
+    ),
+    PipelineErr,
+> {
+    use rust_data_processing::ingestion::{
+        apply_watermark_after_ingest, ingest_from_object_store_uri, ingest_from_ordered_paths,
+    };
+    use rust_data_processing::types::{DataSet, Value};
+
+    let mut all_rows: Vec<Vec<Value>> = Vec::new();
+    let mut batch_meta = rust_data_processing::ingestion::OrderedBatchIngestMetadata {
+        paths: Vec::new(),
+        last_path: None,
+        max_watermark_value: None,
+    };
+    let mut object_store_source_results = Vec::new();
+
+    if !local_paths.is_empty() {
+        let (ds, meta) = ingest_from_ordered_paths(&local_paths, schema, opts).map_err(|e| {
+            PipelineErr::structured("INGEST_FAILED", format!("ingest_from_ordered_paths: {e}"), "ingest")
+        })?;
+        all_rows.extend(ds.rows);
+        batch_meta = meta;
+    }
+
+    for uri in object_store_uris {
+        match ingest_from_object_store_uri(uri, schema, opts) {
+            Ok(ds) => {
+                object_store_source_results.push(serde_json::json!({
+                    "uri": uri,
+                    "scheme": object_store_scheme(uri),
+                    "status": "ok",
+                    "row_count": ds.row_count(),
+                }));
+                all_rows.extend(ds.rows);
+            }
+            Err(e) => {
+                return Err(PipelineErr::structured(
+                    "OBJECT_STORE_SOURCE_FAILED",
+                    format!("ingest `{uri}`: {e}"),
+                    "ingest",
+                ));
+            }
+        }
+    }
+
+    let (db_source_results, db_rows) = ingest_db_reads(db_reads, schema, opts)?;
+    all_rows.extend(db_rows);
+
+    if all_rows.is_empty() {
+        return Err(PipelineErr::structured(
+            "ORCHESTRATION_VALIDATION",
+            "no rows ingested: provide sources.paths, sources.object_store_uris, and/or sources.db_reads",
+            "ingest",
+        ));
+    }
+
+    let mut ingested = DataSet::new(schema.clone(), all_rows);
+    ingested = apply_watermark_after_ingest(ingested, schema, opts).map_err(|e| {
+        PipelineErr::structured("INGEST_FAILED", format!("watermark: {e}"), "ingest")
+    })?;
+
+    if let Some(col) = &opts.watermark_column {
+        batch_meta.max_watermark_value =
+            rust_data_processing::ingestion::max_value_in_column(&ingested, schema, col);
+    }
+
+    Ok((ingested, batch_meta, object_store_source_results, db_source_results))
 }
 
 #[cfg(feature = "link-main")]
@@ -313,9 +584,7 @@ fn check_deadline(deadline: &Option<std::time::Instant>, stage: &'static str) ->
 
 #[cfg(feature = "link-main")]
 fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineErr> {
-    use rust_data_processing::ingestion::{
-        export_dataset_to_parquet, export_dataset_to_xml, ingest_from_ordered_paths,
-    };
+    use rust_data_processing::ingestion::{export_dataset_to_parquet, export_dataset_to_xml};
     use rust_data_processing::pipeline::DataFrame;
     use rust_data_processing::sql;
 
@@ -363,7 +632,18 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
     }
 
     let deadline = pipeline_deadline(&orchestration);
-
+    let object_store_uris = sources.object_store_uris.clone();
+    for u in &object_store_uris {
+        if !is_object_store_uri(u) {
+            return Err(PipelineErr::structured(
+                "ORCHESTRATION_VALIDATION",
+                format!(
+                    "sources.object_store_uris entry `{u}` must be an object-store URI (s3://, gs://, gcs://, abfs://, abfss://, azure://, or https://)"
+                ),
+                "parse",
+            ));
+        }
+    }
     for p in &sources.paths {
         if let Some(err) = object_store_path_error(p) {
             return Err(PipelineErr::structured(
@@ -374,10 +654,27 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
         }
     }
 
-    if sources.paths.is_empty() {
+    for db in &sources.db_reads {
+        if let Some(err) = db_read_url_error(&db.url) {
+            return Err(PipelineErr::structured(
+                "DB_SOURCE_URL_INVALID",
+                err,
+                "parse",
+            ));
+        }
+        if db.query.trim().is_empty() {
+            return Err(PipelineErr::structured(
+                "ORCHESTRATION_VALIDATION",
+                "sources.db_reads.query must be non-empty",
+                "parse",
+            ));
+        }
+    }
+
+    if sources.paths.is_empty() && object_store_uris.is_empty() && sources.db_reads.is_empty() {
         return Err(PipelineErr::structured(
             "ORCHESTRATION_VALIDATION",
-            "sources.paths must be non-empty",
+            "sources must declare at least one of paths, object_store_uris, or db_reads",
             "parse",
         ));
     }
@@ -403,9 +700,9 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
         PipelineErr::structured("ORCHESTRATION_VALIDATION", e, "parse")
     })?;
 
-    let (ingested_ds, meta) = ingest_from_ordered_paths(&path_bufs, &schema, &opts).map_err(|e| {
-        PipelineErr::structured("INGEST_FAILED", format!("ingest_from_ordered_paths: {e}"), "ingest")
-    })?;
+    let db_reads = sources.db_reads;
+    let (ingested_ds, meta, object_store_source_results, db_source_results) =
+        ingest_pipeline_sources(path_bufs, &object_store_uris, &db_reads, &schema, &opts)?;
 
     check_deadline(&deadline, "ingest")?;
 
@@ -451,7 +748,11 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
             | SinkSpec::Postgresql { sql, .. }
             | SinkSpec::DeltaLake { sql, .. }
             | SinkSpec::Iceberg { sql, .. }
-            | SinkSpec::Jdbc { sql, .. } => sql.clone(),
+            | SinkSpec::Jdbc { sql, .. }
+            | SinkSpec::Snowflake { sql, .. }
+            | SinkSpec::Databricks { sql, .. }
+            | SinkSpec::Spark { sql, .. }
+            | SinkSpec::ObjectStore { sql, .. } => sql.clone(),
         };
         let branch = if let Some(ref s) = sink_sql {
             let t = s.trim();
@@ -563,17 +864,44 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                 table,
                 ..
             } => {
-                drop(branch);
-                sink_results.push(serde_json::json!({
-                    "kind": "delta_lake",
-                    "status": "connector_pending",
-                    "error_code": "DELTA_LAKE_CONNECTOR_PENDING",
-                    "table": table,
-                    "warehouse": warehouse,
-                    "catalog_uri": catalog_uri,
-                    "namespace": namespace,
-                    "detail": "Native Delta Lake write (transaction log + storage) is not linked in this rdp_jvm_sys build; use kind parquet_file to persist Polars output from Rust until the Delta connector is enabled.",
-                }));
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                let wh = warehouse.as_deref().ok_or_else(|| {
+                    PipelineErr::structured(
+                        "ORCHESTRATION_VALIDATION",
+                        "delta_lake sink requires warehouse (s3://, abfss://, or file://)",
+                        "sink",
+                    )
+                })?;
+                let table_uri = rust_data_processing::ingestion::delta_table_uri(
+                    wh,
+                    namespace.as_deref(),
+                    &table,
+                );
+                match rust_data_processing::ingestion::write_dataset_to_delta_table(&table_uri, &ds) {
+                    Ok(row_count) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "delta_lake",
+                            "status": "ok",
+                            "table": table,
+                            "table_uri": table_uri,
+                            "warehouse": warehouse,
+                            "catalog_uri": catalog_uri,
+                            "namespace": namespace,
+                            "row_count": row_count,
+                        }));
+                    }
+                    Err(e) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "delta_lake",
+                            "status": "error",
+                            "error_code": "DELTA_LAKE_SINK_FAILED",
+                            "table_uri": table_uri,
+                            "error": format!("{e:?}"),
+                        }));
+                    }
+                }
             }
             SinkSpec::Iceberg {
                 catalog_uri,
@@ -610,6 +938,184 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                     "detail": detail,
                 }));
             }
+            SinkSpec::Snowflake {
+                account_url,
+                warehouse,
+                database,
+                schema: sf_schema,
+                table,
+                stage_uri,
+                role,
+                ..
+            } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                let stage = stage_uri.as_deref().ok_or_else(|| {
+                    PipelineErr::structured(
+                        "ORCHESTRATION_VALIDATION",
+                        "snowflake sink requires stage_uri (s3://, gs://, abfss://, or file://)",
+                        "sink",
+                    )
+                })?;
+                let stage_parquet = if stage.ends_with('/') {
+                    format!("{stage}load.parquet")
+                } else {
+                    format!("{stage}.parquet")
+                };
+                match rust_data_processing::ingestion::write_dataset_to_snowflake_stage(
+                    &stage_parquet,
+                    &ds,
+                ) {
+                    Ok(row_count) => {
+                        let copy_ok = rust_data_processing::ingestion::copy_into_table_from_stage(
+                            &account_url,
+                            warehouse.as_deref(),
+                            database.as_deref(),
+                            sf_schema.as_deref(),
+                            &table,
+                            &stage_parquet,
+                            role.as_deref(),
+                        );
+                        let (copy_status, copy_detail) = match copy_ok {
+                            Ok(()) => ("ok", None),
+                            Err(e) => (
+                                "skipped",
+                                Some(format!(
+                                    "stage write ok; COPY INTO skipped ({e}). Set SNOWFLAKE_USER/PASSWORD and feature snowflake for automatic COPY."
+                                )),
+                            ),
+                        };
+                        sink_results.push(serde_json::json!({
+                            "kind": "snowflake",
+                            "status": "ok",
+                            "account_url": account_url,
+                            "table": table,
+                            "stage_uri": stage_parquet,
+                            "row_count": row_count,
+                            "copy_status": copy_status,
+                            "copy_detail": copy_detail,
+                        }));
+                    }
+                    Err(e) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "snowflake",
+                            "status": "error",
+                            "error_code": "SNOWFLAKE_SINK_FAILED",
+                            "error": format!("{e:?}"),
+                        }));
+                    }
+                }
+            }
+            SinkSpec::Databricks {
+                workspace_url,
+                catalog_uri,
+                warehouse,
+                namespace,
+                table,
+                ..
+            } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                let wh = warehouse.as_deref().ok_or_else(|| {
+                    PipelineErr::structured(
+                        "ORCHESTRATION_VALIDATION",
+                        "databricks sink requires warehouse (abfss:// or s3://)",
+                        "sink",
+                    )
+                })?;
+                let table_uri = rust_data_processing::ingestion::delta_table_uri(
+                    wh,
+                    namespace.as_deref(),
+                    &table,
+                );
+                match rust_data_processing::ingestion::write_dataset_to_delta_table(&table_uri, &ds) {
+                    Ok(row_count) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "databricks",
+                            "status": "ok",
+                            "workspace_url": workspace_url,
+                            "catalog_uri": catalog_uri,
+                            "table_uri": table_uri,
+                            "row_count": row_count,
+                        }));
+                    }
+                    Err(e) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "databricks",
+                            "status": "error",
+                            "error_code": "DATABRICKS_SINK_FAILED",
+                            "table_uri": table_uri,
+                            "error": format!("{e:?}"),
+                        }));
+                    }
+                }
+            }
+            SinkSpec::Spark {
+                master,
+                app_name,
+                handoff_uri,
+                ..
+            } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                match export_dataset_to_handoff_uri(&handoff_uri, &ds) {
+                    Ok(row_count) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "spark",
+                            "status": "ok",
+                            "master": master,
+                            "app_name": app_name,
+                            "handoff_uri": handoff_uri,
+                            "row_count": row_count,
+                            "detail": "Parquet written by Rust at handoff_uri; Spark driver reads with spark.read.parquet (no JVM connector in rdp_jvm_sys).",
+                        }));
+                    }
+                    Err(e) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "spark",
+                            "status": "error",
+                            "error_code": "SPARK_HANDOFF_FAILED",
+                            "handoff_uri": handoff_uri,
+                            "error": format!("{e:?}"),
+                        }));
+                    }
+                }
+            }
+            SinkSpec::ObjectStore { uri, format, .. } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                let target = if uri.ends_with('/') {
+                    format!("{uri}data.parquet")
+                } else {
+                    uri.clone()
+                };
+                match rust_data_processing::ingestion::export_dataset_to_object_store_uri(&target, &ds)
+                {
+                    Ok(()) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "object_store",
+                            "status": "ok",
+                            "uri": target,
+                            "scheme": object_store_scheme(&target),
+                            "format": format,
+                            "row_count": ds.row_count(),
+                        }));
+                    }
+                    Err(e) => {
+                        sink_results.push(serde_json::json!({
+                            "kind": "object_store",
+                            "status": "error",
+                            "error_code": "OBJECT_STORE_SINK_FAILED",
+                            "uri": target,
+                            "error": e.to_string(),
+                        }));
+                    }
+                }
+            }
         }
     }
 
@@ -632,6 +1138,12 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
         },
         "sink_results": sink_results,
     });
+    if !object_store_source_results.is_empty() {
+        out["object_store_source_results"] = serde_json::Value::Array(object_store_source_results);
+    }
+    if !db_source_results.is_empty() {
+        out["db_source_results"] = serde_json::Value::Array(db_source_results);
+    }
     if let Some(d) = legacy_declared {
         out["declared_staging_schemas"] = d;
     }
@@ -910,7 +1422,11 @@ mod tests {
         let sinks = v["sink_results"].as_array().unwrap();
         assert_eq!(sinks.len(), 3);
         assert_eq!(sinks[0]["kind"].as_str(), Some("delta_lake"));
-        assert_eq!(sinks[0]["error_code"].as_str(), Some("DELTA_LAKE_CONNECTOR_PENDING"));
+        assert!(
+            sinks[0]["status"].as_str() == Some("ok") || sinks[0]["status"].as_str() == Some("error"),
+            "delta_lake: {:?}",
+            sinks[0]
+        );
         assert_eq!(sinks[1]["kind"].as_str(), Some("iceberg"));
         assert_eq!(sinks[1]["error_code"].as_str(), Some("ICEBERG_CONNECTOR_PENDING"));
         assert_eq!(sinks[2]["kind"].as_str(), Some("postgresql"));
@@ -957,7 +1473,88 @@ mod tests {
         assert!(v.get("declared_staging_schemas").is_some());
         let sinks = v["sink_results"].as_array().unwrap();
         assert_eq!(sinks.len(), 3);
-        assert_eq!(sinks[0]["error_code"].as_str(), Some("DELTA_LAKE_CONNECTOR_PENDING"));
+        assert!(
+            sinks[0]["status"].as_str() == Some("ok") || sinks[0]["status"].as_str() == Some("error"),
+            "delta_lake: {:?}",
+            sinks[0]
+        );
+    }
+
+    /// Same pipeline as `docs/java/examples/PlatformConnectorsPipelineExample.java`.
+    #[test]
+    fn run_pipeline_platform_connectors_committed_fixture() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
+        let bundle = PipelineBundle::from_repo_fixture("cloud_connectors");
+        let root = bundle.root();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let stage = std::env::temp_dir().join(format!("rdp_connectors_stage_{stamp}"));
+        let delta_wh = std::env::temp_dir().join(format!("rdp_connectors_delta_{stamp}"));
+        std::fs::create_dir_all(&stage).unwrap();
+        std::fs::create_dir_all(&delta_wh).unwrap();
+
+        let file_base = root.to_string_lossy().into_owned();
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/platform_connectors.pipeline.json",
+                &HashMap::from([
+                    ("FILE_BASE".into(), file_base),
+                    ("STAGE_BASE".into(), stage.to_string_lossy().into_owned()),
+                    ("DELTA_WH".into(), delta_wh.to_string_lossy().into_owned()),
+                ]),
+            )
+            .unwrap();
+
+        let v = run_pipeline_impl(&payload).unwrap();
+        assert_eq!(v["ingested_row_count"].as_i64(), Some(6));
+        let os = v["object_store_source_results"].as_array().unwrap();
+        assert_eq!(os.len(), 3);
+        assert_eq!(os[0]["status"].as_str(), Some("ok"));
+        let sinks = v["sink_results"].as_array().unwrap();
+        assert_eq!(sinks.len(), 6);
+        assert_eq!(sinks[0]["kind"].as_str(), Some("snowflake"));
+        assert_eq!(sinks[0]["status"].as_str(), Some("ok"));
+        assert_eq!(sinks[2]["kind"].as_str(), Some("spark"));
+        assert_eq!(sinks[2]["status"].as_str(), Some("ok"));
+        let _ = std::fs::remove_dir_all(&stage);
+        let _ = std::fs::remove_dir_all(&delta_wh);
+    }
+
+    /// Same pipeline as `docs/java/examples/ObjectStoreUrlsExample.java`.
+    #[test]
+    fn run_pipeline_object_store_sources_with_local_parquet_sink() {
+        use rust_data_processing::pipeline_spec::PipelineBundle;
+        use std::collections::HashMap;
+
+        let bundle = PipelineBundle::from_repo_fixture("cloud_connectors");
+        let root = bundle.root();
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("rdp_object_store_src_test_{stamp}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sink = dir.join("out.parquet");
+
+        let payload = bundle
+            .resolve_pipeline_json(
+                "pipelines/object_store_sources_only.pipeline.json",
+                &HashMap::from([
+                    ("FILE_BASE".into(), root.to_string_lossy().into_owned()),
+                    ("SINK_PATH".into(), sink.to_string_lossy().into_owned()),
+                ]),
+            )
+            .unwrap();
+
+        let v = run_pipeline_impl(&payload).unwrap();
+        assert_eq!(v["ingested_row_count"].as_i64(), Some(6));
+        assert_eq!(v["object_store_source_results"].as_array().unwrap().len(), 3);
+        assert!(sink.exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Same pipeline as `docs/java/examples/ParquetSnippets.java` (`people/pipelines/csv_to_parquet.pipeline.json`).
@@ -1199,5 +1796,68 @@ mod tests {
             }
         ));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn run_pipeline_rejects_jdbc_url_in_db_reads() {
+        let payload = serde_json::json!({
+            "pipeline_spec_version": 1,
+            "sources": {
+                "paths": [],
+                "db_reads": [{
+                    "url": "jdbc:oracle:thin:@//db01.example.com:1521/ORCLPDB1",
+                    "query": "SELECT 1 FROM dual"
+                }],
+                "schema": {
+                    "fields": [
+                        {"name": "id", "data_type": "Int64"}
+                    ]
+                },
+                "options": {}
+            },
+            "sinks": [
+                {"kind": "parquet_file", "path": "/tmp/out.parquet"}
+            ]
+        });
+        let err = run_pipeline_impl(&payload.to_string()).unwrap_err();
+        assert!(matches!(
+            err,
+            PipelineErr::Structured {
+                code: "DB_SOURCE_URL_INVALID",
+                ..
+            }
+        ));
+    }
+
+    #[cfg(not(feature = "db_connectorx"))]
+    #[test]
+    fn run_pipeline_db_reads_requires_db_connectorx_feature() {
+        let payload = serde_json::json!({
+            "pipeline_spec_version": 1,
+            "sources": {
+                "paths": [],
+                "db_reads": [{
+                    "url": "oracle://etl_user:pass@db01.example.com:1521/ORCLPDB1",
+                    "query": "SELECT 1 FROM dual"
+                }],
+                "schema": {
+                    "fields": [
+                        {"name": "id", "data_type": "Int64"}
+                    ]
+                },
+                "options": {}
+            },
+            "sinks": [
+                {"kind": "parquet_file", "path": "/tmp/out.parquet"}
+            ]
+        });
+        let err = run_pipeline_impl(&payload.to_string()).unwrap_err();
+        assert!(matches!(
+            err,
+            PipelineErr::Structured {
+                code: "DB_CONNECTORX_NOT_BUILT",
+                ..
+            }
+        ));
     }
 }

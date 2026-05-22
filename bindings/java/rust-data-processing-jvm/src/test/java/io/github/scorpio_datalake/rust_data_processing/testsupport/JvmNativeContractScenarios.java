@@ -22,13 +22,17 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.Assumptions;
 
 /**
- * Shared native-call scenarios for {@code FfiExportedSymbolsContractTest} (manifest-driven symbol
- * checks) and {@code
- * io.github.scorpio_datalake.rust_data_processing.docexamples.DocsExampleNativeIntegrationTest}
- * (doc-aligned integration tests).
+ * Shared native-call scenarios for JVM FFI tests.
  *
- * <p>Pipeline specs and schemas load from {@code tests/fixtures/<bundle>/} (see {@code
- * PipelineFixtureSupport}).
+ * <p><strong>Why this class exists.</strong> Doc examples under {@code docs/java/examples/} are not on
+ * the test classpath. This class is the <em>executable contract</em> those examples describe: same
+ * fixtures, same {@link RdpNativeJson} downcalls, concrete assertions. {@code
+ * DocsExampleNativeIntegrationTest} stays thin so each failure names one doc file; {@code
+ * FfiExportedSymbolsContractTest} reuses subsets for manifest-wide smoke.
+ *
+ * <p><strong>What it tests.</strong> End-to-end behavior (row counts, {@code interchange.kind}, file
+ * sinks on disk), not Java business logic — Java must not parse CSV/Excel itself. Pipeline specs and
+ * schemas load from {@code tests/fixtures/<bundle>/} (see {@code PipelineFixtureSupport}).
  */
 public final class JvmNativeContractScenarios {
 
@@ -664,6 +668,146 @@ public final class JvmNativeContractScenarios {
     Path parquetPath = Path.of(interchange.getString("path"));
     assertTrue(Files.exists(parquetPath), "parquet file missing: " + parquetPath);
     Files.deleteIfExists(parquetPath);
+  }
+
+  /** Shared Phase 2 export/privacy/truncate/jsonl parity ({@code rdp_parity_export_privacy_reports}). */
+  private static JSONObject invokeExportPrivacyReportsPhase2(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    JSONObject root =
+        RdpNativeJson.invokeParityExport(linker, lookup, arena, "rdp_parity_export_privacy_reports");
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    JSONObject interchange = root.getJSONObject("interchange");
+    assertEquals("export_privacy_reports_phase2", interchange.getString("kind"));
+    return interchange;
+  }
+
+  /**
+   * Doc: {@code ExportJsonlTrainTest.java} (Phase 2 §1). Proves {@code dataset_to_jsonl} and {@code
+   * train_test_row_indices} results cross FFI as {@code jsonl_preview_lines} and 80/20 index lengths.
+   */
+  public static void runPhase2ExportJsonlTrainTestContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    JSONObject interchange = invokeExportPrivacyReportsPhase2(linker, lookup, arena);
+    JSONArray jsonlLines = interchange.getJSONArray("jsonl_preview_lines");
+    assertTrue(jsonlLines.length() >= 1, "jsonl_preview_lines");
+    assertTrue(jsonlLines.getString(0).contains("email"), "JSONL line should include email column");
+    JSONObject trainTest = interchange.getJSONObject("train_test_indices_demo");
+    assertEquals(80, trainTest.getInt("train_len"));
+    assertEquals(20, trainTest.getInt("test_len"));
+  }
+
+  /**
+   * Doc: {@code PrivacyDiffReports.java} (§3). Proves {@code privacy_report_json} is a non-empty UTF-8
+   * column diff array ({@code column} on first row) after Rust applies an internal mask.
+   */
+  public static void runPhase2PrivacyDiffReportsContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    JSONObject interchange = invokeExportPrivacyReportsPhase2(linker, lookup, arena);
+    Object report = interchange.get("privacy_report_json");
+    assertTrue(report != JSONObject.NULL && report != null, "privacy_report_json");
+    if (report instanceof JSONArray arr) {
+      assertTrue(arr.length() >= 1, "privacy report rows");
+      assertTrue(arr.getJSONObject(0).has("column"), "Utf8ColumnChangeSummary");
+    }
+  }
+
+  /**
+   * Doc: {@code ReportsTruncateUtf8.java} (§4). Proves {@code reports_truncated_sample} respects the
+   * 120-byte cap used in Rust parity (log/LLM-safe snippet).
+   */
+  public static void runPhase2ReportsTruncateUtf8Contract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    JSONObject interchange = invokeExportPrivacyReportsPhase2(linker, lookup, arena);
+    String truncated = interchange.getString("reports_truncated_sample");
+    assertFalse(truncated.isEmpty());
+    assertTrue(
+        truncated.length() <= 120,
+        "truncate_utf8_by_bytes(max_bytes=120) sample length");
+  }
+
+  /**
+   * Doc: {@code TransformUtf8Masking.java} (§5). Proves {@code rdp_parity_transform} returns {@code
+   * transform_spec_polars} with a two-row {@code dataset} until Utf8Sha256Hex parity is added.
+   */
+  public static void runPhase2TransformUtf8MaskingContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    JSONObject root =
+        RdpNativeJson.invokeParityExport(linker, lookup, arena, "rdp_parity_transform");
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    JSONObject interchange = root.getJSONObject("interchange");
+    assertEquals("transform_spec_polars", interchange.getString("kind"));
+    assertEquals(
+        2, interchange.getJSONObject("dataset").getJSONArray("rows").length());
+  }
+
+  /**
+   * Doc: {@code ValidationUtf8Length.java} (§6). Proves validation {@code summary} reports failures
+   * over FFI (parity uses {@code not_null}; documents gap vs Python {@code utf8_len_chars_between}).
+   */
+  public static void runPhase2ValidationUtf8LengthContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    JSONObject root =
+        RdpNativeJson.invokeParityExport(linker, lookup, arena, "rdp_parity_validation");
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    JSONObject summary = root.getJSONObject("interchange").getJSONObject("summary");
+    assertTrue(summary.getInt("total_checks") >= 1);
+    assertTrue(summary.getInt("failed_checks") >= 1);
+  }
+
+  /**
+   * Doc: {@code IngestValidateJsonlEndToEnd.java} (§9). Proves real {@code people.csv} ingest (2 rows),
+   * then validation + JSONL preview parity exports — the production-shaped multi-call tour.
+   */
+  public static void runPhase2IngestValidateJsonlEndToEndContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    Path fixtures =
+        RdpJvmSysTestSupport.resolveTestsFixturesDir()
+            .orElseThrow(() -> new IllegalStateException("tests/fixtures not found"));
+    Path csvPath = fixtures.resolve("people.csv");
+    Assumptions.assumeTrue(
+        Files.isRegularFile(csvPath), "Skip when tests/fixtures/people.csv missing");
+    Path bundle = requireBundle("people");
+
+    String csvPayload =
+        PipelineFixtureSupport.resolvePayloadJson(
+            bundle,
+            "payloads/csv_path_dataset.payload.json",
+            Map.of("SOURCE_PATH", csvPath.toAbsolutePath().normalize().toString()));
+    JSONObject ingestRoot =
+        RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, arena, csvPayload);
+    PytestMirrorAssertions.assertEnvelopeOk(ingestRoot);
+    assertEquals(
+        2,
+        ingestRoot
+            .getJSONObject("interchange")
+            .getJSONObject("dataset")
+            .getJSONArray("rows")
+            .length());
+
+    runPhase2ValidationUtf8LengthContract(linker, lookup, arena);
+
+    JSONObject exportInterchange = invokeExportPrivacyReportsPhase2(linker, lookup, arena);
+    assertTrue(exportInterchange.getJSONArray("jsonl_preview_lines").length() >= 1);
+  }
+
+  /**
+   * Doc: {@code DeltaLakeHandoff.java} (§8). No lake connector in CI — asserts repo contains handoff
+   * docs ({@code docs/LAKE_TABLE_READ.md}) and Parquet ingest fixtures so the example is actionable.
+   */
+  public static void runPhase2DeltaLakeHandoffPrerequisitesContract() throws Exception {
+    Path fixtures =
+        RdpJvmSysTestSupport.resolveTestsFixturesDir()
+            .orElseThrow(() -> new IllegalStateException("tests/fixtures not found"));
+    Path repoRoot = fixtures.getParent().getParent();
+    assertTrue(Files.isRegularFile(fixtures.resolve("people.csv")));
+    Path bundle = requireBundle("people");
+    assertTrue(
+        Files.isRegularFile(bundle.resolve("pipelines/csv_to_parquet.pipeline.json")));
+    assertTrue(
+        Files.isRegularFile(bundle.resolve("schemas/people_flat.schema.json")));
+    assertTrue(
+        Files.isRegularFile(repoRoot.resolve("docs/LAKE_TABLE_READ.md")),
+        "docs/LAKE_TABLE_READ.md for lake → Parquet → rdp_ingest_parquet_path handoff");
   }
 
   private static void deleteTree(Path root) throws Exception {

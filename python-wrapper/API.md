@@ -48,6 +48,8 @@ Bindings for the [`rust-data-processing`](../README.md) crate. Types stay in **c
 | `ingest_with_inferred_schema(path, options=None)` | `(DataSet, schema list)` — convenience; same two-step behavior as Rust. |
 | `ingest_from_db(conn, query, schema)` | `DataSet` — SQL → Arrow → dataset (requires extension built with **`db`** Cargo feature; see [README_DEV](README_DEV.md)) |
 | `ingest_from_db_infer(conn, query)` | `DataSet` — inferred schema (same feature gate) |
+| `ingest_from_object_store_uri(uri, schema, options=None)` | `DataSet` — read `s3://` / `gs://` / `abfss://` / `file://` (feature **`cloud`**; see [CONNECTORS.md](../docs/CONNECTORS.md)) |
+| `export_dataset_to_object_store_uri(uri, ds)` | `None` — write Parquet to cloud URI (feature **`cloud`**) |
 
 **Database data without the `db` feature:** You only need **`--features db`** if you want **`ingest_from_db` / `ingest_from_db_infer`** (ConnectorX inside the native extension). If you already use **psycopg2**, **SQLAlchemy**, **asyncpg**, or any other Python DB API, run your query in Python, convert rows to `list[list]` aligned to a [schema](#conventions), and use **`DataSet(schema, rows)`**. Profiling, validation, SQL-on-`DataSet`, and pipelines work the same; you are not required to enable `db`.
 
