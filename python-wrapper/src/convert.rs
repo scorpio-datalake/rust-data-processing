@@ -392,15 +392,21 @@ pub(crate) fn validation_spec_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Valida
                     .extract()?;
                 let min_chars: u32 = c
                     .get_item("min_chars")?
-                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'min_chars'"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("utf8_len_chars_between needs 'min_chars'")
+                    })?
                     .extract()?;
                 let max_chars: u32 = c
                     .get_item("max_chars")?
-                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'max_chars'"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("utf8_len_chars_between needs 'max_chars'")
+                    })?
                     .extract()?;
                 let sev: String = c
                     .get_item("severity")?
-                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'severity'"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("utf8_len_chars_between needs 'severity'")
+                    })?
                     .extract()?;
                 Check::Utf8LenCharsBetween {
                     column,

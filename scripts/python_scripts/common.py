@@ -263,6 +263,76 @@ def _ensure_native_linker_linux() -> None:
         raise SystemExit("error: `cc` still not on PATH after installing build-essential.")
 
 
+def _libclang_shared_library() -> Path | None:
+    """Return a usable libclang.so if already on the system."""
+    env_path = os.environ.get("LIBCLANG_PATH", "").strip()
+    if env_path:
+        path = Path(env_path)
+        if path.is_file():
+            return path
+
+    search_roots = [
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/lib64"),
+        Path("/usr/lib"),
+    ]
+    for root in search_roots:
+        if not root.is_dir():
+            continue
+        matches = sorted(root.glob("libclang.so*"))
+        for candidate in matches:
+            if candidate.is_file() and not candidate.name.endswith(".a"):
+                return candidate
+
+    for llvm_lib in sorted(Path("/usr/lib").glob("llvm-*/lib"), reverse=True):
+        matches = sorted(llvm_lib.glob("libclang.so*"))
+        for candidate in matches:
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def ensure_libclang_linux() -> None:
+    """``libgssapi-sys`` / ConnectorX bindgen needs libclang (JVM ``--features full``)."""
+    if platform.system() != "Linux":
+        return
+    if _libclang_shared_library() is not None:
+        return
+    if os.environ.get("BUILD_ALL_NO_AUTO_LIBCLANG"):
+        raise SystemExit(
+            "error: libclang not found (required for rdp_jvm_sys full / ConnectorX builds). "
+            "Install libclang-dev (Debian/Ubuntu) or set LIBCLANG_PATH, or unset "
+            "BUILD_ALL_NO_AUTO_LIBCLANG to allow apt install.",
+        )
+    if not _is_debian_like_linux():
+        raise SystemExit(
+            "error: libclang not found. Install clang/libclang for your OS "
+            "(e.g. libclang-dev on Debian/Ubuntu), then re-run.",
+        )
+    banner("Linux: installing libclang-dev (bindgen for native JVM/Python deps)")
+    subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "DEBIAN_FRONTEND=noninteractive",
+            "apt-get",
+            "install",
+            "-y",
+            "libclang-dev",
+            "libkrb5-dev",
+            "pkg-config",
+        ],
+        check=True,
+    )
+    found = _libclang_shared_library()
+    if found is None:
+        raise SystemExit(
+            "error: libclang still not found after installing libclang-dev. "
+            "Set LIBCLANG_PATH to your libclang.so and re-run.",
+        )
+    print(f"  using libclang: {found}", flush=True)
+
+
 def _prefetch_cargo_for_offline_workflow() -> None:
     """Ensure the local crate cache can satisfy --offline; fetch from the network once if needed."""
     if os.environ.get("BUILD_ALL_NO_CARGO_PREFETCH"):
@@ -281,6 +351,129 @@ def _prefetch_cargo_for_offline_workflow() -> None:
     env.pop("CARGO_NET_OFFLINE", None)
     env.pop("RUSTUP_OFFLINE", None)
     subprocess.run(["cargo", "fetch", "--locked"], cwd=REPO_ROOT, env=env, check=True)
+
+
+def disk_clean_enabled() -> bool:
+    """When false (``BUILD_ALL_NO_DISK_CLEAN=1``), skip pre-phase disk cleanup."""
+    return os.environ.get("BUILD_ALL_NO_DISK_CLEAN", "").lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def report_disk_usage(title: str, paths: list[Path]) -> None:
+    banner(f"Disk: {title}")
+    run(["df", "-h", "."])
+    existing = [p for p in paths if p.exists()]
+    if not existing:
+        print("  (nothing on disk yet for listed paths)", flush=True)
+        return
+    print(f"+ du -sh {' '.join(str(p) for p in existing)}", flush=True)
+    subprocess.run(["du", "-sh", *[str(p) for p in existing]], check=False)
+
+
+def _remove_path(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        display = path.relative_to(REPO_ROOT)
+    except ValueError:
+        display = path
+    print(f"  removing {display}", flush=True)
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def cleanup_disk_for_python() -> None:
+    """Free space before Python wrapper build (runs at start of ``python_build.py``)."""
+    if not disk_clean_enabled():
+        return
+    paths = [
+        REPO_ROOT / "target",
+        PYTHON_WRAPPER / "target",
+        Path.home() / ".cargo" / "registry",
+        Path.home() / ".cargo" / "git",
+        Path.home() / ".cache" / "uv",
+    ]
+    report_disk_usage("before Python cleanup", paths)
+    banner("Disk: Python phase cleanup")
+    for path in paths:
+        _remove_path(path)
+    gc.collect()
+
+
+def cleanup_disk_for_jvm() -> None:
+    """Free space before JVM build (runs at start of ``java_build.py``)."""
+    if not disk_clean_enabled():
+        return
+    paths = [
+        JVM_SYS_DIR / "target",
+        JVM_MAVEN_MAIN / "target",
+        JVM_MAVEN_EXAMPLES / "target",
+        JVM_MAVEN_SPARK / "target",
+        JVM_GRADLE_DIR / "build",
+        JVM_GRADLE_DIR / ".gradle",
+    ]
+    if os.environ.get("BUILD_ALL_JVM_CLEAN_M2", "").lower() in ("1", "true", "yes"):
+        paths.append(Path.home() / ".m2" / "repository")
+    report_disk_usage("before JVM cleanup", paths)
+    banner("Disk: JVM phase cleanup")
+    for path in paths:
+        _remove_path(path)
+    gc.collect()
+
+
+def python_wrapper_cargo_env() -> dict[str, str]:
+    """Environment for maturin/cargo under ``python-wrapper/``.
+
+    Default: ``CARGO_TARGET_DIR`` at repo root so build_all reuses Rust compile artifacts.
+    Set ``BUILD_ALL_PYTHON_SEPARATE_TARGET=1`` to use ``python-wrapper/target/`` only.
+    """
+    if os.environ.get("BUILD_ALL_PYTHON_SEPARATE_TARGET", "").lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return {}
+    return {"CARGO_TARGET_DIR": str(REPO_ROOT / "target")}
+
+
+def python_venv_executable(name: str) -> Path:
+    """Binary from ``python-wrapper/.venv`` (dev group sync; no local wheel needed)."""
+    if platform.system() == "Windows":
+        path = PYTHON_WRAPPER / ".venv" / "Scripts" / f"{name}.exe"
+    else:
+        path = PYTHON_WRAPPER / ".venv" / "bin" / name
+    if not path.is_file():
+        raise SystemExit(
+            f"Missing {path}. Run: cd python-wrapper && "
+            "uv sync --group dev --no-install-project",
+        )
+    return path
+
+
+def python_maturin_use_release() -> bool:
+    """Release extension build (CI / wheel parity). Default debug for local build_all disk use."""
+    return os.environ.get("BUILD_ALL_PYTHON_RELEASE", "").lower() in ("1", "true", "yes")
+
+
+def cargo_jobs_args() -> list[str]:
+    """`-j` for cargo on Linux during build_all (limits concurrent Polars test links).
+
+    Override with ``BUILD_ALL_CARGO_JOBS`` or ``CARGO_BUILD_JOBS``. Set ``BUILD_ALL_CARGO_JOBS=0``
+    to omit ``-j`` and use Cargo's default parallelism.
+    """
+    raw = os.environ.get("BUILD_ALL_CARGO_JOBS", os.environ.get("CARGO_BUILD_JOBS"))
+    if raw is not None:
+        if raw == "0":
+            return []
+        return ["-j", str(raw)]
+    if platform.system() == "Linux":
+        return ["-j", "2"]
+    return []
 
 
 def setup_rust_toolchain_env(*, offline: bool = False) -> None:

@@ -14,18 +14,18 @@ import org.junit.jupiter.api.Test;
 /**
  * Integration tests that keep {@code docs/java/examples/*.java} honest in CI.
  *
- * <p><strong>Why these tests exist.</strong> Documentation examples are copy-paste sources; they are
- * not compiled into the JAR. Without JUnit, a Rust FFI or fixture change could break every {@code main}
- * on the docs site while unit tests still pass. Each method here names the doc file it guards (see
- * {@code JvmNativeContractScenarios} for assertions).
+ * <p><strong>Why these tests exist.</strong> Documentation examples are copy-paste sources; they
+ * are not compiled into the JAR. Without JUnit, a Rust FFI or fixture change could break every
+ * {@code main} on the docs site while unit tests still pass. Each method here names the doc file it
+ * guards (see {@code JvmNativeContractScenarios} for assertions).
  *
- * <p><strong>What they prove.</strong> Given {@code RDP_JVM_SYS}, Panama can load symbols, Rust returns
- * {@code ok: true}, and interchange fields match committed fixtures (row counts, kinds, temp Parquet
- * paths). They do <em>not</em> re-test every symbol — see {@code FfiExportedSymbolsContractTest} for
- * manifest-wide smoke.
+ * <p><strong>What they prove.</strong> Given {@code RDP_JVM_SYS}, Panama can load symbols, Rust
+ * returns {@code ok: true}, and interchange fields match committed fixtures (row counts, kinds,
+ * temp Parquet paths). They do <em>not</em> re-test every symbol — see {@code
+ * FfiExportedSymbolsContractTest} for manifest-wide smoke.
  *
- * <p><strong>RDP vs “plain Java”</strong> — tests never parse CSV/JSON/Excel in Java. Java builds UTF-8
- * JSON payloads; ingestion, Polars SQL, and Excel run in {@code rdp_jvm_sys}.
+ * <p><strong>RDP vs “plain Java”</strong> — tests never parse CSV/JSON/Excel in Java. Java builds
+ * UTF-8 JSON payloads; ingestion, Polars SQL, and Excel run in {@code rdp_jvm_sys}.
  */
 final class DocsExampleNativeIntegrationTest {
 
@@ -263,8 +263,8 @@ final class DocsExampleNativeIntegrationTest {
   }
 
   /**
-   * Guards {@code PrivacyDiffReports.java}: {@code privacy_report_json} shape after UTF-8 column diff
-   * (Phase 2 §3).
+   * Guards {@code PrivacyDiffReports.java}: {@code privacy_report_json} shape after UTF-8 column
+   * diff (Phase 2 §3).
    */
   @Test
   void privacyDiffReportsMatchesDocsExample() throws Throwable {
@@ -280,7 +280,8 @@ final class DocsExampleNativeIntegrationTest {
   }
 
   /**
-   * Guards {@code ReportsTruncateUtf8.java}: {@code reports_truncated_sample} byte cap (Phase 2 §4).
+   * Guards {@code ReportsTruncateUtf8.java}: {@code reports_truncated_sample} byte cap (Phase 2
+   * §4).
    */
   @Test
   void reportsTruncateUtf8MatchesDocsExample() throws Throwable {
@@ -296,8 +297,8 @@ final class DocsExampleNativeIntegrationTest {
   }
 
   /**
-   * Guards {@code TransformUtf8Masking.java}: {@code rdp_parity_transform} dataset interchange (Phase 2
-   * §5; Utf8 masking still Python-first).
+   * Guards {@code TransformUtf8Masking.java}: {@code rdp_parity_transform} dataset interchange
+   * (Phase 2 §5; Utf8 masking still Python-first).
    */
   @Test
   void transformUtf8MaskingMatchesDocsExample() throws Throwable {
@@ -312,9 +313,7 @@ final class DocsExampleNativeIntegrationTest {
     }
   }
 
-  /**
-   * Guards {@code ValidationUtf8Length.java}: validation summary over FFI (Phase 2 §6).
-   */
+  /** Guards {@code ValidationUtf8Length.java}: validation summary over FFI (Phase 2 §6). */
   @Test
   void validationUtf8LengthMatchesDocsExample() throws Throwable {
     Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
@@ -347,8 +346,8 @@ final class DocsExampleNativeIntegrationTest {
   }
 
   /**
-   * Guards {@code DeltaLakeHandoff.java}: no live lake in CI — verifies handoff docs and Parquet ingest
-   * fixtures exist (Phase 2 §8).
+   * Guards {@code DeltaLakeHandoff.java}: no live lake in CI — verifies handoff docs and Parquet
+   * ingest fixtures exist (Phase 2 §8).
    */
   @Test
   void deltaLakeHandoffPrerequisitesMatchDocsExample() throws Exception {
@@ -356,5 +355,115 @@ final class DocsExampleNativeIntegrationTest {
         RdpJvmSysTestSupport.resolveTestsFixturesDir().isPresent(),
         "tests/fixtures not discoverable — run from repository checkout");
     JvmNativeContractScenarios.runPhase2DeltaLakeHandoffPrerequisitesContract();
+  }
+
+  @Test
+  void quickStartIngestPeopleCsvMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runQuickStartIngestPeopleCsvContract);
+  }
+
+  @Test
+  void partitionDiscoveryMirrorMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runPartitionDiscoveryMirrorContract);
+  }
+
+  @Test
+  void ingestObservabilityMirrorMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runIngestObservabilityMirrorContract);
+  }
+
+  @Test
+  void profilingParityMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runProfilingParityContract);
+  }
+
+  @Test
+  void outlierDetectionParityMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runOutlierDetectionParityContract);
+  }
+
+  @Test
+  void cdcBoundaryParityMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runCdcBoundaryParityContract);
+  }
+
+  @Test
+  void processingReduceParityMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runProcessingReduceParityContract);
+  }
+
+  @Test
+  void groupByAggregatesSqlSuiteMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runGroupByAggregatesSqlSuiteContract);
+  }
+
+  @Test
+  void sqlJoinPipelineParityMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runSqlJoinPipelineParityContract);
+  }
+
+  @Test
+  void cookbookMappingSpecMirrorMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runCookbookMappingSpecMirrorContract);
+  }
+
+  @Test
+  void warehouseExportHandoffMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runWarehouseExportHandoffContract);
+  }
+
+  @Test
+  void inferredSchemaExcelIngestMatchesDocsExample() throws Throwable {
+    Optional<Path> peopleXlsx = RdpJvmSysTestSupport.resolveFixtureFile(PEOPLE_XLSX_FIXTURE);
+    Assumptions.assumeTrue(
+        peopleXlsx.isPresent(),
+        "Missing tests/fixtures/"
+            + PEOPLE_XLSX_FIXTURE
+            + " — from repo root: python scripts/write_people_xlsx_stdlib.py");
+    runWithNative(JvmNativeContractScenarios::runInferredSchemaExcelIngestContract);
+  }
+
+  @Test
+  void objectStoreUrlsFilePipelineMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runObjectStoreUrlsFilePipelineContract);
+  }
+
+  @Test
+  void platformConnectorsFilePipelineMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runPlatformConnectorsFilePipelineContract);
+  }
+
+  /** {@code DbReadPipelineExample} — template resolution only (no warehouse connection). */
+  @Test
+  void dbReadPipelineTemplateMatchesDocsExample() throws Exception {
+    Assumptions.assumeTrue(
+        RdpJvmSysTestSupport.resolveTestsFixturesDir().isPresent(),
+        "tests/fixtures not discoverable — run from repository checkout");
+    JvmNativeContractScenarios.runDbReadPipelineTemplateContract();
+  }
+
+  /** {@code SftpFtpConnectorsExample} — pipeline JSON only (no loopback FTP in JVM CI). */
+  @Test
+  void sftpFtpPipelineTemplateMatchesDocsExample() throws Exception {
+    Assumptions.assumeTrue(
+        RdpJvmSysTestSupport.resolveTestsFixturesDir().isPresent(),
+        "tests/fixtures not discoverable — run from repository checkout");
+    JvmNativeContractScenarios.runSftpFtpPipelineTemplateContract();
+  }
+
+  @FunctionalInterface
+  private interface NativeScenario {
+    void run(Linker linker, SymbolLookup lookup, Arena arena) throws Throwable;
+  }
+
+  private static void runWithNative(NativeScenario scenario) throws Throwable {
+    Optional<Path> lib = RdpJvmSysTestSupport.resolveNativeLibraryPath();
+    Assumptions.assumeTrue(lib.isPresent(), RdpJvmSysTestSupport.missingNativeLibraryMessage());
+    Linker linker = Linker.nativeLinker();
+    try (Arena arena = Arena.ofConfined()) {
+      SymbolLookup lookup = SymbolLookup.libraryLookup(lib.get(), arena);
+      RdpNativeJson.invokeAbiVersion(linker, lookup);
+      scenario.run(linker, lookup, arena);
+    }
   }
 }

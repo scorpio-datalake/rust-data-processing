@@ -52,6 +52,10 @@ connectorx = { version = "0.4.5", default-features = false, features = ["dst_arr
 object_store = { version = "0.13.1", optional = true, default-features = false, features = ["aws", "gcp", "azure", "fs"] }
 tokio = { version = "1", optional = true, features = ["rt"] }
 url = { version = "2", optional = true }
+libssh2-sys = { version = "0.3.1", features = ["vendored-openssl"], optional = true }
+ssh2 = { version = "0.9.4", optional = true }
+suppaftp = { version = "6.0.3", default-features = false, features = ["rustls"], optional = true }
+webpki-roots = { version = "0.26", optional = true }
 
 [features]
 # Keep the default dependency surface small; enable connectors explicitly.
@@ -75,7 +79,14 @@ db_connectorx = [
 object_store = ["dep:object_store", "dep:tokio", "dep:url"]
 delta_lake = ["object_store"]
 snowflake = ["object_store"]
-cloud_connectors = ["object_store", "delta_lake", "snowflake"]
+file_transfer = [
+  "dep:libssh2-sys",
+  "dep:ssh2",
+  "dep:suppaftp",
+  "dep:url",
+  "dep:webpki-roots",
+]
+cloud_connectors = ["object_store", "delta_lake", "snowflake", "file_transfer"]
 # Same feature set as `rust_ci.yml` “expanded” job: deep tests + Arrow/serde_arrow + Excel writer,
 # but **not** `db_connectorx` (ConnectorX → OpenSSL; needs Perl or system SSL on Windows).
 ci_expanded = ["deep_tests", "excel_test_writer", "arrow", "serde_arrow"]
@@ -107,18 +118,27 @@ harness = false
 name = "outliers"
 harness = false
 
+[[test]]
+name = "file_transfer_ftp_integration"
+required-features = ["cloud_connectors"]
+
+[[example]]
+name = "file_transfer_ingest"
+required-features = ["cloud_connectors"]
+
 [[bin]]
 name = "generate_people_xlsx_fixture"
 path = "src/bin/generate_people_xlsx_fixture.rs"
 required-features = ["excel_test_writer"]
 
-# Reduce Windows/MSVC linker memory use for `cargo test`.
-# (Integration tests can otherwise hit LNK1102 when linking large dependency graphs like Polars.)
+# Reduce linker memory for integration tests (Polars + Arrow graphs).
 [profile.test]
 debug = 0
+strip = "debuginfo"
 
 # Dependencies still use the `dev` profile; full debug (`debug = 2`) makes `.rlib`s enormous and
-# routinely exhausts `rust-lld` during `--lib` / integration test links on 8–16 GB Windows boxes.
-# `debug = 1` keeps line tables for backtraces while cutting PDB/link pressure sharply.
+# routinely exhausts the linker during `--lib` / integration test links on 8–16 GB boxes
+# (Windows LNK1102 / Linux rust-lld SIGBUS). `debug = 1` keeps line tables while cutting
+# link pressure; Linux also uses bfd ld via `.cargo/config.toml`.
 [profile.dev]
 debug = 1

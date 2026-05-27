@@ -64,7 +64,6 @@
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
       <version>${jmh.version}</version>
-      <optional>true</optional>
     </dependency>
   </dependencies>
 
@@ -128,6 +127,24 @@
       </plugin>
       <!-- Runs during `integration-test`; use CI-friendly iterations (`verify` includes this phase). -->
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>jmh-dep-classpath</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputProperty>rdp.jmh.dep.classpath</outputProperty>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.5.0</version>
@@ -147,6 +164,13 @@
                 <jvmArg>--enable-preview</jvmArg>
                 <jvmArg>--enable-native-access=ALL-UNNAMED</jvmArg>
               </jvmArgs>
+              <!-- JMH forks read java.class.path; exec:java does not set it to Maven's full CP. -->
+              <systemProperties>
+                <property>
+                  <key>java.class.path</key>
+                  <value>${project.build.outputDirectory}${path.separator}${rdp.jmh.dep.classpath}</value>
+                </property>
+              </systemProperties>
               <environmentVariables>
                 <RDP_JVM_SYS>${env.RDP_JVM_SYS}</RDP_JVM_SYS>
               </environmentVariables>
@@ -159,6 +183,8 @@
                 <argument>1</argument>
                 <argument>-t</argument>
                 <argument>1</argument>
+                <argument>-jvmArgsAppend</argument>
+                <argument>--enable-preview --enable-native-access=ALL-UNNAMED</argument>
                 <argument>io.github.scorpio_datalake.rust_data_processing.jmh.RdpAbiVersionBenchmark</argument>
               </arguments>
             </configuration>

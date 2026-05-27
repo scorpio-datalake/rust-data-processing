@@ -121,8 +121,8 @@ Same rule: set env on the **process** (`export` in shell, `docker run -e`, K8s `
 | [Azure ADLS](AZURE_ADLS.md) | `abfss://`, `azure://` | `AZURE_*` / MSI / account key | Location only |
 | [Snowflake](SNOWFLAKE.md) | Often `s3://…` for stage I/O | Stage: [AMAZON_S3.md](AMAZON_S3.md); `COPY` optional: `SNOWFLAKE_*` | Account URL in sink JSON; not storage secrets |
 | [Databricks warehouse](#databricks-pipeline-sink-kind-databricks) | `abfss://` or `s3://` under `warehouse` | Same as Azure or S3 for that URI | `warehouse` path only; PAT not used in-tree |
-| [SFTP](#sftp-not-implemented) | `sftp://…` | N/A — not implemented | N/A |
-| [FTP](#ftp-not-implemented) | `ftp://` / `ftps://` | N/A — not implemented | N/A |
+| [SFTP](#sftp) | `sftp://…` | `SFTP_PASSWORD`, `SFTP_PRIVATE_KEY_PATH`, optional `SFTP_USER` | URI in `file_transfer_uris` only |
+| [FTP / FTPS](#ftp--ftps) | `ftp://` / `ftps://` | `FTP_PASSWORD`, optional `FTP_USER` | URI in `file_transfer_uris` only |
 
 ---
 
@@ -217,42 +217,47 @@ See [CONNECTORS.md — Apache Spark](CONNECTORS.md#apache-spark).
 
 ---
 
-## SFTP (not implemented)
+## SFTP
 
-**Status:** No `sftp://` handler in `rdp_jvm_sys` or `rust-data-processing` today.
+**Status:** Implemented in `rust-data-processing` and `rdp_jvm_sys` when built with **`cloud_connectors`** (Cargo feature `file_transfer`).
 
-**Planned URL shape:** `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet`
+**URL shape:** `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet`
 
-| Auth (future) | Notes |
+| Auth | Notes |
 | --- | --- |
-| Password | User in URL or env — **do not commit real passwords** to git |
-| SSH private key | Path via env (e.g. `SFTP_PRIVATE_KEY_PATH`) — not in pipeline JSON |
-| Host key trust | Known-hosts file or env — TBD when implemented |
+| Password | User in URL; **`SFTP_PASSWORD`** env overrides URL password — do not commit real passwords to git |
+| SSH private key | **`SFTP_PRIVATE_KEY_PATH`** — path on the host running Rust / JVM / Python native code |
+| Username only in env | **`SFTP_USER`** when the URL omits a user |
 
-**Workaround today:** sync files to S3, ADLS, GCS, or local disk with your own SFTP client (`scp`, `sftp`, Airflow operator, etc.), then:
+**Pipeline JSON** — declare the URI only (no secrets in JSON):
 
 ```json
-"object_store_uris": ["s3://demo-bucket-us-east-1/rdp/incoming/from-sftp.parquet"]
+"file_transfer_uris": ["sftp://etl_user@sftp.example.com:22/rdp/incoming/data.parquet"]
 ```
 
-or `sources.paths` for a local copy.
+Rust downloads the remote file to a temp path, then uses the same CSV/JSON/Parquet/XML readers as local ingest. Set `sources.options.format` when the extension is ambiguous.
 
-When SFTP is added, expect the same rule: **Rust performs I/O; Java/Python pass URIs; credentials on the native process** (not in JSON).
+**Fallback:** land files on S3/ADLS/GCS/local with your own SFTP client, then use `object_store_uris` or `sources.paths`.
 
 ---
 
-## FTP (not implemented)
+## FTP / FTPS
 
-**Status:** No `ftp://` or `ftps://` handler in-tree.
+**Status:** `ftp://` and `ftps://` via the same `file_transfer` module (`cloud_connectors` feature).
 
-**Planned URL:** `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet`
+**URL:** `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet`
 
-| Auth (future) | Notes |
+| Auth | Notes |
 | --- | --- |
-| User / password | Env or URL placeholder — prefer env for production |
-| Explicit TLS (FTPS) | Often port 990 — same implementation gap as FTP |
+| User / password | URL userinfo; **`FTP_PASSWORD`** env overrides URL password |
+| Username | **`FTP_USER`** when the URL omits a user |
+| FTPS | `ftps://` — default port **990**; TLS via rustls in-tree |
 
-**Workaround:** same as [SFTP](#sftp-not-implemented) — land files on object storage or local paths, then use `object_store_uris` or `sources.paths`.
+```json
+"file_transfer_uris": ["ftp://etl_user@ftp.example.com:21/rdp/incoming/data.parquet"]
+```
+
+**Fallback:** same as [SFTP](#sftp) — object store or local paths after external sync.
 
 ---
 
@@ -266,8 +271,8 @@ When SFTP is added, expect the same rule: **Rust performs I/O; Java/Python pass 
 | `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`, bearer tokens | Azure client reads env / MSI on the Rust process |
 | `GOOGLE_APPLICATION_CREDENTIALS` path | GCS client reads env on the Rust process |
 | `dapi…` Databricks PAT | Not used by in-tree `databricks` sink (storage path only) |
-| SFTP/FTP passwords for production | Not implemented; use object-store workaround |
-| `jdbc:…` for DB read | Use ConnectorX `oracle://` / `mssql://` in `sources.db_reads` — see [CONNECTORS.md](CONNECTORS.md) |
+| SFTP/FTP passwords for production | Use **`SFTP_PASSWORD`** / **`FTP_PASSWORD`** env on the native process — not pipeline JSON |
+| `jdbc:…` URLs for DB read | Not supported — use ConnectorX `oracle://` / `mssql://` in `sources.db_reads`, or export to a local file and use `sources.paths` — see [CONNECTORS.md](CONNECTORS.md) |
 
 ---
 

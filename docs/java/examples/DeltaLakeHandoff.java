@@ -19,6 +19,9 @@ import java.nio.file.Path;
  * ds = rdp.ingest_from_path("exported_slice.parquet", schema)
  * }</pre>
  *
+ * <p><strong>Runnable handoff in-repo:</strong> {@link WarehouseExportHandoffExample} (CSV→Parquet→
+ * {@code rdp_ingest_parquet_path}) exercises the same file path without a lake client.
+ *
  * <p><strong>JUnit contract</strong> ({@code DocsExampleNativeIntegrationTest#deltaLakeHandoffPrerequisitesMatchDocsExample}):
  * does not connect to a lake in CI; verifies {@code people.csv}, people Parquet pipeline fixtures, and
  * {@code docs/LAKE_TABLE_READ.md} exist so the documented handoff path is reproducible in-repo.

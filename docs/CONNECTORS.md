@@ -17,8 +17,8 @@ Rust (`rust-data-processing` / `rdp_jvm_sys`) performs I/O. **Python** and **Jav
 | **Amazon S3** | `s3://demo-bucket-us-east-1/rdp/incoming/part-00000.parquet` | OS env: `AWS_*` (or IAM role on host/pod) — **[AMAZON_S3.md](AMAZON_S3.md)** |
 | **Google Cloud Storage** | `gs://demo-gcs-project/rdp/incoming/part-00000.parquet` | OS env: `GOOGLE_APPLICATION_CREDENTIALS` — [CLOUD_AUTH.md](CLOUD_AUTH.md) |
 | **Azure Blob / ADLS** | `abfss://container@storacc01.dfs.core.windows.net/rdp/incoming/part-00000.parquet` | OS env: `AZURE_*` — **[AZURE_ADLS.md](AZURE_ADLS.md)** |
-| **SFTP** | `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet` | User + password (or SSH key) — **not implemented** |
-| **FTP** | `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet` | User + password — **not implemented** |
+| **SFTP** | `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet` | User + password or `SFTP_PRIVATE_KEY_PATH` env — see [CLOUD_AUTH.md](CLOUD_AUTH.md#sftp) |
+| **FTP** | `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet` | User + password (`FTP_PASSWORD` env) — see [CLOUD_AUTH.md](CLOUD_AUTH.md#ftp--ftps) |
 
 **Warehouse SQL** (same text in all languages where applicable):
 
@@ -26,7 +26,7 @@ Rust (`rust-data-processing` / `rdp_jvm_sys`) performs I/O. **Python** and **Jav
 SELECT id, name, amount FROM demo.fact_scores WHERE amount > 0 LIMIT 100000;
 ```
 
-**Build features:** Rust/Python cloud I/O: `cloud_connectors` (object store + Delta staging). SQL read: `db_connectorx` / Python `db`. JVM: `rdp_jvm_sys` with `link-main` (includes `cloud_connectors`).
+**Build features:** Rust/Python cloud I/O: `cloud_connectors` (object store, SFTP/FTP, Delta staging). SQL read: `db_connectorx` / Python `db`. JVM: `rdp_jvm_sys` with `link-main` (includes `cloud_connectors`).
 
 ---
 
@@ -36,7 +36,7 @@ SELECT id, name, amount FROM demo.fact_scores WHERE amount > 0 LIMIT 100000;
 | --- | --- |
 | **Rust** | `ingest_from_db` / sink `postgresql://` |
 | **Python** | `ingest_from_db(conn, query, schema)` — feature `db` |
-| **Java** | `rdp_run_pipeline_json` with `kind: postgresql` sink (libpq URL, not `jdbc:`) |
+| **Java** | `rdp_run_pipeline_json` with `kind: postgresql` sink (`postgresql://` libpq URL) |
 
 ### Rust
 
@@ -89,7 +89,7 @@ JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pip
 
 | Layer | Notes |
 | --- | --- |
-| **Rust / Python** | ConnectorX `oracle://` (not `jdbc:oracle:thin:`) |
+| **Rust / Python** | ConnectorX `oracle://` |
 | **Java** | Same ConnectorX URL + SQL in pipeline **`sources.db_reads`** (requires `rdp_jvm_sys` built with **`--features db_connectorx`** or **`full`**) |
 
 ### Rust
@@ -110,7 +110,7 @@ SQL = "SELECT id, name, amount FROM demo.fact_scores WHERE ROWNUM <= 100000"
 
 ### Java
 
-Rust runs the warehouse `SELECT` via ConnectorX — use **`oracle://`**, not **`jdbc:oracle:thin:`**. Build the native library with DB read enabled:
+Rust runs the warehouse `SELECT` via ConnectorX — use **`oracle://`**. Build the native library with DB read enabled:
 
 ```bash
 cargo build -p rdp-jvm-sys --features link-main,db_connectorx
@@ -140,7 +140,7 @@ JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pip
 // root.optJSONArray("db_source_results") — one entry per db_reads[] with status ok
 ```
 
-Without **`db_connectorx`**, `db_reads` returns **`DB_CONNECTORX_NOT_BUILT`**. JDBC staging → **`sources.paths`** is only a fallback when you cannot rebuild the native library.
+Without **`db_connectorx`**, `db_reads` returns **`DB_CONNECTORX_NOT_BUILT`**. Export query results to a local file and use **`sources.paths`** when you cannot rebuild with **`db_connectorx`**.
 
 ---
 
@@ -163,7 +163,7 @@ SQL = "SELECT TOP (100000) id, name, amount FROM dbo.fact_scores WHERE amount > 
 
 ### Java
 
-Same as Oracle: **`sources.db_reads`** with ConnectorX **`mssql://`** (not **`jdbc:sqlserver:`**):
+Same as Oracle: **`sources.db_reads`** with ConnectorX **`mssql://`**:
 
 ```json
 {
@@ -429,33 +429,80 @@ URI = "abfss://container@storacc01.dfs.core.windows.net/rdp/incoming/part-00000.
 
 ---
 
-## SFTP (not implemented)
+## SFTP
 
-**Auth / status:** [CLOUD_AUTH.md — SFTP](CLOUD_AUTH.md#sftp-not-implemented) — not wired in Rust yet; use object-store or local workaround.
+**Auth:** [CLOUD_AUTH.md — SFTP](CLOUD_AUTH.md#sftp). **Pipeline field:** `sources.file_transfer_uris` (not `object_store_uris`).
 
-**Planned URL:** `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet`
+**URL:** `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet`
 
-| Auth (future) | Example |
+| Auth | Example |
 | --- | --- |
-| Password | `etl_user` / env or URL placeholder |
-| SSH private key | Path via env (e.g. `SFTP_PRIVATE_KEY_PATH`) — not in JSON |
+| Password | URL userinfo or `SFTP_PASSWORD` env (overrides URL password) |
+| SSH private key | `SFTP_PRIVATE_KEY_PATH` — not in JSON |
 
-Today: sync to S3/ADLS/GCS/local, then use `object_store_uris` or `sources.paths` with [S3](AMAZON_S3.md) / [Azure](AZURE_ADLS.md) OS env on the process.
+### Rust
+
+```rust
+use rust_data_processing::ingestion::{ingest_from_file_transfer_uri, IngestionOptions};
+// cargo run --features cloud_connectors --example file_transfer_ingest -- 'sftp://...'
+
+const URI: &str = "sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet";
+let ds = ingest_from_file_transfer_uri(URI, &schema, &IngestionOptions::default())?;
+```
+
+### Python
+
+```python
+import rust_data_processing as rdp  # maturin build --features cloud
+
+URI = "sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet"
+ds = rdp.ingest_from_file_transfer_uri(URI, schema, {"format": "parquet"})
+```
+
+### Java
+
+```json
+"file_transfer_uris": ["sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet"]
+```
+
+See [`SftpFtpConnectorsExample.java`](java/examples/SftpFtpConnectorsExample.java) and fixture `tests/fixtures/file_transfer/`.
 
 ---
 
-## FTP (not implemented)
+## FTP / FTPS
 
-**Auth / status:** [CLOUD_AUTH.md — FTP](CLOUD_AUTH.md#ftp-not-implemented).
+**Auth:** [CLOUD_AUTH.md — FTP / FTPS](CLOUD_AUTH.md#ftp--ftps). **Pipeline field:** `sources.file_transfer_uris`.
 
-**Planned URL:** `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet`
+**URL:** `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet` · FTPS: `ftps://…` (port 990 default)
 
 | Mode | Notes |
 | --- | --- |
-| Explicit TLS (FTPS) | Often `ftps://` on port 990 — same gap as FTP |
-| Anonymous | `ftp://ftp.example.com/...` (discouraged) |
+| Plain FTP | `ftp://` |
+| Explicit TLS (FTPS) | `ftps://` — requires `cloud_connectors` (rustls) |
+| Anonymous | Omit user; set `FTP_USER` if needed (discouraged) |
 
-Same workaround as [SFTP](CLOUD_AUTH.md#sftp-not-implemented) until an FTP client is linked in Rust.
+### Rust
+
+```rust
+const URI: &str = "ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet";
+let ds = ingest_from_file_transfer_uri(URI, &schema, &IngestionOptions::default())?;
+```
+
+### Python
+
+```python
+ds = rdp.ingest_from_file_transfer_uri(
+    "ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet",
+    schema,
+    {"format": "parquet"},
+)
+```
+
+### Java
+
+```json
+"file_transfer_uris": ["ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet"]
+```
 
 ---
 

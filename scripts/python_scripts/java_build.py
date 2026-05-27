@@ -18,6 +18,8 @@ from common import (
     JVM_SYS_DIR,
     REPO_ROOT,
     banner,
+    cleanup_disk_for_jvm,
+    ensure_libclang_linux,
     generate_people_xlsx_fixture,
     gradlew_argv,
     native_lib_release,
@@ -35,6 +37,7 @@ def gradle_clean() -> None:
 
 def build_native(*, release: bool = True) -> Path:
     require_tool("cargo")
+    ensure_libclang_linux()
     banner("JVM: build rdp_jvm_sys (--features full)")
     cmd = [
         "cargo",
@@ -96,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    cleanup_disk_for_jvm()
     if args.clean:
         gradle_clean()
 

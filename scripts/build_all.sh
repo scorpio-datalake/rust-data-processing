@@ -6,6 +6,11 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 readme="${script_dir}/build_all.md"
 
+# Fresh capture logs each invocation (see scripts/build_all.md). Set BUILD_ALL_KEEP_LOGS=1 to retain.
+if [[ -z "${BUILD_ALL_KEEP_LOGS:-}" ]]; then
+  rm -f "${repo_root}/build_all.log"
+fi
+
 usage() {
   cat <<'EOF'
 Usage: ./scripts/build_all.sh [OPTIONS] [ORCHESTRATOR_ARGS...]

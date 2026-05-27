@@ -152,7 +152,8 @@ def main(argv: list[str] | None = None) -> int:
         pause(wait, "before Python build")
         _run_module(python_build_main, python_args)
         pause(wait, "before Python tests")
-        _run_module(python_test_main, [])
+        # Skip a second release wheel compile in the same run (saves disk; CI uses python_ci.yml).
+        _run_module(python_test_main, ["--skip-wheel-smoke"])
 
     if not args.skip_java:
         pause(wait, "before JVM build")

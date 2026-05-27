@@ -8,14 +8,33 @@ import shutil
 import sys
 from pathlib import Path
 
-from common import PYTHON_WRAPPER, REPO_ROOT, banner, require_uv, run
+from common import (
+    PYTHON_WRAPPER,
+    REPO_ROOT,
+    banner,
+    cleanup_disk_for_python,
+    python_venv_executable,
+    python_wrapper_cargo_env,
+    require_uv,
+    run,
+)
 
 
 def generate() -> None:
+    cleanup_disk_for_python()
     require_uv()
     banner("Python docs: uv sync + maturin (for pdoc imports)")
-    run(["uv", "sync", "--group", "dev"], cwd=PYTHON_WRAPPER)
-    run(["uv", "run", "maturin", "develop", "--release"], cwd=PYTHON_WRAPPER)
+    env = python_wrapper_cargo_env()
+    run(
+        ["uv", "sync", "--group", "dev", "--no-install-project"],
+        cwd=PYTHON_WRAPPER,
+        env=env,
+    )
+    run(
+        [str(python_venv_executable("maturin")), "develop"],
+        cwd=PYTHON_WRAPPER,
+        env=env,
+    )
 
     py_out = REPO_ROOT / "_site" / "python"
     if py_out.is_dir():
@@ -25,9 +44,7 @@ def generate() -> None:
     banner("Python docs: pdoc")
     run(
         [
-            "uv",
-            "run",
-            "pdoc",
+            str(python_venv_executable("pdoc")),
             "-d",
             "google",
             "-o",

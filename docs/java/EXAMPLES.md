@@ -32,7 +32,7 @@ Use this as a **tour of how Java integrates today** (parity JSON over FFI), not 
 | **Temp Parquet → local Spark `DataFrame`** | [`rdp_export_parquet_temp`](#temp-parquet-handoff-rdp_export_parquet_temp) |
 | **All doc examples** (`docs/java/examples/`) | [Example catalog](#example-catalog), [Why these examples](#why-these-examples), [Shared fixtures](#shared-json-fixtures-testsfixtures) |
 | **Phase 2 (Python `PHASE2_EXAMPLES.md`)** | [Phase 2 examples](#phase-2-examples) |
-| **Database / data lake (no JDBC into FFI)** | [Database and data lake on the JVM](#database-and-data-lake-jvm) |
+| **Database / data lake (no warehouse driver on FFI)** | [Database and data lake on the JVM](#database-and-data-lake-jvm) |
 | **All connectors (Rust / Python / Java, same URLs)** | [`docs/CONNECTORS.md`](../CONNECTORS.md) |
 
 ## Why rust-data-processing on the JVM {#why-rust-data-processing-on-the-jvm}
@@ -63,7 +63,8 @@ Every runnable class under [`docs/java/examples/`](examples/) loads committed JS
 | `ghcn/` | `json_source`, `xml_intermediate`, `parquet_lake` under `schemas/` | `pipelines/json_to_xml.pipeline.json`, `xml_to_parquet.pipeline.json` | `ghcn_stations_sample.json` (5 NOAA stations, committed sample) |
 | `people/` | `people_csv`, `people_json`, `people_flat`, … | `pipelines/csv_to_parquet.pipeline.json`, `payloads/*_path_*.json` | `../people.csv`, `../people.json`, `../people.xlsx` |
 | `student_etl/` | `student_source`, `lake_grade_stats`, `postgres_courses` | `legacy_student_etl*.pipeline.json`, `payloads/ordered_ingest_*.payload.json` | `data/part-0000*.json` |
-| `cloud_connectors/` | `id_name` | `platform_connectors.pipeline.json`, `object_store_sources_only.pipeline.json` | `data/two_rows.json` |
+| `cloud_connectors/` | `id_name` | `platform_connectors.pipeline.json`, `object_store_sources_only.pipeline.json`, `oracle_db_read.pipeline.json` | `data/two_rows.json` |
+| `file_transfer/` | `id_name` | `ftp_sources_only.pipeline.json` | `data/two_rows.json` (FTP demo) |
 | `watermark/` | `schemas/events.schema.json` | `payloads/csv_watermark_ingest.body.json`, `directory_scan_two_csv.payload.json` | `../watermark_events.csv` / `.json` |
 | `sql_parity/` | `join_left`, `join_right` | `queries/join_people_scores.sql.json` | `data/join_left.json`, `join_right.json` |
 
@@ -152,22 +153,35 @@ Each example shows how to:
 
 Class-level Javadoc in each `.java` file explains **why** that sketch exists, **what** it calls in Rust, and the Python analogue.
 
-> **JUnit:** Most runnable examples have a matching integration test in [`DocsExampleNativeIntegrationTest`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) (when `RDP_JVM_SYS` is set in CI). **Not** covered in CI (external URLs / no live connectors): [`PlatformConnectorsPipelineExample.java`](examples/PlatformConnectorsPipelineExample.java), [`ObjectStoreUrlsExample.java`](examples/ObjectStoreUrlsExample.java) — run `main` locally. Documentation-only: [`ExportFilterRowsMaxUtf8Chars.java`](examples/ExportFilterRowsMaxUtf8Chars.java), [`MedianReduceAndDataFrame.java`](examples/MedianReduceAndDataFrame.java), [`DeltaLakeHandoff.java`](examples/DeltaLakeHandoff.java). See [Prerequisites](#prerequisites).
+> **JUnit:** Most runnable examples have a matching integration test in [`DocsExampleNativeIntegrationTest`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) (when `RDP_JVM_SYS` is set in CI). Cloud connector examples use committed **`file://`** URIs in CI (no live S3/Snowflake). **Template-only in CI** (no network): [`DbReadPipelineExample.java`](examples/DbReadPipelineExample.java), [`SftpFtpConnectorsExample.java`](examples/SftpFtpConnectorsExample.java) — run `main` with real URLs locally. Documentation-only: [`ExportFilterRowsMaxUtf8Chars.java`](examples/ExportFilterRowsMaxUtf8Chars.java), [`MedianReduceAndDataFrame.java`](examples/MedianReduceAndDataFrame.java), [`ExecutionEngineNoteExample.java`](examples/ExecutionEngineNoteExample.java), [`DeltaLakeHandoff.java`](examples/DeltaLakeHandoff.java) (prerequisites only). See [Prerequisites](#prerequisites).
 
 ## Example catalog {#example-catalog}
 
-All **21** classes in [`docs/java/examples/`](examples/):
+All **35** classes in [`docs/java/examples/`](examples/):
 
 ### Pipelines, SQL, and multi-format ETL
 
 | Example | What it demonstrates | Native entry point(s) | Fixtures |
 | --- | --- | --- | --- |
+| [`QuickStartIngestExample.java`](examples/QuickStartIngestExample.java) | Minimal CSV path ingest with explicit schema | `rdp_ingest_csv_path` | `people` |
 | [`DataFrameCentricPipeline.java`](examples/DataFrameCentricPipeline.java) | Polars SQL on `df` inside a pipeline (filter active rows, double `score`) → Parquet sink | `rdp_run_pipeline_json` | `jvm_contract` |
 | [`SQLQueries.java`](examples/SQLQueries.java) | Single-table SQL via pipeline JSON; JOIN via `rdp_parity_sql_suite_mirror` | `rdp_run_pipeline_json`, `rdp_parity_sql_suite_mirror` | `jvm_contract`, `sql_parity` |
+| [`SqlJoinPipelineExample.java`](examples/SqlJoinPipelineExample.java) | JOIN-only tour via `rdp_parity_sql_suite_mirror` | `rdp_parity_sql_suite_mirror` | `sql_parity` (parity data) |
+| [`GroupByAggregatesExample.java`](examples/GroupByAggregatesExample.java) | `GROUP BY` / `HAVING` via SQL suite parity | `rdp_parity_sql_suite_mirror` | parity |
+| [`CookbookTransformsExample.java`](examples/CookbookTransformsExample.java) | Rename / cast / fill_null mapping spec | `rdp_parity_mapping_spec_mirror` | parity |
+| [`ProcessingReduceExample.java`](examples/ProcessingReduceExample.java) | Filter / map / reduce row-wise API | `rdp_parity_processing` | parity |
+| [`ProfilingExample.java`](examples/ProfilingExample.java) | Dataset profiling JSON report | `rdp_parity_profiling` | parity |
+| [`OutlierDetectionExample.java`](examples/OutlierDetectionExample.java) | IQR outlier detection summary | `rdp_parity_outliers` | parity |
+| [`ValidationUtf8Length.java`](examples/ValidationUtf8Length.java) | Validation summary over FFI | `rdp_parity_validation` | parity |
+| [`CdcBoundaryExample.java`](examples/CdcBoundaryExample.java) | CDC event type shapes (no live connector) | `rdp_parity_cdc` | parity |
+| [`ExecutionEngineNoteExample.java`](examples/ExecutionEngineNoteExample.java) | Documents Python-only `ExecutionEngine` | (none) | — |
 | [`GhcnJsonXmlParquetPipeline.java`](examples/GhcnJsonXmlParquetPipeline.java) | JSON → XML → Parquet with three schemas on a NOAA station sample | `rdp_run_pipeline_json`, `rdp_ingest_xml_path`, `rdp_ingest_parquet_path` | `ghcn` |
 | [`RDPOnlyETLExample.java`](examples/RDPOnlyETLExample.java) | `postgresql_url` + `lake_sink` URLs in pipeline JSON; local JSON sources | `rdp_run_pipeline_json`, `rdp_ingest_ordered_paths_json` | `student_etl` |
 | [`PlatformConnectorsPipelineExample.java`](examples/PlatformConnectorsPipelineExample.java) | Full Snowflake / Databricks / Spark / S3·GCS·ABFS URLs; `object_store_uris` + Rust sinks | `rdp_run_pipeline_json` | `cloud_connectors` |
 | [`ObjectStoreUrlsExample.java`](examples/ObjectStoreUrlsExample.java) | S3, GCS, Azure Blob read URIs + working local `parquet_file` sink | `rdp_run_pipeline_json` | `cloud_connectors` |
+| [`SftpFtpConnectorsExample.java`](examples/SftpFtpConnectorsExample.java) | SFTP / FTP / FTPS in `file_transfer_uris` | `rdp_run_pipeline_json` | `file_transfer` |
+| [`DbReadPipelineExample.java`](examples/DbReadPipelineExample.java) | ConnectorX `sources.db_reads` pipeline sketch (run locally) | `rdp_run_pipeline_json` | `cloud_connectors` |
+| [`WarehouseExportHandoffExample.java`](examples/WarehouseExportHandoffExample.java) | Export Parquet locally → `rdp_ingest_parquet_path` | `rdp_run_pipeline_json`, `rdp_ingest_parquet_path` | `people` |
 | [`SparkParquetHandoffExample.java`](examples/SparkParquetHandoffExample.java) | Working `rdp_export_parquet_temp`; documents pending `kind: spark` sink | `rdp_export_parquet_temp`, (pipeline JSON in sibling example) | `jvm_contract` (export sample) |
 
 ### People fixtures (CSV, JSON, Parquet, Excel)
@@ -175,6 +189,7 @@ All **21** classes in [`docs/java/examples/`](examples/):
 | Example | What it demonstrates | Native entry point(s) | Fixtures |
 | --- | --- | --- | --- |
 | [`JsonParquetExcelSnippets.java`](examples/JsonParquetExcelSnippets.java) | Payload and path ingest for JSON/CSV; CSV→Parquet pipeline round-trip | `rdp_ingest_ordered_paths_json`, `rdp_ingest_*_path`, `rdp_run_pipeline_json` | `people` |
+| [`InferredSchemaIngestExample.java`](examples/InferredSchemaIngestExample.java) | Excel infer-then-ingest inside Rust (`rdp_excel_ingest_path_sheet`) | `rdp_excel_ingest_path_sheet` | `people.xlsx` |
 | [`ExcelSnippets.java`](examples/ExcelSnippets.java) | Excel sheet ingest via payload and `rdp_excel_ingest_path_sheet` | `rdp_ingest_ordered_paths_json`, `rdp_excel_ingest_path_sheet` | `people` (+ `people.xlsx`) |
 | [`ParquetSnippets.java`](examples/ParquetSnippets.java) | CSV→Parquet pipeline, path verify, temp Parquet export handoff | `rdp_run_pipeline_json`, `rdp_ingest_parquet_path`, `rdp_export_parquet_temp` | `people` |
 
@@ -184,14 +199,16 @@ All **21** classes in [`docs/java/examples/`](examples/):
 | --- | --- | --- | --- |
 | [`OrderedPaths.java`](examples/OrderedPaths.java) | Java glob → `paths` array → ingest with watermark options | `rdp_ingest_ordered_paths_json` | `watermark` |
 | [`PathFromDirectoryScan.java`](examples/PathFromDirectoryScan.java) | Back-compat alias; delegates to `OrderedPaths` | (same as `OrderedPaths`) | `watermark` |
+| [`PartitionDiscoveryExample.java`](examples/PartitionDiscoveryExample.java) | Hive partition discovery, globs, explicit lists | `rdp_parity_partition_discovery_mirror` | `hive_partitioned` |
+| [`IngestObservabilityExample.java`](examples/IngestObservabilityExample.java) | Missing-file ingest errors / observability hooks | `rdp_parity_observability_mirror` | parity |
 
 ## Database and data lake on the JVM {#database-and-data-lake-jvm}
 
-This is **not** the same model as “open JDBC in Java and stream rows into the library.” On the JVM you pass **UTF-8 JSON** (pipeline specs, ingest payloads, schemas) and **local filesystem paths** for sources. Connection strings and lake catalog URIs appear **inside that JSON**; **Rust** (`rdp_jvm_sys`) interprets them and uses the crate’s own drivers (file readers, optional PostgreSQL **sink** via libpq, ConnectorX on the Python binding for **read**, etc.). Java does **not** pass a `javax.sql.Connection`, Spark session, or Delta catalog handle across the FFI boundary.
+This is **not** the same model as opening a warehouse connection in Java and streaming rows across the FFI boundary. On the JVM you pass **UTF-8 JSON** (pipeline specs, ingest payloads, schemas) and **local filesystem paths** for sources. Connection strings and lake catalog URIs appear **inside that JSON**; **Rust** (`rdp_jvm_sys`) interprets them and uses the crate’s own drivers (file readers, optional PostgreSQL **sink** via libpq, optional **`sources.db_reads`** via ConnectorX when built with **`db_connectorx`**, etc.). Java does **not** pass a live database session, Spark session, or Delta catalog handle across FFI.
 
 | What Java developers often expect | What this library does on the JVM |
 | --- | --- |
-| `DataSource.getConnection("jdbc:postgresql://…")` → library | **Not supported** for ingest |
+| `jdbc:…` URL or `DataSource` → direct ingest FFI | **Not supported** — use **`sources.db_reads`** (`oracle://`, `mssql://`, …) or **local file** handoff |
 | SQL URL in a **pipeline JSON** field → Rust runs the connector | **Supported** for **sinks** and **declared** lake metadata (see below) |
 | `s3://` / `gs://` / `abfss://` in **`sources.paths`** | **Rejected** — use **`sources.object_store_uris`** (pending) + **local** `paths` for ingest |
 | Read `your_lake` table via catalog API in Java | **Out of process** — export Parquet/CSV locally, then ingest (see [Your data lake](#your-data-lake-your_lake)) |
@@ -202,10 +219,10 @@ The runnable examples teach the mechanics: [`JsonParquetExcelSnippets`](examples
 
 **Three patterns** (pick one; they are not interchangeable):
 
-**1. File handoff (most common on the JVM today)** — Your app (or any ETL tool) runs SQL with **your** JDBC driver, writes a **bounded** CSV or Parquet file to disk, then passes that **local path** into ingest FFI—the same as `people.csv` in the people fixtures:
+**1. File handoff (most common on the JVM today)** — Your app (or any ETL tool) runs warehouse SQL with **your own** database client, writes a **bounded** CSV or Parquet file to disk, then passes that **local path** into ingest FFI—the same as `people.csv` in the people fixtures:
 
 ```java
-// Step A — outside rdp_jvm_sys: your JDBC code (Hikari, Spring, etc.)
+// Step A — outside rdp_jvm_sys: your app's DB client (Hikari, Spring, sqlcmd, etc.)
 // ResultSet → write /tmp/your_database/nightly_accounts.parquet (or .csv)
 
 // Step B — Rust ingest: absolute LOCAL path only
@@ -221,7 +238,7 @@ JSONObject root = RdpNativeJson.invokeIngestOrderedPathsJson(linker, lookup, are
 
 See [`JsonParquetExcelSnippets`](examples/JsonParquetExcelSnippets.java), [`IngestValidateJsonlEndToEnd`](examples/IngestValidateJsonlEndToEnd.java).
 
-**2. SQL URL in pipeline JSON (Rust sink, not JDBC ingest)** — You embed a **PostgreSQL URL string** in pipeline metadata; Java sends the document to `rdp_run_pipeline_json`. Rust ingests **local JSON sources**, transforms in Polars, then may **write** to Postgres using a **Rust** sink (when `rdp_jvm_sys` is built with `sink_postgres`). Java never opens the URL as JDBC.
+**2. SQL URL in pipeline JSON (Rust sink)** — You embed a **`postgresql://`** string in pipeline metadata; Java sends the document to `rdp_run_pipeline_json`. Rust ingests **local JSON sources**, transforms in Polars, then may **write** to Postgres using a **Rust** libpq sink (when `rdp_jvm_sys` is built with `sink_postgres`).
 
 Committed fixture (replace host, database, and table with **your_database** values):
 
@@ -292,14 +309,14 @@ More background: [`docs/LAKE_TABLE_READ.md`](../LAKE_TABLE_READ.md), [`DeltaLake
 
 ### Connector cookbook: PostgreSQL, Oracle, SQL Server, Snowflake, Databricks, Spark, object stores {#connector-cookbook}
 
-Cross-language reference with **the same fake URLs** in Rust, Python, and Java: [`docs/CONNECTORS.md`](../CONNECTORS.md) (includes SFTP/FTP as not implemented yet).
+Cross-language reference with **the same fake URLs** in Rust, Python, and Java: [`docs/CONNECTORS.md`](../CONNECTORS.md) (SFTP/FTP via `sources.file_transfer_uris` — see [`SftpFtpConnectorsExample.java`](examples/SftpFtpConnectorsExample.java)).
 
 **Runnable JVM examples (no external CI):** [`PlatformConnectorsPipelineExample.java`](examples/PlatformConnectorsPipelineExample.java), [`ObjectStoreUrlsExample.java`](examples/ObjectStoreUrlsExample.java), [`SparkParquetHandoffExample.java`](examples/SparkParquetHandoffExample.java). Fixtures: `tests/fixtures/cloud_connectors/`. Build `rdp_jvm_sys` with **`cloud_connectors`** (enabled on `link-main`). CI uses `file://`; production uses `s3://` / `gs://` / `abfss://` in the same JSON fields — Java never ingests files for ETL.
 
 | Platform | JVM `rdp_run_pipeline_json` | JVM ingest today | Example class / fixture |
 | --- | --- | --- | --- |
 | **PostgreSQL** | `postgresql` sink (`postgresql://…`, libpq) or legacy `relational_sink` | Local paths; optional COPY sink | [`RDPOnlyETLExample`](examples/RDPOnlyETLExample.java) |
-| **Oracle / SQL Server** | `jdbc` sink → **`JDBC_PROTOCOL_NOT_LINKED`** | JDBC export → local file | Cookbook snippets below |
+| **Oracle / SQL Server** | **`sources.db_reads`** (`oracle://`, `mssql://`) when **`db_connectorx`** | Else: export → local file → **`sources.paths`** | Cookbook snippets below |
 | **Snowflake** | `kind: snowflake` — Rust writes stage Parquet (`stage_uri`); optional `COPY INTO` | `sources.object_store_uris` | [`PlatformConnectorsPipelineExample`](examples/PlatformConnectorsPipelineExample.java) |
 | **Databricks** | `kind: databricks` — Rust writes Parquet under `warehouse` path | same | Same |
 | **Apache Spark** | `kind: spark` — Rust writes `handoff_uri` Parquet (driver reads outside FFI) | same | [`SparkParquetHandoffExample`](examples/SparkParquetHandoffExample.java) |
@@ -310,7 +327,7 @@ Cross-language reference with **the same fake URLs** in Rust, Python, and Java: 
 
 | Kind | Where you put it | What runs it | Example |
 | --- | --- | --- | --- |
-| **Source / warehouse SQL** | Java `String` in your JDBC app, or Python `ingest_from_db(..., query, ...)` | **Your** DB driver (Oracle, SQL Server, …) or Python ConnectorX | `SELECT … FROM hr.employees` on Oracle |
+| **Source / warehouse SQL** | Java `String` in your app, or Python `ingest_from_db(..., query, ...)` | **Your** DB client, **`sources.db_reads`**, or Python ConnectorX | `SELECT … FROM hr.employees` on Oracle |
 | **Pipeline SQL (Polars)** | `transform.sql` and/or per-sink `"sql"` in **pipeline JSON** | **Rust** (`rdp_run_pipeline_json`) on the ingested frame `df` | `SELECT id, score FROM df WHERE active = TRUE` |
 
 Pipeline SQL is **not** sent to Oracle or PostgreSQL as a remote query — it filters and projects rows **after** Rust has loaded a file or object-store slice. See [`SQLQueries.java`](examples/SQLQueries.java) and `tests/fixtures/jvm_contract/pipelines/sql_query_dataset.pipeline.json`.
@@ -319,7 +336,7 @@ Pipeline SQL is **not** sent to Oracle or PostgreSQL as a remote query — it fi
 
 #### PostgreSQL
 
-**Python — built-in read** (build with `db` feature; URL is ConnectorX/libpq style, not `jdbc:`):
+**Python — built-in read** (build with `db` feature; use ConnectorX URL form):
 
 ```python
 import rust_data_processing as rdp
@@ -355,7 +372,7 @@ FROM public.fact_scores
 WHERE dt = CURRENT_DATE;
 ```
 
-**In Java** — hold the query next to your JDBC URL, export rows, then call Rust on the file path:
+**In Java** — run the query in your app, export rows to disk, then call Rust on the file path:
 
 ```java
 String postgresSelect =
@@ -364,8 +381,7 @@ String postgresSelect =
     FROM public.fact_scores
     WHERE dt = CURRENT_DATE
     """;
-// DataSource: jdbc:postgresql://db.your_database.example:5432/analytics
-// executeQuery(postgresSelect) → write /var/rdp/staging/pg_fact_scores.parquet
+// Your DB client → write /var/rdp/staging/pg_fact_scores.parquet
 
 Path staging = Path.of("/var/rdp/staging/pg_fact_scores.parquet");
 String payload =
@@ -404,7 +420,7 @@ Per-sink `"sql"` is optional; it projects the frame again before that sink write
 
 #### Oracle
 
-**Python — built-in read** (requires `--features db_connectorx` / Python `db`; use ConnectorX `oracle://` form, not `jdbc:oracle:`):
+**Python — built-in read** (requires `--features db_connectorx` / Python `db`; use ConnectorX `oracle://` form):
 
 ```python
 ds = rdp.ingest_from_db_infer(
@@ -413,7 +429,7 @@ ds = rdp.ingest_from_db_infer(
 )
 ```
 
-**Source SQL (warehouse)** — Oracle dialect; pass the same text in pipeline **`sources.db_reads[].query`** (Rust ConnectorX, not JDBC):
+**Source SQL (warehouse)** — Oracle dialect; pass the same text in pipeline **`sources.db_reads[].query`** (Rust ConnectorX):
 
 ```sql
 SELECT employee_id, department_id, hire_date
@@ -421,7 +437,7 @@ FROM hr.employees
 WHERE ROWNUM <= 100000;
 ```
 
-**In Java (preferred)** — ConnectorX URL + query in pipeline JSON; build **`rdp_jvm_sys`** with **`--features db_connectorx`** (or **`full`**). Use **`oracle://`**, not **`jdbc:oracle:thin:`** (see [`docs/CONNECTORS.md`](../CONNECTORS.md)):
+**In Java (preferred)** — ConnectorX URL + query in pipeline JSON; build **`rdp_jvm_sys`** with **`--features db_connectorx`** (or **`full`**). Use **`oracle://`** (see [`docs/CONNECTORS.md`](../CONNECTORS.md)):
 
 ```json
 {
@@ -461,23 +477,7 @@ String pipeline =
 JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipeline);
 ```
 
-**Fallback (no `db_connectorx` build)** — run the same SQL with `ojdbc`, write Parquet locally, then set **`sources.paths`** to that file. Expect **`DB_CONNECTORX_NOT_BUILT`** if you use **`db_reads`** without the feature.
-
-Do **not** put `jdbc:oracle:thin:…` in a `jdbc` sink (always unsupported). Optional `jdbc` sink only documents intent:
-
-```json
-{
-  "sinks": [
-    {
-      "kind": "jdbc",
-      "url": "jdbc:oracle:thin:@//db.your_database.example:1521/ORCLPDB1",
-      "table": "hr.employees"
-    }
-  ]
-}
-```
-
-Expect `sink_results[].status: "unsupported"`, `error_code: "JDBC_PROTOCOL_NOT_LINKED"`.
+**Fallback (no `db_connectorx` build)** — run the same SQL in your environment, write Parquet locally, then set **`sources.paths`** to that file. Expect **`DB_CONNECTORX_NOT_BUILT`** if you use **`db_reads`** without the feature. Do **not** use `jdbc:` URLs in **`db_reads`** — they are rejected at parse.
 
 #### Microsoft SQL Server
 
@@ -490,7 +490,7 @@ ds = rdp.ingest_from_db_infer(
 )
 ```
 
-**Source SQL (warehouse)** — T-SQL; run in JDBC or `sqlcmd` in your environment:
+**Source SQL (warehouse)** — T-SQL; run in your DB client or `sqlcmd`:
 
 ```sql
 SELECT TOP (100000) id, amount, posted_at
@@ -527,7 +527,7 @@ WHERE posted_at >= '2026-05-01';
 JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipelineJson);
 ```
 
-**Fallback** — JDBC → local Parquet → **`sources.paths`** (same as before) when the native library is not built with **`db_connectorx`**.
+**Fallback** — export to local Parquet → **`sources.paths`** when the native library is not built with **`db_connectorx`**.
 
 #### Snowflake
 
@@ -665,7 +665,7 @@ Then ingest `/var/rdp/staging/snowflake_ledger.parquet` from Java as in the Snow
 
 ### Summary for Java integrators
 
-- **Credentials and URLs** belong in **JSON documents** (and **local path** lists) you send to `rdp_run_pipeline_json`, `rdp_ingest_*_path`, or `rdp_ingest_ordered_paths_json`—not in JDBC API objects on the FFI boundary.
+- **Credentials and URLs** belong in **JSON documents** (and **local path** lists) you send to `rdp_run_pipeline_json`, `rdp_ingest_*_path`, or `rdp_ingest_ordered_paths_json`—not in live database session objects on the FFI boundary.
 - **Rust** performs reads/writes using library drivers; you avoid reimplementing Polars, Parquet, or SQL execution in Java.
 - **Examples to copy:** file ingest → people/GHCN fixtures; pipeline URLs → [`RDPOnlyETLExample`](examples/RDPOnlyETLExample.java) + `tests/fixtures/student_etl/`; cloud platforms + object stores → [`PlatformConnectorsPipelineExample`](examples/PlatformConnectorsPipelineExample.java), [`ObjectStoreUrlsExample`](examples/ObjectStoreUrlsExample.java), [`SparkParquetHandoffExample`](examples/SparkParquetHandoffExample.java) + `tests/fixtures/cloud_connectors/`; [Connector cookbook](#connector-cookbook).
 

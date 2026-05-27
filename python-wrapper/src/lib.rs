@@ -20,23 +20,24 @@ use rust_data_processing::export::{
 use rust_data_processing::ingestion::{
     IngestionOptions, discover_hive_partitioned_files as discover_hive_partitioned_files_rs,
     infer_schema_from_path, ingest_from_db, ingest_from_db_infer, ingest_from_ordered_paths,
-    ingest_from_path, ingest_from_path_infer, parse_partition_segment as parse_partition_segment_rs,
+    ingest_from_path, ingest_from_path_infer,
+    parse_partition_segment as parse_partition_segment_rs,
     paths_from_directory_scan as paths_from_directory_scan_rs,
     paths_from_explicit_list as paths_from_explicit_list_rs, paths_from_glob as paths_from_glob_rs,
 };
 #[cfg(feature = "cloud")]
 use rust_data_processing::ingestion::{
-    export_dataset_to_object_store_uri, ingest_from_object_store_uri,
+    export_dataset_to_object_store_uri, ingest_from_file_transfer_uri, ingest_from_object_store_uri,
 };
 use rust_data_processing::outliers::{
     detect_outliers_dataset, render_outlier_report_json, render_outlier_report_markdown,
 };
 use rust_data_processing::pipeline::{Agg, CastMode, DataFrame, JoinKind, Predicate};
-use rust_data_processing::processing::{
-    VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce, top_k_by_frequency,
-};
 use rust_data_processing::privacy::{
     render_privacy_report_json, render_privacy_report_markdown, summarize_utf8_column_changes,
+};
+use rust_data_processing::processing::{
+    VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce, top_k_by_frequency,
 };
 use rust_data_processing::profiling::{
     profile_dataset, render_profile_report_json, render_profile_report_markdown,
@@ -793,6 +794,23 @@ fn export_dataset_to_object_store_uri_py(uri: &str, ds: &PyDataSet) -> PyResult<
     export_dataset_to_object_store_uri(uri, &ds.inner).map_err(ingestion_err_to_py)
 }
 
+/// Read one file over `sftp://`, `ftp://`, or `ftps://` into a `DataSet` (feature `cloud`).
+#[cfg(feature = "cloud")]
+#[pyfunction(name = "ingest_from_file_transfer_uri")]
+#[pyo3(signature = (uri, schema, options=None))]
+fn ingest_from_file_transfer_uri_py(
+    _py: Python<'_>,
+    uri: &str,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(schema)?;
+    let opts = merge_ingestion_options(_py, options)?;
+    ingest_from_file_transfer_uri(uri, &schema, &opts)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
 #[pyfunction]
 fn sql_query_dataset(ds: &PyDataSet, sql: &str) -> PyResult<PyDataSet> {
     let df = DataFrame::from_dataset(&ds.inner).map_err(ingestion_err_to_py)?;
@@ -834,7 +852,10 @@ fn reports_truncate_utf8_bytes_py(text: &str, max_bytes: usize) -> String {
 
 /// Deterministic train/test row index split: `(train_indices, test_indices)` as two lists of `int`.
 #[pyfunction(name = "export_train_test_row_indices")]
-fn export_train_test_row_indices_py(row_count: usize, test_fraction: f64) -> (Vec<usize>, Vec<usize>) {
+fn export_train_test_row_indices_py(
+    row_count: usize,
+    test_fraction: f64,
+) -> (Vec<usize>, Vec<usize>) {
     train_test_row_indices(row_count, test_fraction)
 }
 
@@ -1081,7 +1102,8 @@ fn discover_hive_partitioned_files(
     root: &str,
     file_pattern: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
-    let files = discover_hive_partitioned_files_rs(root, file_pattern).map_err(ingestion_err_to_py)?;
+    let files =
+        discover_hive_partitioned_files_rs(root, file_pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for pf in files {
         let d = PyDict::new(py);
@@ -1118,7 +1140,8 @@ fn paths_from_directory_scan_py(
     root: &str,
     relative_pattern: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
-    let paths = paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
+    let paths =
+        paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for p in paths {
         list.append(p.to_string_lossy().to_string())?;
@@ -1169,6 +1192,7 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     {
         m.add_function(wrap_pyfunction!(ingest_from_object_store_uri_py, m)?)?;
         m.add_function(wrap_pyfunction!(export_dataset_to_object_store_uri_py, m)?)?;
+        m.add_function(wrap_pyfunction!(ingest_from_file_transfer_uri_py, m)?)?;
     }
     m.add_function(wrap_pyfunction!(sql_query_dataset, m)?)?;
     m.add_function(wrap_pyfunction!(transform_apply_json, m)?)?;
@@ -1176,7 +1200,10 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(export_train_test_row_indices_py, m)?)?;
     m.add_function(wrap_pyfunction!(export_filter_rows_max_utf8_chars_py, m)?)?;
     m.add_function(wrap_pyfunction!(privacy_summarize_utf8_changes_json_py, m)?)?;
-    m.add_function(wrap_pyfunction!(privacy_summarize_utf8_changes_markdown_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        privacy_summarize_utf8_changes_markdown_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(reports_truncate_utf8_bytes_py, m)?)?;
     m.add_function(wrap_pyfunction!(profile_dataset_json, m)?)?;
     m.add_function(wrap_pyfunction!(profile_dataset_markdown, m)?)?;

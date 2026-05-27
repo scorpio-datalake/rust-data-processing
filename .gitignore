@@ -31,6 +31,8 @@ HighLevelDevelopmentPlan.txt
 epcis_and_stories.txt
 test_run.log
 test_run_*.log
+.build_all_runs/
+build_all.log
 benchmarks.log
 # Local planning / story tracking — not for version control
 Planning/

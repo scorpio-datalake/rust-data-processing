@@ -10,11 +10,7 @@ use crate::types::DataSet;
 use super::object_store::export_dataset_to_object_store_uri;
 
 /// Build a table root URI from warehouse + optional namespace + table name.
-pub fn delta_table_uri(
-    warehouse: &str,
-    namespace: Option<&str>,
-    table: &str,
-) -> String {
+pub fn delta_table_uri(warehouse: &str, namespace: Option<&str>, table: &str) -> String {
     let base = warehouse.trim_end_matches('/');
     let table_path = table.trim_start_matches('/');
     match namespace.filter(|n| !n.is_empty()) {

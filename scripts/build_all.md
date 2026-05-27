@@ -15,13 +15,31 @@ chmod +x scripts/build_all.sh   # once, if needed
 
 First run on a minimal cloud image may use `sudo` to install OpenJDK 21, `build-essential` (`cc`), and `uv` (Python). Later runs reuse what is already installed.
 
+## Logs (fresh each run)
+
+Capture logs are **removed at the start** of every pipeline run so you do not read stale output from an earlier attempt.
+
+| Mechanism | Log path | Cleanup |
+|-----------|----------|---------|
+| Foreground | `./scripts/build_all.sh` (stdout) or `> build_all.log` | Deletes repo-root `build_all.log` before work begins |
+| Background (SSH-safe) | `./build_all_run.sh start` | Deletes `build_all.log`, prunes prior `.build_all_runs/run-*` (keeps an in-flight run), writes a new `build.log` per run |
+
+```bash
+./build_all_run.sh start              # detached; survives logout
+./build_all_run.sh logs -f            # follow .build_all_runs/latest/build.log
+./build_all_run.sh status             # running / OK / failed
+./build_all_run.sh failures           # grep summary after failure
+```
+
+Set `BUILD_ALL_KEEP_LOGS=1` to skip deletion of `build_all.log` and prior `.build_all_runs/` directories (for comparing runs).
+
 ## What the default run does
 
 1. **`cargo clean`** — root Rust workspace  
 2. **`python_clean.py`** — Python wrapper build artifacts under `python-wrapper/`  
 3. **`build_all.py`** — in order, with short pauses between heavy steps:
    - Rust: `cargo fmt --check`, clippy, build, tests + doctests, `ci_expanded` tests, `people.xlsx` fixture
-   - Python: Ruff, `uv sync`, `maturin develop`, pytest; on Linux, wheel build + pip smoke
+   - Python: Ruff, `uv sync` (no pep517 build yet), debug `maturin develop` into shared repo `target/`, pytest (wheel smoke skipped here — see `python_ci.yml`)
    - Java (same gates as `.github/workflows/jvm_bindings_ci.yml`): FFI manifest + version checks, Spotless (Gradle main + Maven on all three modules), `rdp_jvm_sys` (`--features full`), `people.xlsx`, `mvn verify` + install (main + examples), Spark `mvn package`, Gradle `check` + `jmh` + `publishToMavenLocal`
    - Docs: `cargo doc`, pdoc → `_site/python/`, pandoc → `_site/java/examples.html`
 
@@ -152,9 +170,17 @@ python3 scripts/python_scripts/docs_java.py
 |----------|----------|----------|
 | `BUILD_ALL_NO_AUTO_JAVA=1` | JVM steps need JDK 21+ | Fail instead of `apt install openjdk-21-jdk` |
 | `BUILD_ALL_NO_AUTO_BUILD_ESSENTIAL=1` | Rust needs `cc` | Fail instead of `apt install build-essential` |
+| `BUILD_ALL_NO_AUTO_LIBCLANG=1` | JVM `rdp_jvm_sys --features full` (bindgen) | Fail instead of `apt install libclang-dev` on Debian/Ubuntu |
 | `BUILD_ALL_NO_AUTO_UV=1` | Python steps need `uv` | Fail instead of astral `uv` installer |
 | `BUILD_ALL_NO_AUTO_MAVEN=1` | JVM steps need `mvn` | Fail instead of `apt install maven` |
 | `BUILD_ALL_NO_CARGO_PREFETCH=1` | `--offline` and empty cache | Fail instead of one online `cargo fetch` |
+| `BUILD_ALL_KEEP_LOGS=1` | You want prior `build_all.log` / `.build_all_runs/` kept | Skip log cleanup at start of `build_all.sh` / `build_all_run.sh start` |
+| `BUILD_ALL_CARGO_JOBS` | Linux test links OOM or you have more RAM | `2` default via `rust_test.py`; `4`+ on large machines; `0` = Cargo default job count |
+| `BUILD_ALL_PYTHON_RELEASE` | Match CI `maturin develop --release` locally | Default **debug** develop (reuses repo `target/` after Rust steps; much less disk) |
+| `BUILD_ALL_PYTHON_SEPARATE_TARGET` | Isolate Python artifacts | Use `python-wrapper/target/` instead of shared repo `target/` |
+| `BUILD_ALL_SKIP_PYTHON_WHEEL_SMOKE` | Disk tight after develop | `build_all` already skips wheel smoke; set when running `python_test.py` alone |
+| `BUILD_ALL_NO_DISK_CLEAN` | Keep caches/target between phases | Skip automatic cleanup in `python_build.py` / `java_build.py` |
+| `BUILD_ALL_JVM_CLEAN_M2` | JVM phase still out of disk | Also remove `~/.m2/repository` before JVM (slow; re-downloads Maven deps) |
 
 ## Prerequisites (if auto-install is disabled)
 
@@ -179,3 +205,21 @@ python3 scripts/python_scripts/docs_java.py
 | `Required tool not on PATH: mvn` | Install Maven (`sudo apt install maven` on Debian/Ubuntu) |
 | `no matching package named ...` with `--offline` | Run once without `--offline`, or unset `BUILD_ALL_NO_CARGO_PREFETCH` |
 | `linker cc not found` | Allow `build-essential` install or `sudo apt install build-essential` |
+| `ld terminated with signal 7 [Bus error]` / rust-lld stack dump linking tests | Repo disables `lld` and uses GNU `bfd` (`.cargo/config.toml`); `cargo clean` then re-run |
+| `ld terminated with signal 9 [Killed]` linking tests (OOM) | `build_all` runs `cargo test -j 2` on Linux; on a bigger VM set `BUILD_ALL_CARGO_JOBS=4` (or `0` for Cargo default); then `cargo clean` and re-run |
+| `No space left on device` during Python / maturin | Free disk (`df -h`); remove old `python-wrapper/target/` if present; re-run — Python now shares repo `target/` and uses debug `maturin develop` (not a second release tree). Optional: `BUILD_ALL_PYTHON_RELEASE=1` only when you need release parity |
+| `Unable to find libclang` / `libgssapi-sys` build failed | Re-run `build_all` (auto-installs `libclang-dev` on Debian/Ubuntu before JVM native build), or `sudo apt install libclang-dev libkrb5-dev pkg-config` |
+
+### Automatic disk cleanup (each Python / JVM phase)
+
+Before **Python** (`python_build.py`), `build_all` runs:
+
+- `df -h` and `du -sh` on `target/`, `python-wrapper/target/`, `~/.cargo/registry`, `~/.cargo/git`, `~/.cache/uv`
+- Removes those paths (frees space for maturin; next step refetches crates as needed)
+
+Before **JVM** (`java_build.py`), `build_all` runs:
+
+- `df -h` and `du -sh` on `bindings/jvm-sys/target`, Maven `target/` dirs (main, examples, spark), Gradle `build/` + `.gradle/`
+- Removes those paths (optional: `BUILD_ALL_JVM_CLEAN_M2=1` also clears `~/.m2/repository`)
+
+Set `BUILD_ALL_NO_DISK_CLEAN=1` to disable both cleanups.

@@ -9,10 +9,7 @@ use crate::types::DataSet;
 use super::object_store::export_dataset_to_object_store_uri;
 
 /// Write `ds` as Parquet to `stage_uri` (object-store URI Rust can write).
-pub fn write_dataset_to_snowflake_stage(
-    stage_uri: &str,
-    ds: &DataSet,
-) -> IngestionResult<usize> {
+pub fn write_dataset_to_snowflake_stage(stage_uri: &str, ds: &DataSet) -> IngestionResult<usize> {
     let rows = ds.row_count();
     export_dataset_to_object_store_uri(stage_uri, ds)?;
     Ok(rows)
@@ -28,7 +25,15 @@ pub fn copy_into_table_from_stage(
     stage_uri: &str,
     role: Option<&str>,
 ) -> IngestionResult<()> {
-    let _ = (account_url, warehouse, database, schema, table, stage_uri, role);
+    let _ = (
+        account_url,
+        warehouse,
+        database,
+        schema,
+        table,
+        stage_uri,
+        role,
+    );
     if std::env::var("SNOWFLAKE_USER").is_ok() && std::env::var("SNOWFLAKE_PASSWORD").is_ok() {
         return Err(IngestionError::SchemaMismatch {
             message: "SNOWFLAKE_USER/PASSWORD are set but in-tree COPY INTO is not linked yet; run COPY FROM the staged Parquet in Snowflake SQL or add snowflake driver in a future release".to_string(),

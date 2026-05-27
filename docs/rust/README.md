@@ -140,6 +140,30 @@ let ds = ingest_from_db_infer(
 println!("rows={}", ds.row_count());
 ```
 
+## SFTP / FTP / FTPS ingest (feature-gated)
+
+Enable the feature (includes object store + SFTP/FTP):
+
+```powershell
+cargo test --features cloud_connectors
+cargo run --features cloud_connectors --example file_transfer_ingest -- `
+  "ftp://etl_user:PASS@ftp.example.com:21/rdp/incoming/data.json"
+```
+
+Set secrets on the process: `FTP_PASSWORD`, `SFTP_PASSWORD`, or `SFTP_PRIVATE_KEY_PATH` (see [CONNECTORS.md](../CONNECTORS.md) and [CLOUD_AUTH.md](../CLOUD_AUTH.md)).
+
+```rust
+use rust_data_processing::ingestion::{ingest_from_file_transfer_uri, IngestionOptions};
+
+let ds = ingest_from_file_transfer_uri(
+    "sftp://etl_user@sftp.example.com:22/rdp/incoming/data.parquet",
+    &schema,
+    &IngestionOptions::default(),
+)?;
+```
+
+JVM pipelines use `sources.file_transfer_uris` in JSON (same URIs; Rust performs the download).
+
 ## End-user transformation spec (TransformSpec) (Phase 1)
 
 `transform::TransformSpec` is a serde-friendly “mapping spec” that compiles to our Polars-backed pipeline wrappers

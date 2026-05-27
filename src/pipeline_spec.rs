@@ -12,7 +12,7 @@
 //!   payloads/*.payload.json        — `rdp_ingest_ordered_paths_json` bodies
 //! ```
 //!
-//! Bundles: `ghcn`, `jvm_contract`, `student_etl`, `people`, `watermark`, `deep`, …
+//! Bundles: `ghcn`, `jvm_contract`, `student_etl`, `people`, `watermark`, `deep`, `file_transfer`, …
 //!
 //! Pipelines may use `"schema_ref": "schemas/foo.schema.json"` (relative to the bundle root)
 //! instead of an inline `"schema"` object.

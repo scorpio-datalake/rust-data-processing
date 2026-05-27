@@ -7,13 +7,25 @@ import argparse
 import platform
 import sys
 
-from common import PYTHON_WRAPPER, banner, require_uv, run
+from common import (
+    PYTHON_WRAPPER,
+    banner,
+    python_venv_executable,
+    python_wrapper_cargo_env,
+    require_uv,
+    run,
+)
 
 
 def test(*, extra_pytest_args: list[str] | None = None) -> None:
     require_uv()
     banner("Python: pytest")
-    cmd = ["uv", "run", "pytest", "-m", "not deep and not benchmark", "-q"]
+    cmd = [
+        str(python_venv_executable("pytest")),
+        "-m",
+        "not deep and not benchmark",
+        "-q",
+    ]
     if extra_pytest_args:
         cmd.extend(extra_pytest_args)
     run(cmd, cwd=PYTHON_WRAPPER)
@@ -27,7 +39,17 @@ def wheel_install_smoke() -> None:
     require_uv()
     dist = PYTHON_WRAPPER / "dist"
     banner("Python: maturin build wheel + pip install smoke")
-    run(["uv", "run", "maturin", "build", "--release", "-o", "dist"], cwd=PYTHON_WRAPPER)
+    run(
+        [
+            str(python_venv_executable("maturin")),
+            "build",
+            "--release",
+            "-o",
+            "dist",
+        ],
+        cwd=PYTHON_WRAPPER,
+        env=python_wrapper_cargo_env(),
+    )
     wheels = sorted(dist.glob("*.whl"))
     if not wheels:
         raise SystemExit(f"No wheel produced under {dist}")

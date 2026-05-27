@@ -18,7 +18,7 @@ import org.json.JSONObject;
  * <p>Loads {@code tests/fixtures/cloud_connectors/pipelines/platform_connectors.pipeline.json}.
  * Ingest uses {@code sources.object_store_uris} only ({@code file://} in tests; {@code s3://} /
  * {@code gs://} / {@code abfss://} in production). Sinks write Parquet via Rust {@code object_store}
- * (and stage paths for Snowflake). Java never opens JDBC, Spark, or local files for ETL.
+ * (and stage paths for Snowflake). Java never opens warehouse drivers, Spark, or local files for ETL.
  */
 public final class PlatformConnectorsPipelineExample {
 

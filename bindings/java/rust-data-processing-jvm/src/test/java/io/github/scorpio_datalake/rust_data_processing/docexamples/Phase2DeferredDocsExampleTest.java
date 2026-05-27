@@ -13,14 +13,14 @@ import org.junit.jupiter.api.Test;
  * symbols appear in {@code ffi_manifest.json}.
  *
  * <p><strong>Why this class exists.</strong> {@code ExportFilterRowsMaxUtf8Chars.java} and {@code
- * MedianReduceAndDataFrame.java} describe Rust APIs that Python already exposes but the JVM does not
- * call yet. We still want a JUnit hook so that when a maintainer adds {@code
+ * MedianReduceAndDataFrame.java} describe Rust APIs that Python already exposes but the JVM does
+ * not call yet. We still want a JUnit hook so that when a maintainer adds {@code
  * rdp_parity_export_filter_rows_max_utf8_chars} (or similar), CI fails until the real contract is
  * implemented — instead of leaving silent doc drift.
  *
  * <p><strong>Behavior today.</strong> Each test assumes the native library is present, then {@code
- * assumeTrue(symbol exists)}. The symbol is missing, so tests <em>skip</em> with an explicit message.
- * That skip is intentional, not a pass.
+ * assumeTrue(symbol exists)}. The symbol is missing, so tests <em>skip</em> with an explicit
+ * message. That skip is intentional, not a pass.
  */
 final class Phase2DeferredDocsExampleTest {
 
@@ -28,9 +28,9 @@ final class Phase2DeferredDocsExampleTest {
   private static final String MEDIAN_REDUCE = "rdp_parity_median_reduce_and_groupby";
 
   /**
-   * Future guard for {@code ExportFilterRowsMaxUtf8Chars.java} (Phase 2 §2). When the symbol is added,
-   * replace this skip with {@code JvmNativeContractScenarios.runPhase2ExportFilterRows…} and assert
-   * only the short UTF-8 row survives {@code max_chars=10}.
+   * Future guard for {@code ExportFilterRowsMaxUtf8Chars.java} (Phase 2 §2). When the symbol is
+   * added, replace this skip with {@code JvmNativeContractScenarios.runPhase2ExportFilterRows…} and
+   * assert only the short UTF-8 row survives {@code max_chars=10}.
    */
   @Test
   void exportFilterRowsMaxUtf8CharsWhenFfiPresent() throws Throwable {

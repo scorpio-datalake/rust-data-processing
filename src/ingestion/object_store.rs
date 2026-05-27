@@ -13,7 +13,7 @@ use url::Url;
 use crate::error::{IngestionError, IngestionResult};
 use crate::types::{DataSet, Schema};
 
-use super::{export_dataset_to_parquet, ingest_from_path, IngestionFormat, IngestionOptions};
+use super::{IngestionFormat, IngestionOptions, export_dataset_to_parquet, ingest_from_path};
 
 fn block_on<F: std::future::Future>(f: F) -> F::Output {
     tokio::runtime::Builder::new_current_thread()
@@ -28,15 +28,17 @@ pub fn resolve_object_store_uri(uri: &str) -> IngestionResult<(Arc<dyn ObjectSto
     let url = Url::parse(uri).map_err(|e| IngestionError::SchemaMismatch {
         message: format!("invalid object-store URI `{uri}`: {e}"),
     })?;
-    let (store, path) = object_store::parse_url_opts(&url, std::iter::empty::<(&str, &str)>()).map_err(|e| {
-        IngestionError::SchemaMismatch {
+    let (store, path) = object_store::parse_url_opts(&url, std::iter::empty::<(&str, &str)>())
+        .map_err(|e| IngestionError::SchemaMismatch {
             message: format!("invalid object-store URI `{uri}`: {e}"),
-        }
-    })?;
+        })?;
     Ok((Arc::from(store), path))
 }
 
-fn infer_format_from_object_path(path: &ObjectPath, options: &IngestionOptions) -> IngestionResult<IngestionFormat> {
+fn infer_format_from_object_path(
+    path: &ObjectPath,
+    options: &IngestionOptions,
+) -> IngestionResult<IngestionFormat> {
     if let Some(f) = options.format {
         return Ok(f);
     }
@@ -88,10 +90,13 @@ pub fn ingest_from_object_store_uri(
 
     let local = temp_download_path(suffix)?;
     let bytes = block_on(async {
-        let result = store.get(&object_path).await.map_err(|e| IngestionError::Engine {
-            message: format!("object store get `{uri}`"),
-            source: Box::new(e),
-        })?;
+        let result = store
+            .get(&object_path)
+            .await
+            .map_err(|e| IngestionError::Engine {
+                message: format!("object store get `{uri}`"),
+                source: Box::new(e),
+            })?;
         result.bytes().await.map_err(|e| IngestionError::Engine {
             message: format!("object store read bytes `{uri}`"),
             source: Box::new(e),
@@ -114,10 +119,13 @@ pub fn export_dataset_to_object_store_uri(uri: &str, ds: &DataSet) -> IngestionR
     let bytes = std::fs::read(&local).map_err(IngestionError::Io)?;
     let _ = std::fs::remove_file(&local);
     block_on(async {
-        store.put(&object_path, bytes.into()).await.map_err(|e| IngestionError::Engine {
-            message: format!("object store put `{uri}`"),
-            source: Box::new(e),
-        })
+        store
+            .put(&object_path, bytes.into())
+            .await
+            .map_err(|e| IngestionError::Engine {
+                message: format!("object store put `{uri}`"),
+                source: Box::new(e),
+            })
     })?;
     Ok(())
 }
