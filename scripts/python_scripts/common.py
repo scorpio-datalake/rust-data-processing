@@ -292,24 +292,51 @@ def _libclang_shared_library() -> Path | None:
     return None
 
 
+def _gssapi_header_present() -> bool:
+    """``libgssapi-sys`` bindgen needs Kerberos headers (Debian: ``libkrb5-dev``)."""
+    return any(
+        path.is_file()
+        for path in (
+            Path("/usr/include/gssapi/gssapi.h"),
+            Path("/usr/include/gssapi.h"),
+        )
+    )
+
+
 def ensure_libclang_linux() -> None:
-    """``libgssapi-sys`` / ConnectorX bindgen needs libclang (JVM ``--features full``)."""
+    """Native JVM ``--features full`` needs libclang (bindgen) and gssapi headers (ConnectorX)."""
     if platform.system() != "Linux":
         return
-    if _libclang_shared_library() is not None:
+    need_libclang = _libclang_shared_library() is None
+    need_gssapi = not _gssapi_header_present()
+    if not need_libclang and not need_gssapi:
         return
     if os.environ.get("BUILD_ALL_NO_AUTO_LIBCLANG"):
+        missing = []
+        if need_libclang:
+            missing.append("libclang-dev (or LIBCLANG_PATH)")
+        if need_gssapi:
+            missing.append("libkrb5-dev (gssapi.h)")
         raise SystemExit(
-            "error: libclang not found (required for rdp_jvm_sys full / ConnectorX builds). "
-            "Install libclang-dev (Debian/Ubuntu) or set LIBCLANG_PATH, or unset "
-            "BUILD_ALL_NO_AUTO_LIBCLANG to allow apt install.",
+            "error: missing native build deps for rdp_jvm_sys full / ConnectorX: "
+            + ", ".join(missing)
+            + ". Install on Debian/Ubuntu or unset BUILD_ALL_NO_AUTO_LIBCLANG to allow apt install.",
         )
     if not _is_debian_like_linux():
         raise SystemExit(
-            "error: libclang not found. Install clang/libclang for your OS "
-            "(e.g. libclang-dev on Debian/Ubuntu), then re-run.",
+            "error: missing native build deps (libclang and/or gssapi.h). "
+            "Install libclang-dev and libkrb5-dev for your OS, then re-run.",
         )
-    banner("Linux: installing libclang-dev (bindgen for native JVM/Python deps)")
+    packages: list[str] = []
+    if need_libclang:
+        packages.append("libclang-dev")
+    if need_gssapi:
+        packages.extend(["libkrb5-dev", "pkg-config"])
+    banner(
+        "Linux: installing native JVM deps ("
+        + ", ".join(packages)
+        + " for bindgen / libgssapi-sys)",
+    )
     subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
     subprocess.run(
         [
@@ -318,19 +345,22 @@ def ensure_libclang_linux() -> None:
             "apt-get",
             "install",
             "-y",
-            "libclang-dev",
-            "libkrb5-dev",
-            "pkg-config",
+            *packages,
         ],
         check=True,
     )
-    found = _libclang_shared_library()
-    if found is None:
+    if need_libclang:
+        found = _libclang_shared_library()
+        if found is None:
+            raise SystemExit(
+                "error: libclang still not found after installing libclang-dev. "
+                "Set LIBCLANG_PATH to your libclang.so and re-run.",
+            )
+        print(f"  using libclang: {found}", flush=True)
+    if need_gssapi and not _gssapi_header_present():
         raise SystemExit(
-            "error: libclang still not found after installing libclang-dev. "
-            "Set LIBCLANG_PATH to your libclang.so and re-run.",
+            "error: gssapi.h still not found after installing libkrb5-dev.",
         )
-    print(f"  using libclang: {found}", flush=True)
 
 
 def _prefetch_cargo_for_offline_workflow() -> None:

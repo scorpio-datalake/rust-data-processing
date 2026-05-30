@@ -154,6 +154,12 @@ jobs:
         working-directory: bindings/java/rust-data-processing-jvm
         run: mvn -B spotless:check
 
+      - name: Install native build deps (Linux)
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libkrb5-dev pkg-config libclang-dev
+
       - name: Build native rdp_jvm_sys (tests, full Rust linkage)
         if: steps.gate.outputs.skip != 'true'
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full

@@ -73,6 +73,14 @@ jobs:
           python scripts/check_jvm_ffi_manifest.py
           python scripts/check_java_version_consistency.py
 
+      # libgssapi-sys (ConnectorX) needs gssapi.h; bindgen needs libclang. GitHub ubuntu runners
+      # ship libgssapi_krb5.so but not -dev headers — build_all installs these on Debian/Ubuntu.
+      - name: Install native build deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libkrb5-dev pkg-config libclang-dev
+
       # Link Phase 1 / Phase 2 rust-data-processing (SQL default stack) into the cdylib — matches release-shaped JVM parity builds.
       - name: Build native rdp_jvm_sys (full Rust core linkage)
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
