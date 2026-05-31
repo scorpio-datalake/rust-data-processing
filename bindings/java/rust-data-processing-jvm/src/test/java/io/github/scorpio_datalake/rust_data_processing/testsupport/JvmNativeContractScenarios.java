@@ -1055,8 +1055,8 @@ public final class JvmNativeContractScenarios {
   }
 
   /**
-   * Doc: {@code KafkaEltLoadExample.java}. **Load** step via {@code rdp_kafka_elt_load_records_json}
-   * (fixture JSON — no broker).
+   * Doc: {@code KafkaEltLoadExample.java}. **Load** step via {@code
+   * rdp_kafka_elt_load_records_json} (fixture JSON — no broker).
    */
   public static void runKafkaEltLoadRecordsJsonContract(
       Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
@@ -1071,19 +1071,16 @@ public final class JvmNativeContractScenarios {
         ]}
         """;
     JSONObject root =
-        RdpNativeJson.invokeKafkaEltLoadRecordsJson(
-            linker, lookup, arena, recordsJson, schemaJson);
+        RdpNativeJson.invokeKafkaEltLoadRecordsJson(linker, lookup, arena, recordsJson, schemaJson);
     if (!root.getBoolean("ok")) {
       String err = root.optString("error", root.toString());
       Assumptions.assumeFalse(
-          err.contains("kafka support disabled"),
-          "rdp_jvm_sys built without --features kafka");
+          err.contains("kafka support disabled"), "rdp_jvm_sys built without --features kafka");
     }
     PytestMirrorAssertions.assertEnvelopeOk(root);
     JSONObject inter = root.getJSONObject("interchange");
     assertEquals("kafka_elt_load", inter.getString("kind"));
-    assertEquals(
-        2, inter.getJSONObject("dataset").getJSONArray("rows").length());
+    assertEquals(2, inter.getJSONObject("dataset").getJSONArray("rows").length());
   }
 
   private static void deleteTree(Path root) throws Exception {

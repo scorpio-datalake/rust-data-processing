@@ -64,7 +64,7 @@ try {
     Write-Host ""
     Write-Host ("== Running: cargo bench --bench " + $b + " ==")
 
-    $cargoArgs = @('bench', '--bench', $b, '--locked')
+    $cargoArgs = @('bench', '--bench', $b, '--locked', '--features', 'deep_tests')
     if ($Offline) { $cargoArgs += '--offline' }
 
     $crit = @()

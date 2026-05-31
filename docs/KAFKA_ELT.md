@@ -101,7 +101,14 @@ Native `poll_kafka_window*` blocks while holding the GIL — run from a dedicate
 
 ## Java (wrapper)
 
-JVM does **not** embed `kafka-clients` for ingestion. Panama FFI calls into `rdp_jvm_sys` (same Rust implementation):
+JVM does **not** embed `kafka-clients` for ingestion. **Project Panama** downcalls into `rdp_jvm_sys`, which runs the same Rust `rdkafka` code as the native crate and Python wrapper.
+
+Build the native library first:
+
+```bash
+cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full,kafka
+export RDP_JVM_SYS=bindings/jvm-sys/target/release/librdp_jvm_sys.so   # .dylib / .dll on macOS / Windows
+```
 
 | FFI symbol | Rust analogue |
 | --- | --- |
@@ -110,11 +117,115 @@ JVM does **not** embed `kafka-clients` for ingestion. Panama FFI calls into `rdp
 | `rdp_kafka_poll_window_loaded_json` | `poll_kafka_window_loaded` |
 | `rdp_kafka_export_dataset_json` | `export_dataset_to_kafka` |
 
-Example: `docs/java/examples/KafkaEltLoadExample.java` (Load via fixture JSON — no broker).
+All calls return the usual JSON envelope: `{ "ok": true, "interchange": { … } }` (or `{ "ok": false, "error": "…" }`).
 
-**Transform** — `rdp_run_pipeline_json` or SQL parity exports on landed data.
+### Load (fixture — no broker)
 
-Requires `rdp_jvm_sys` built with `--features kafka` (Linux CI builds `full,kafka`). Maven and Gradle both load the same native artifact.
+`docs/java/examples/KafkaEltLoadExample.java` — map `tests/fixtures/kafka/stream_records.json` into a landing `dataset` via `rdp_kafka_elt_load_records_json`.
+
+### Connect to a broker (Extract → Load)
+
+Consumer config is a JSON object (not Java `Properties`):
+
+```json
+{
+  "brokers": "localhost:9092",
+  "group_id": "rdp-elt-java",
+  "topic": "events",
+  "max_records": 500,
+  "auto_offset_reset": "earliest",
+  "session_timeout_ms": 10000
+}
+```
+
+Landing schema uses Rust `Schema` serde shape (`data_type`, not Python’s list form):
+
+```json
+{
+  "fields": [
+    { "name": "user_id", "data_type": "Int64" },
+    { "name": "event", "data_type": "Utf8" },
+    { "name": "_kafka_offset", "data_type": "Int64" }
+  ]
+}
+```
+
+**Extract + Load** in one FFI call:
+
+```java
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
+import java.lang.foreign.Arena;
+import java.lang.foreign.Linker;
+import java.lang.foreign.SymbolLookup;
+import org.json.JSONObject;
+
+Path lib = RdpNativeJson.resolveNativeLibraryFromEnvOrProperty(); // RDP_JVM_SYS
+Linker linker = Linker.nativeLinker();
+try (Arena arena = Arena.ofConfined()) {
+  SymbolLookup lookup = SymbolLookup.libraryLookup(lib, arena);
+
+  String consumerConfig =
+      """
+      {"brokers":"localhost:9092","group_id":"rdp-elt-java","topic":"events","max_records":500}
+      """;
+  String landingSchema =
+      """
+      {"fields":[
+        {"name":"user_id","data_type":"Int64"},
+        {"name":"event","data_type":"Utf8"},
+        {"name":"_kafka_offset","data_type":"Int64"}
+      ]}
+      """;
+
+  JSONObject root =
+      RdpNativeJson.invokeKafkaPollWindowLoadedJson(
+          linker, lookup, arena, consumerConfig, landingSchema);
+  if (!root.getBoolean("ok")) {
+    throw new IllegalStateException(root.getString("error"));
+  }
+  JSONObject dataset = root.getJSONObject("interchange").getJSONObject("dataset");
+  int rows = dataset.getJSONArray("rows").length();
+  System.out.println("Landed " + rows + " rows (offsets in _kafka_* columns)");
+}
+```
+
+Runnable loop example: `docs/java/examples/KafkaEltStreamExample.java`
+
+```bash
+# optional: KAFKA_BROKERS, KAFKA_GROUP_ID, KAFKA_TOPIC env vars
+java KafkaEltStreamExample localhost:9092 rdp-elt-java events 500
+```
+
+**Extract only** (raw records, no landing schema):
+
+```java
+JSONObject root =
+    RdpNativeJson.invokeKafkaPollWindowJson(linker, lookup, arena, consumerConfig);
+var records = root.getJSONObject("interchange").getJSONArray("records");
+```
+
+### Sink (produce to a topic)
+
+Producer config + dataset JSON (Rust `DataSet` serde):
+
+```java
+String producerConfig =
+    """
+    {"brokers":"localhost:9092","topic":"curated-out","key_column":"user_id"}
+    """;
+String datasetJson = landedDatasetEnvelope.toString(); // { "schema": {…}, "rows": […] }
+
+JSONObject root =
+    RdpNativeJson.invokeKafkaExportDatasetJson(
+        linker, lookup, arena, producerConfig, datasetJson);
+int sent = root.getJSONObject("interchange").getInt("row_count");
+```
+
+### Transform (separate stage)
+
+After landing (Parquet temp export, pipeline JSON, etc.), run **`rdp_run_pipeline_json`** or SQL parity exports on the landed data — same as other connectors.
+
+Requires `rdp_jvm_sys` built with **`--features kafka`**. Linux CI builds `full,kafka`; other platforms need an explicit kafka-enabled native artifact on `RDP_JVM_SYS`.
 
 ---
 

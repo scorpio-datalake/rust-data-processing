@@ -13,29 +13,29 @@
 //! Enable native I/O with **`--features kafka`**. See [`docs/KAFKA_ELT.md`](../../docs/KAFKA_ELT.md).
 
 #[cfg(feature = "kafka")]
-mod record;
-#[cfg(feature = "kafka")]
-mod load;
-#[cfg(feature = "kafka")]
 mod builder;
 #[cfg(feature = "kafka")]
 mod consumer;
 #[cfg(feature = "kafka")]
+mod load;
+#[cfg(feature = "kafka")]
 mod producer;
+#[cfg(feature = "kafka")]
+mod record;
 
+#[cfg(feature = "kafka")]
+pub use builder::{KafkaConsumerBuilder, KafkaProducerBuilder};
+#[cfg(feature = "kafka")]
+pub use consumer::{poll_kafka_window, poll_kafka_window_loaded};
 #[cfg(feature = "kafka")]
 pub use load::{
     elt_load_kafka_records, elt_load_kafka_records_json, ingest_from_external_kafka_batches,
     ingest_from_external_kafka_batches_json,
 };
 #[cfg(feature = "kafka")]
-pub use record::{BytesTopicBatch, KafkaHeader, KafkaStreamRecord};
-#[cfg(feature = "kafka")]
-pub use builder::{KafkaConsumerBuilder, KafkaProducerBuilder};
-#[cfg(feature = "kafka")]
-pub use consumer::{poll_kafka_window, poll_kafka_window_loaded};
-#[cfg(feature = "kafka")]
 pub use producer::export_dataset_to_kafka;
+#[cfg(feature = "kafka")]
+pub use record::{BytesTopicBatch, KafkaHeader, KafkaStreamRecord};
 
 /// Back-compat aliases.
 #[cfg(feature = "kafka")]

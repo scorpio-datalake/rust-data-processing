@@ -6,12 +6,12 @@ use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::{Headers, Message};
 
 use crate::error::{IngestionError, IngestionResult};
-use crate::kafka::record::KafkaStreamRecord;
 use crate::kafka::KafkaStreamSource;
+use crate::kafka::record::KafkaStreamRecord;
 use crate::types::{DataSet, Schema};
 
-use super::load::elt_load_kafka_records;
 use super::KafkaConsumerBuilder;
+use super::load::elt_load_kafka_records;
 
 /// **Extract:** poll up to `max_records` from the topic (one checkpoint window).
 pub fn poll_kafka_window(

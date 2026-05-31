@@ -10,6 +10,11 @@
 #
 # Artifacts: .build_all_runs/<run-id>/build.log, failures.txt, exit.code, meta.txt
 
+# Re-exec under bash when invoked as `sh build_all_run.sh` (dash lacks pipefail).
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

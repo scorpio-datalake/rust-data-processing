@@ -24,7 +24,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ]}"#;
 
     let landed = elt_load_kafka_records_json(json, &landing)?;
-    println!("Load: landed {} rows (offsets preserved)", landed.row_count());
+    println!(
+        "Load: landed {} rows (offsets preserved)",
+        landed.row_count()
+    );
 
     // Transform is a separate step — e.g. sql_query_dataset, pipeline JSON, validation.
     println!("Transform: run Polars SQL / pipeline on landed data (not in this example).");

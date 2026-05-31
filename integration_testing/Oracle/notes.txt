@@ -1,0 +1,46 @@
+# Integration testing notes — Oracle
+
+## Done
+
+### 1. Rancher Desktop (on-demand)
+
+Scripts: `integration_testing/scripts/rancher/check_rancher_desktop.py`, `start_rancher_desktop.py`, `stop_rancher_desktop.py`
+
+### 2. Oracle Docker Compose
+
+`docker-compose.yml`, `.env.example`, `README.md` — Oracle XE via `gvenzl/oracle-xe:21-slim`.
+
+### 3. Build scripts (libs → `integration_testing/libs/`)
+
+| Script | Output |
+| --- | --- |
+| `scripts/build_libs/build_rust_lib.py` | `libs/rust/env.sh` (db_connectorx build) |
+| `scripts/build_libs/build_java_lib.py` | `libs/java/librdp_jvm_sys.so`, JAR, `env.sh` |
+| `scripts/build_libs/build_python_lib.py` | `libs/python/_rust_data_processing*.so`, `env.sh` |
+| `scripts/build_libs/build_all_libs.py` | All of the above |
+
+Incremental: skips rebuild unless sources changed, `--force`, or `libs/.last_test_failed` exists.
+
+### 4. Uber NYC pickups data
+
+`scripts/data_download/download_uber_data.py` → `integration_testing/data/uber_nyc_pickups_apr2014.csv`  
+Optional: `--sample` for 50k-row subset.
+
+
+### 5. Tri-language import tests (`run_tests.py`)
+
+Self-contained under `Oracle/` — no shared harness binary.
+
+| Path | Role |
+| --- | --- |
+| `Oracle/java/` | JUnit test using `libs/java/` JAR + `RDP_JVM_SYS` |
+| `Oracle/tests/` | pytest using `libs/python/` extension |
+| `Oracle/rust/` | `cargo test` using `rust-data-processing` with `db_connectorx` |
+
+Each leg: reset table → RDP CSV ingest via built lib → load into Oracle (JDBC / oracledb / local helper) → verify read-back.
+
+```bash
+python3 integration_testing/scripts/build_libs/build_all_libs.py
+python3 integration_testing/scripts/data_download/download_uber_data.py --sample
+python3 integration_testing/Oracle/run_tests.py
+```

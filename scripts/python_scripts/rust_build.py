@@ -10,7 +10,12 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import REPO_ROOT, banner, require_tool, run, setup_rust_toolchain_env
+from common import REPO_ROOT, banner, cargo_jobs_args, require_tool, run, setup_rust_toolchain_env
+
+# Criterion benches (`deep_tests`) are exercised via `cargo test --features ci_expanded` /
+# `cargo bench`; linking them during build_all routinely OOMs on small VMs.
+RUST_CLIPPY_TARGETS = ["--all-targets"]
+RUST_BUILD_TARGETS = ["--lib", "--bins", "--tests", "--examples"]
 
 
 def clean() -> None:
@@ -27,7 +32,7 @@ def fmt_check() -> None:
 
 def clippy(*, expanded: bool, offline: bool) -> None:
     require_tool("cargo")
-    args = ["cargo", "clippy", "--locked", "--all-targets"]
+    args = ["cargo", "clippy", "--locked", *cargo_jobs_args(), *RUST_CLIPPY_TARGETS]
     if expanded:
         args.extend(["--features", "ci_expanded"])
         banner("Rust clippy (--features ci_expanded, all targets)")
@@ -40,12 +45,12 @@ def clippy(*, expanded: bool, offline: bool) -> None:
 
 def build(*, expanded: bool, offline: bool) -> None:
     require_tool("cargo")
-    args = ["cargo", "build", "--locked", "--all-targets"]
+    args = ["cargo", "build", "--locked", *cargo_jobs_args(), *RUST_BUILD_TARGETS]
     if expanded:
         args.extend(["--features", "ci_expanded"])
-        banner("Rust build (--features ci_expanded, all targets)")
+        banner("Rust build (--features ci_expanded, lib/bins/tests/examples)")
     else:
-        banner("Rust build (default features, all targets)")
+        banner("Rust build (default features, lib/bins/tests/examples)")
     if offline:
         args.append("--offline")
     run(args, cwd=REPO_ROOT)

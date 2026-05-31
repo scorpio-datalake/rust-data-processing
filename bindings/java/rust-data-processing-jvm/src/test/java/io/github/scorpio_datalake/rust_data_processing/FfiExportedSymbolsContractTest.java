@@ -258,8 +258,7 @@ final class FfiExportedSymbolsContractTest {
         }
       case "rdp_kafka_poll_window_loaded_json":
         {
-          String schema =
-              "{\"fields\":[{\"name\":\"id\",\"data_type\":\"Int64\"}]}";
+          String schema = "{\"fields\":[{\"name\":\"id\",\"data_type\":\"Int64\"}]}";
           JSONObject root =
               RdpNativeJson.invokeKafkaPollWindowLoadedJson(
                   linker,

@@ -13,7 +13,11 @@ pub struct KafkaConsumerBuilder {
 }
 
 impl KafkaConsumerBuilder {
-    pub fn new(brokers: impl Into<String>, group_id: impl Into<String>, topic: impl Into<String>) -> Self {
+    pub fn new(
+        brokers: impl Into<String>,
+        group_id: impl Into<String>,
+        topic: impl Into<String>,
+    ) -> Self {
         Self {
             brokers: brokers.into(),
             group_id: group_id.into(),

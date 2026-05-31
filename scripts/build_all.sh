@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Full CI-style pipeline: see scripts/build_all.md
+
+# Re-exec under bash when invoked as `sh build_all.sh` (dash lacks pipefail).
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

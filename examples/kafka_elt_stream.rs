@@ -9,7 +9,9 @@
 //! ```
 
 use rust_data_processing::ingestion::export_dataset_to_parquet;
-use rust_data_processing::kafka::{elt_load_kafka_records, poll_kafka_window, KafkaConsumerBuilder};
+use rust_data_processing::kafka::{
+    KafkaConsumerBuilder, elt_load_kafka_records, poll_kafka_window,
+};
 use rust_data_processing::pipeline::DataFrame;
 use rust_data_processing::sql;
 use rust_data_processing::types::{DataType, Field, Schema};
@@ -53,8 +55,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- Transform (separate stage on landed storage) ---
     let df = DataFrame::from_dataset(&landed)?;
-    let curated = sql::query(&df, "SELECT user_id, event FROM df WHERE event IS NOT NULL")?
-        .collect()?;
-    println!("Transform: curated {} rows via Polars SQL", curated.row_count());
+    let curated =
+        sql::query(&df, "SELECT user_id, event FROM df WHERE event IS NOT NULL")?.collect()?;
+    println!(
+        "Transform: curated {} rows via Polars SQL",
+        curated.row_count()
+    );
     Ok(())
 }

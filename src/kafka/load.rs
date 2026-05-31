@@ -22,16 +22,18 @@ pub fn elt_load_kafka_records(
 }
 
 /// JSON: `{ "records": [ …KafkaStreamRecord… ] }` or a bare record array.
-pub fn elt_load_kafka_records_json(json: &str, landing_schema: &Schema) -> IngestionResult<DataSet> {
-    let records: Vec<KafkaStreamRecord> = if let Ok(wrapper) =
-        serde_json::from_str::<ExternalRecordEnvelope>(json)
-    {
-        wrapper.records
-    } else {
-        serde_json::from_str(json).map_err(|e| IngestionError::SchemaMismatch {
-            message: format!("invalid kafka stream record JSON: {e}"),
-        })?
-    };
+pub fn elt_load_kafka_records_json(
+    json: &str,
+    landing_schema: &Schema,
+) -> IngestionResult<DataSet> {
+    let records: Vec<KafkaStreamRecord> =
+        if let Ok(wrapper) = serde_json::from_str::<ExternalRecordEnvelope>(json) {
+            wrapper.records
+        } else {
+            serde_json::from_str(json).map_err(|e| IngestionError::SchemaMismatch {
+                message: format!("invalid kafka stream record JSON: {e}"),
+            })?
+        };
     elt_load_kafka_records(&records, landing_schema)
 }
 
@@ -44,7 +46,10 @@ pub fn ingest_from_external_kafka_batches(
 }
 
 /// Back-compat — prefer [`elt_load_kafka_records_json`].
-pub fn ingest_from_external_kafka_batches_json(json: &str, schema: &Schema) -> IngestionResult<DataSet> {
+pub fn ingest_from_external_kafka_batches_json(
+    json: &str,
+    schema: &Schema,
+) -> IngestionResult<DataSet> {
     elt_load_kafka_records_json(json, schema)
 }
 
@@ -85,15 +90,8 @@ fn kafka_metadata_value(record: &KafkaStreamRecord, name: &str) -> IngestionResu
         "_kafka_topic" => Ok(Value::Utf8(record.topic.clone())),
         "_kafka_partition" => Ok(Value::Int64(i64::from(record.partition))),
         "_kafka_offset" => Ok(Value::Int64(record.offset)),
-        "_kafka_timestamp_ms" => Ok(record
-            .timestamp_ms
-            .map(Value::Int64)
-            .unwrap_or(Value::Null)),
-        "_kafka_key" => Ok(record
-            .key
-            .clone()
-            .map(Value::Utf8)
-            .unwrap_or(Value::Null)),
+        "_kafka_timestamp_ms" => Ok(record.timestamp_ms.map(Value::Int64).unwrap_or(Value::Null)),
+        "_kafka_key" => Ok(record.key.clone().map(Value::Utf8).unwrap_or(Value::Null)),
         other => Err(IngestionError::SchemaMismatch {
             message: format!("unknown kafka metadata column '{other}'"),
         }),
@@ -103,12 +101,13 @@ fn kafka_metadata_value(record: &KafkaStreamRecord, name: &str) -> IngestionResu
 fn json_field_to_value(v: Option<&serde_json::Value>, dt: &DataType) -> IngestionResult<Value> {
     match v {
         None | Some(serde_json::Value::Null) => Ok(Value::Null),
-        Some(serde_json::Value::Number(n)) if matches!(dt, DataType::Int64) => Ok(Value::Int64(
-            n.as_i64()
-                .ok_or_else(|| IngestionError::SchemaMismatch {
+        Some(serde_json::Value::Number(n)) if matches!(dt, DataType::Int64) => {
+            Ok(Value::Int64(n.as_i64().ok_or_else(|| {
+                IngestionError::SchemaMismatch {
                     message: "expected i64 in kafka value JSON".to_string(),
-                })?,
-        )),
+                }
+            })?))
+        }
         Some(serde_json::Value::Number(n)) if matches!(dt, DataType::Float64) => {
             Ok(Value::Float64(n.as_f64().unwrap_or(f64::NAN)))
         }
@@ -121,24 +120,27 @@ fn json_field_to_value(v: Option<&serde_json::Value>, dt: &DataType) -> Ingestio
 fn string_to_value(s: &str, dt: &DataType) -> IngestionResult<Value> {
     match dt {
         DataType::Utf8 => Ok(Value::Utf8(s.to_string())),
-        DataType::Int64 => s
-            .parse::<i64>()
-            .map(Value::Int64)
-            .map_err(|e| IngestionError::SchemaMismatch {
-                message: format!("kafka value int64 cast failed: {e}"),
-            }),
-        DataType::Float64 => s
-            .parse::<f64>()
-            .map(Value::Float64)
-            .map_err(|e| IngestionError::SchemaMismatch {
-                message: format!("kafka value float64 cast failed: {e}"),
-            }),
-        DataType::Bool => s
-            .parse::<bool>()
-            .map(Value::Bool)
-            .map_err(|e| IngestionError::SchemaMismatch {
-                message: format!("kafka value bool cast failed: {e}"),
-            }),
+        DataType::Int64 => {
+            s.parse::<i64>()
+                .map(Value::Int64)
+                .map_err(|e| IngestionError::SchemaMismatch {
+                    message: format!("kafka value int64 cast failed: {e}"),
+                })
+        }
+        DataType::Float64 => {
+            s.parse::<f64>()
+                .map(Value::Float64)
+                .map_err(|e| IngestionError::SchemaMismatch {
+                    message: format!("kafka value float64 cast failed: {e}"),
+                })
+        }
+        DataType::Bool => {
+            s.parse::<bool>()
+                .map(Value::Bool)
+                .map_err(|e| IngestionError::SchemaMismatch {
+                    message: format!("kafka value bool cast failed: {e}"),
+                })
+        }
     }
 }
 

@@ -38,9 +38,7 @@ pub fn export_dataset_to_kafka(
             .and_then(|i| value_to_string(&row[i]))
             .unwrap_or_else(|| idx.to_string());
 
-        let mut record = BaseRecord::to(&builder.topic)
-            .key(&key)
-            .payload(&payload);
+        let mut record = BaseRecord::to(&builder.topic).key(&key).payload(&payload);
 
         if !builder.headers.is_empty() {
             let mut hdrs = OwnedHeaders::new();
@@ -53,10 +51,12 @@ pub fn export_dataset_to_kafka(
             record = record.headers(hdrs);
         }
 
-        producer.send(record).map_err(|(e, _)| IngestionError::Engine {
-            message: format!("kafka produce to topic '{}' failed", builder.topic),
-            source: Box::new(e),
-        })?;
+        producer
+            .send(record)
+            .map_err(|(e, _)| IngestionError::Engine {
+                message: format!("kafka produce to topic '{}' failed", builder.topic),
+                source: Box::new(e),
+            })?;
         sent += 1;
     }
 
@@ -76,11 +76,12 @@ fn row_payload(
     value_column: Option<&str>,
 ) -> IngestionResult<String> {
     if let Some(col) = value_column {
-        let idx = dataset.schema.index_of(col).ok_or_else(|| {
-            IngestionError::SchemaMismatch {
+        let idx = dataset
+            .schema
+            .index_of(col)
+            .ok_or_else(|| IngestionError::SchemaMismatch {
                 message: format!("kafka value_column '{col}' not in schema"),
-            }
-        })?;
+            })?;
         return value_to_string(&row[idx]).ok_or_else(|| IngestionError::SchemaMismatch {
             message: format!("kafka value_column '{col}' is null"),
         });

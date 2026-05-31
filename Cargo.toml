@@ -67,7 +67,7 @@ default = ["sql"]
 excel = ["dep:calamine"]
 # Enable Excel integration tests / benchmarks that generate an `.xlsx` at runtime (adds `rust_xlsxwriter`).
 excel_test_writer = ["excel", "dep:rust_xlsxwriter"]
-deep_tests = []
+deep_tests = [] # Criterion benches + large fixture tests (omit from default `clippy --all-targets` to save linker RAM).
 sql = ["dep:polars-sql"]
 arrow = ["dep:arrow"]
 serde_arrow = ["arrow", "dep:serde_arrow"]
@@ -102,26 +102,32 @@ criterion = "0.5"
 [[bench]]
 name = "pipelines"
 harness = false
+required-features = ["deep_tests"]
 
 [[bench]]
 name = "ingestion"
 harness = false
+required-features = ["deep_tests"]
 
 [[bench]]
 name = "map_reduce"
 harness = false
+required-features = ["deep_tests"]
 
 [[bench]]
 name = "profiling"
 harness = false
+required-features = ["deep_tests"]
 
 [[bench]]
 name = "validation"
 harness = false
+required-features = ["deep_tests"]
 
 [[bench]]
 name = "outliers"
 harness = false
+required-features = ["deep_tests"]
 
 [[test]]
 name = "file_transfer_ftp_integration"
@@ -150,6 +156,11 @@ required-features = ["excel_test_writer"]
 
 # Reduce linker memory for integration tests (Polars + Arrow graphs).
 [profile.test]
+debug = 0
+strip = "debuginfo"
+
+# Criterion benches link the same Polars/Arrow graph; keep debug info off the final link.
+[profile.bench]
 debug = 0
 strip = "debuginfo"
 

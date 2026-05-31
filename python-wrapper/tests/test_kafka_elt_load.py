@@ -14,13 +14,11 @@ skip_kafka = pytest.mark.skipif(not KAFKA, reason="extension not built with --fe
 
 @skip_kafka
 def test_elt_load_kafka_records_json_landing():
-    landing = {
-        "fields": [
-            {"name": "event_id", "type": "Int64"},
-            {"name": "payload", "type": "Utf8"},
-            {"name": "_kafka_offset", "type": "Int64"},
-        ]
-    }
+    landing = [
+        {"name": "event_id", "data_type": "int64"},
+        {"name": "payload", "data_type": "utf8"},
+        {"name": "_kafka_offset", "data_type": "int64"},
+    ]
     records = {
         "records": [
             {
@@ -43,7 +41,7 @@ def test_poll_kafka_window_rejects_empty_brokers():
 
 @skip_kafka
 def test_export_dataset_to_kafka_rejects_empty_brokers():
-    landing = {"fields": [{"name": "x", "type": "Utf8"}]}
-    ds = rdp.DataSet(landing, [["hello"]])
+    schema = [{"name": "x", "data_type": "utf8"}]
+    ds = rdp.DataSet(schema, [["hello"]])
     with pytest.raises(Exception, match="brokers"):
         rdp.export_dataset_to_kafka("", "out", ds)

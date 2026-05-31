@@ -1,0 +1,38 @@
+# Local Oracle Database XE for RDP integration testing (development / CI opt-in only).
+#
+# Image: gvenzl/oracle-xe — Oracle Database Express Edition (free for dev/test).
+# Not for production. Enterprise workloads → use GCP / Oracle Cloud (see README.md).
+#
+# Prerequisites:
+#   python3 integration_testing/scripts/rancher/check_rancher_desktop.py [--configure]
+#   python3 integration_testing/scripts/rancher/start_rancher_desktop.py
+#
+# Usage:
+#   cd integration_testing/Oracle
+#   cp .env.example .env   # optional — defaults match ConnectorX fixture URLs
+#   docker compose up -d
+#   docker compose ps
+#   docker compose logs -f oracle   # wait for "DATABASE IS READY TO USE!"
+
+services:
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: rdp-oracle-xe-test
+    restart: "no"
+    ports:
+      - "${ORACLE_PORT:-1521}:1521"
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-rdp_test_sys}
+      APP_USER: ${ORACLE_APP_USER:-etl_user}
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD:-rdp_test_etl}
+    volumes:
+      - oracle-xe-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+volumes:
+  oracle-xe-data:

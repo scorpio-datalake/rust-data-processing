@@ -1,0 +1,8 @@
+{
+  "fields": [
+    { "name": "Date/Time", "data_type": "Utf8" },
+    { "name": "Lat", "data_type": "Float64" },
+    { "name": "Lon", "data_type": "Float64" },
+    { "name": "Base", "data_type": "Utf8" }
+  ]
+}
