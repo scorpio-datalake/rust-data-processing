@@ -451,6 +451,12 @@ final class DocsExampleNativeIntegrationTest {
     JvmNativeContractScenarios.runSftpFtpPipelineTemplateContract();
   }
 
+  /** {@code KafkaEltLoadExample} — Load via {@code rdp_kafka_elt_load_records_json} (no broker). */
+  @Test
+  void kafkaEltLoadMatchesDocsExample() throws Throwable {
+    runWithNative(JvmNativeContractScenarios::runKafkaEltLoadRecordsJsonContract);
+  }
+
   @FunctionalInterface
   private interface NativeScenario {
     void run(Linker linker, SymbolLookup lookup, Arena arena) throws Throwable;

@@ -55,6 +55,16 @@ jobs:
           uv run maturin develop --release
           uv run pytest -m "not deep and not benchmark" -q
 
+      - name: Kafka feature — maturin develop + pytest
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        working-directory: python-wrapper
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            cmake libssl-dev zlib1g-dev libcurl4-openssl-dev pkg-config
+          uv run maturin develop --release --features kafka
+          uv run pytest tests/test_kafka_elt_load.py -q
+
       # PEP 517 / wheel path distinct from `maturin develop` (one matrix cell to save minutes).
       - name: Build wheel + pip install smoke
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'

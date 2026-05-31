@@ -769,6 +769,93 @@ fn ingest_from_db_infer_py(
         .map_err(ingestion_err_to_py)
 }
 
+/// **Load** step: map a JSON poll window into a landing `DataSet` (ELT).
+#[cfg(feature = "kafka")]
+use rust_data_processing::kafka::{
+    elt_load_kafka_records_json, export_dataset_to_kafka, poll_kafka_window,
+    poll_kafka_window_loaded, KafkaConsumerBuilder, KafkaProducerBuilder,
+};
+
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "elt_load_kafka_records_json")]
+fn elt_load_kafka_records_json_py(
+    records_json: &str,
+    landing_schema: &Bound<'_, PyAny>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(landing_schema)?;
+    elt_load_kafka_records_json(records_json, &schema)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+/// **Extract:** poll up to `max_records` from a topic; returns JSON `{ "records": [ … ] }`.
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "poll_kafka_window")]
+#[pyo3(signature = (brokers, group_id, topic, max_records=500, auto_offset_reset="earliest", session_timeout_ms=None))]
+fn poll_kafka_window_py(
+    brokers: &str,
+    group_id: &str,
+    topic: &str,
+    max_records: usize,
+    auto_offset_reset: &str,
+    session_timeout_ms: Option<u32>,
+) -> PyResult<String> {
+    let mut builder =
+        KafkaConsumerBuilder::new(brokers, group_id, topic).auto_offset_reset(auto_offset_reset);
+    if let Some(ms) = session_timeout_ms {
+        builder = builder.session_timeout_ms(ms);
+    }
+    let records = poll_kafka_window(&builder, max_records).map_err(ingestion_err_to_py)?;
+    serde_json::to_string(&serde_json::json!({ "records": records }))
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+}
+
+/// **Extract + Load:** poll a window and map to a landing `DataSet`.
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "poll_kafka_window_loaded")]
+#[pyo3(signature = (brokers, group_id, topic, landing_schema, max_records=500, auto_offset_reset="earliest", session_timeout_ms=None))]
+fn poll_kafka_window_loaded_py(
+    brokers: &str,
+    group_id: &str,
+    topic: &str,
+    landing_schema: &Bound<'_, PyAny>,
+    max_records: usize,
+    auto_offset_reset: &str,
+    session_timeout_ms: Option<u32>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(landing_schema)?;
+    let mut builder =
+        KafkaConsumerBuilder::new(brokers, group_id, topic).auto_offset_reset(auto_offset_reset);
+    if let Some(ms) = session_timeout_ms {
+        builder = builder.session_timeout_ms(ms);
+    }
+    poll_kafka_window_loaded(&builder, &schema, max_records)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+/// **Sink:** publish each row of `dataset` to Kafka; returns rows sent.
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "export_dataset_to_kafka")]
+#[pyo3(signature = (brokers, topic, dataset, key_column=None, value_column=None, message_timeout_ms=5000))]
+fn export_dataset_to_kafka_py(
+    brokers: &str,
+    topic: &str,
+    dataset: &PyDataSet,
+    key_column: Option<&str>,
+    value_column: Option<&str>,
+    message_timeout_ms: u64,
+) -> PyResult<usize> {
+    let mut builder = KafkaProducerBuilder::new(brokers, topic).message_timeout_ms(message_timeout_ms);
+    if let Some(col) = key_column {
+        builder = builder.key_column(col);
+    }
+    if let Some(col) = value_column {
+        builder = builder.value_column(col);
+    }
+    export_dataset_to_kafka(&builder, &dataset.inner).map_err(ingestion_err_to_py)
+}
+
 /// Read one object from `s3://`, `gs://`, `abfss://`, `file://`, … into a `DataSet` (feature `cloud`).
 #[cfg(feature = "cloud")]
 #[pyfunction(name = "ingest_from_object_store_uri")]
@@ -1188,6 +1275,13 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ingest_from_path_infer_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_infer_py, m)?)?;
+    #[cfg(feature = "kafka")]
+    {
+        m.add_function(wrap_pyfunction!(elt_load_kafka_records_json_py, m)?)?;
+        m.add_function(wrap_pyfunction!(poll_kafka_window_py, m)?)?;
+        m.add_function(wrap_pyfunction!(poll_kafka_window_loaded_py, m)?)?;
+        m.add_function(wrap_pyfunction!(export_dataset_to_kafka_py, m)?)?;
+    }
     #[cfg(feature = "cloud")]
     {
         m.add_function(wrap_pyfunction!(ingest_from_object_store_uri_py, m)?)?;

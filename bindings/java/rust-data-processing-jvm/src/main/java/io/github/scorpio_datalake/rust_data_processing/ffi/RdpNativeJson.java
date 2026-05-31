@@ -312,6 +312,101 @@ public final class RdpNativeJson {
     return new JSONObject(json);
   }
 
+  /** Kafka **Load**: {@code rdp_kafka_elt_load_records_json}. */
+  public static JSONObject invokeKafkaEltLoadRecordsJson(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String recordsJson,
+      String schemaJson)
+      throws Throwable {
+    return invokeKafkaThreeStringArgs(
+        linker, lookup, arena, "rdp_kafka_elt_load_records_json", recordsJson, schemaJson);
+  }
+
+  /** Kafka **Extract**: {@code rdp_kafka_poll_window_json} (config JSON object). */
+  public static JSONObject invokeKafkaPollWindowJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String configJson) throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment configUtf8 = allocateUtf8CString(arena, configJson);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find("rdp_kafka_poll_window_json").orElseThrow(),
+            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, configUtf8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_kafka_poll_window_json");
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+    return new JSONObject(json);
+  }
+
+  /** Kafka **Extract+Load**: {@code rdp_kafka_poll_window_loaded_json}. */
+  public static JSONObject invokeKafkaPollWindowLoadedJson(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String configJson,
+      String schemaJson)
+      throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment configUtf8 = allocateUtf8CString(arena, configJson);
+    MemorySegment schemaUtf8 = allocateUtf8CString(arena, schemaJson);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find("rdp_kafka_poll_window_loaded_json").orElseThrow(),
+            FunctionDescriptor.ofVoid(
+                ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, configUtf8, schemaUtf8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_kafka_poll_window_loaded_json");
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+    return new JSONObject(json);
+  }
+
+  /** Kafka **sink**: {@code rdp_kafka_export_dataset_json}. */
+  public static JSONObject invokeKafkaExportDatasetJson(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String configJson,
+      String datasetJson)
+      throws Throwable {
+    return invokeKafkaThreeStringArgs(
+        linker, lookup, arena, "rdp_kafka_export_dataset_json", configJson, datasetJson);
+  }
+
+  private static JSONObject invokeKafkaThreeStringArgs(
+      Linker linker,
+      SymbolLookup lookup,
+      Arena arena,
+      String symbol,
+      String arg1,
+      String arg2)
+      throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment arg1Utf8 = allocateUtf8CString(arena, arg1);
+    MemorySegment arg2Utf8 = allocateUtf8CString(arena, arg2);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find(symbol).orElseThrow(),
+            FunctionDescriptor.ofVoid(
+                ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, arg1Utf8, arg2Utf8);
+    String json = readJsonSliceUtf8(out, arena, symbol);
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+    return new JSONObject(json);
+  }
+
   public static int invokeAbiVersion(Linker linker, SymbolLookup lookup) throws Throwable {
     MethodHandle mh =
         linker.downcallHandle(

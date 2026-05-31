@@ -79,11 +79,17 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libkrb5-dev pkg-config libclang-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libkrb5-dev pkg-config libclang-dev \
+            cmake libssl-dev zlib1g-dev libcurl4-openssl-dev
 
       # Link Phase 1 / Phase 2 rust-data-processing (SQL default stack) into the cdylib — matches release-shaped JVM parity builds.
       - name: Build native rdp_jvm_sys (full Rust core linkage)
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
+
+      - name: Build native rdp_jvm_sys with kafka (Linux only)
+        if: runner.os == 'Linux'
+        run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full,kafka
 
       - name: Generate tests/fixtures/people.xlsx (JVM Excel FFI + docs)
         run: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture

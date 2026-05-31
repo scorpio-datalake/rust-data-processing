@@ -19,6 +19,7 @@ Rust (`rust-data-processing` / `rdp_jvm_sys`) performs I/O. **Python** and **Jav
 | **Azure Blob / ADLS** | `abfss://container@storacc01.dfs.core.windows.net/rdp/incoming/part-00000.parquet` | OS env: `AZURE_*` — **[AZURE_ADLS.md](AZURE_ADLS.md)** |
 | **SFTP** | `sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet` | User + password or `SFTP_PRIVATE_KEY_PATH` env — see [CLOUD_AUTH.md](CLOUD_AUTH.md#sftp) |
 | **FTP** | `ftp://etl_user:FAKE_FTP_PASS@ftp.example.com:21/rdp/incoming/data.parquet` | User + password (`FTP_PASSWORD` env) — see [CLOUD_AUTH.md](CLOUD_AUTH.md#ftp--ftps) |
+| **Kafka (streaming)** | `localhost:9092` + topic `events` (bootstrap servers) | SASL/SSL via librdkafka config — **[KAFKA_ELT.md](KAFKA_ELT.md)** (ELT, not batch ETL) |
 
 **Warehouse SQL** (same text in all languages where applicable):
 
@@ -26,7 +27,7 @@ Rust (`rust-data-processing` / `rdp_jvm_sys`) performs I/O. **Python** and **Jav
 SELECT id, name, amount FROM demo.fact_scores WHERE amount > 0 LIMIT 100000;
 ```
 
-**Build features:** Rust/Python cloud I/O: `cloud_connectors` (object store, SFTP/FTP, Delta staging). SQL read: `db_connectorx` / Python `db`. JVM: `rdp_jvm_sys` with `link-main` (includes `cloud_connectors`).
+**Build features:** Rust/Python cloud I/O: `cloud_connectors` (object store, SFTP/FTP, Delta staging). SQL read: `db_connectorx` / Python `db`. JVM: `rdp_jvm_sys` with `link-main` (includes `cloud_connectors`). **Kafka streaming ELT:** `--features kafka` — see **[KAFKA_ELT.md](KAFKA_ELT.md)** (poll windows, not file batches).
 
 ---
 

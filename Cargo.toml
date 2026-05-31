@@ -56,6 +56,9 @@ libssh2-sys = { version = "0.3.1", features = ["vendored-openssl"], optional = t
 ssh2 = { version = "0.9.4", optional = true }
 suppaftp = { version = "6.0.3", default-features = false, features = ["rustls"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
+rdkafka = { version = "0.36.2", optional = true, default-features = false, features = [
+  "cmake-build",
+] }
 
 [features]
 # Keep the default dependency surface small; enable connectors explicitly.
@@ -87,6 +90,8 @@ file_transfer = [
   "dep:webpki-roots",
 ]
 cloud_connectors = ["object_store", "delta_lake", "snowflake", "file_transfer"]
+# Kafka streaming via librdkafka (system lib on Linux CI; see docs/adr/007-kafka-rdkafka-connector-abi.md).
+kafka = ["dep:rdkafka"]
 # Same feature set as `rust_ci.yml` “expanded” job: deep tests + Arrow/serde_arrow + Excel writer,
 # but **not** `db_connectorx` (ConnectorX → OpenSSL; needs Perl or system SSL on Windows).
 ci_expanded = ["deep_tests", "excel_test_writer", "arrow", "serde_arrow"]
@@ -125,6 +130,18 @@ required-features = ["cloud_connectors"]
 [[example]]
 name = "file_transfer_ingest"
 required-features = ["cloud_connectors"]
+
+[[example]]
+name = "kafka_elt_byo_load"
+required-features = ["kafka"]
+
+[[example]]
+name = "kafka_elt_stream"
+required-features = ["kafka"]
+
+[[test]]
+name = "kafka_elt_load"
+required-features = ["kafka"]
 
 [[bin]]
 name = "generate_people_xlsx_fixture"

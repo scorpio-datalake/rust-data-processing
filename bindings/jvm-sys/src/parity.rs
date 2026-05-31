@@ -786,8 +786,12 @@ pub unsafe extern "C" fn rdp_parity_kafka(out: *mut RdpJsonSlice) {
 fn parity_kafka() -> RdpJsonSlice {
     json_ok(serde_json::json!({
         "kind": "kafka",
-        "status": "planned",
+        "status": "in_progress",
+        "model": "streaming_elt",
+        "extract": "poll_kafka_window (rdp_kafka_poll_window_json FFI)",
+        "load": "elt_load_kafka_records_json",
+        "transform": "separate Polars SQL / rdp_run_pipeline_json",
+        "docs": "docs/KAFKA_ELT.md",
         "tracker": "P3-E2",
-        "note": "rdkafka + BYO connector ABI — Planning/PHASE3_EPICS.md P3-E2",
     }))
 }

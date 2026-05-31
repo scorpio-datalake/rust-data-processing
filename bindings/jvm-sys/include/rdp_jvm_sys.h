@@ -48,6 +48,18 @@ void rdp_ingest_ordered_paths_json(RdpJsonSlice *out, const char *payload_json);
 /** Ordered ingest + Polars SQL + sinks from one UTF-8 JSON document (see docs/java examples). */
 void rdp_run_pipeline_json(RdpJsonSlice *out, const char *payload_json);
 
+/** Kafka ELT: JSON poll window + landing schema → {@code interchange.dataset}. */
+void rdp_kafka_elt_load_records_json(RdpJsonSlice *out, const char *records_json, const char *schema_json);
+
+/** Kafka Extract: consumer config JSON → {@code interchange.records}. */
+void rdp_kafka_poll_window_json(RdpJsonSlice *out, const char *config_json);
+
+/** Kafka Extract+Load: consumer config + landing schema → {@code interchange.dataset}. */
+void rdp_kafka_poll_window_loaded_json(RdpJsonSlice *out, const char *config_json, const char *schema_json);
+
+/** Kafka sink: producer config JSON + dataset JSON → {@code interchange.row_count}. */
+void rdp_kafka_export_dataset_json(RdpJsonSlice *out, const char *config_json, const char *dataset_json);
+
 void rdp_parity_benchmark_smoke_mirror(RdpJsonSlice *out);
 void rdp_parity_bindings_mirror(RdpJsonSlice *out);
 void rdp_parity_cdc(RdpJsonSlice *out);

@@ -18,6 +18,8 @@ default = []
 db = ["rust-data-processing/db_connectorx"]
 # S3 / GCS / Azure / file:// object-store read/write (same as JVM cloud_connectors).
 cloud = ["rust-data-processing/cloud_connectors"]
+# Kafka streaming ELT (Load from BYO poll windows; native poll when parent kafka feature on).
+kafka = ["rust-data-processing/kafka"]
 
 [dependencies]
 pyo3 = { version = "0.26", features = ["extension-module"] }

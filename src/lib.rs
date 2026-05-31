@@ -293,6 +293,7 @@ pub mod error;
 pub mod execution;
 pub mod export;
 pub mod ingestion;
+pub mod kafka;
 pub mod outliers;
 pub mod pipeline;
 pub mod pipeline_spec;

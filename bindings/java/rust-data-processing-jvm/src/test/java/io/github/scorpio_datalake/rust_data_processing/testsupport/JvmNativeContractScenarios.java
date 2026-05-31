@@ -1054,6 +1054,38 @@ public final class JvmNativeContractScenarios {
         "docs/LAKE_TABLE_READ.md for lake → Parquet → rdp_ingest_parquet_path handoff");
   }
 
+  /**
+   * Doc: {@code KafkaEltLoadExample.java}. **Load** step via {@code rdp_kafka_elt_load_records_json}
+   * (fixture JSON — no broker).
+   */
+  public static void runKafkaEltLoadRecordsJsonContract(
+      Linker linker, SymbolLookup lookup, Arena arena) throws Throwable {
+    Path fixture = requireJvmContractFixture("kafka/stream_records.json");
+    String recordsJson = Files.readString(fixture, java.nio.charset.StandardCharsets.UTF_8);
+    String schemaJson =
+        """
+        {"fields":[
+          {"name":"event_id","data_type":"Int64"},
+          {"name":"payload","data_type":"Utf8"},
+          {"name":"_kafka_offset","data_type":"Int64"}
+        ]}
+        """;
+    JSONObject root =
+        RdpNativeJson.invokeKafkaEltLoadRecordsJson(
+            linker, lookup, arena, recordsJson, schemaJson);
+    if (!root.getBoolean("ok")) {
+      String err = root.optString("error", root.toString());
+      Assumptions.assumeFalse(
+          err.contains("kafka support disabled"),
+          "rdp_jvm_sys built without --features kafka");
+    }
+    PytestMirrorAssertions.assertEnvelopeOk(root);
+    JSONObject inter = root.getJSONObject("interchange");
+    assertEquals("kafka_elt_load", inter.getString("kind"));
+    assertEquals(
+        2, inter.getJSONObject("dataset").getJSONArray("rows").length());
+  }
+
   private static void deleteTree(Path root) throws Exception {
     try (var walk = Files.walk(root)) {
       for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {

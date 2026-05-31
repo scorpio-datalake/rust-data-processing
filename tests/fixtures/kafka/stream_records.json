@@ -1,0 +1,17 @@
+{
+  "records": [
+    {
+      "topic": "metrics",
+      "partition": 0,
+      "offset": 10,
+      "timestamp_ms": 1700000000000,
+      "value": "{\"event_id\":100,\"payload\":\"alpha\"}"
+    },
+    {
+      "topic": "metrics",
+      "partition": 1,
+      "offset": 11,
+      "value": "{\"event_id\":101,\"payload\":\"beta\"}"
+    }
+  ]
+}
