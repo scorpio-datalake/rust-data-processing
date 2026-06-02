@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -28,6 +29,7 @@ from common import (  # noqa: E402
     needs_rebuild,
     require_tool,
     run,
+    setup_integration_build_env,
     write_java_env,
 )
 
@@ -48,11 +50,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.force:
-        import os
-
         os.environ["INTEG_FORCE_REBUILD"] = "1"
 
-    load_cargo_env()
+    setup_integration_build_env()
     ensure_linux_native_deps()
     require_tool("cargo")
 

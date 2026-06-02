@@ -16,6 +16,8 @@ REPO_ROOT = INTEG_ROOT.parent
 LIBS_DIR = INTEG_ROOT / "libs"
 DATA_DIR = INTEG_ROOT / "data"
 SCRIPTS_DIR = INTEG_ROOT / "scripts"
+# Isolated from repo ``target/`` so integration builds do not race with ``build_all`` / clippy.
+INTEG_TARGET_DIR = INTEG_ROOT / ".target"
 
 RUST_STAMP = LIBS_DIR / "rust" / ".built_at"
 JAVA_STAMP = LIBS_DIR / "java" / ".built_at"
@@ -58,6 +60,21 @@ def load_cargo_env() -> None:
         prefix = str(cargo_bin)
         if prefix not in path.split(":"):
             os.environ["PATH"] = f"{prefix}:{path}" if path else prefix
+
+
+def setup_integration_build_env() -> None:
+    """Cargo + isolated target dir (safe alongside ``build_all`` on the same machine)."""
+    load_cargo_env()
+    INTEG_TARGET_DIR.mkdir(parents=True, exist_ok=True)
+    os.environ["CARGO_TARGET_DIR"] = str(INTEG_TARGET_DIR)
+    # Limit parallel link/native compiles; override with INTEGR_CARGO_JOBS if needed.
+    if "CARGO_BUILD_JOBS" not in os.environ:
+        jobs = os.environ.get("INTEG_CARGO_JOBS", "2")
+        os.environ["CARGO_BUILD_JOBS"] = jobs
+
+
+def cargo_target_dir() -> Path:
+    return Path(os.environ.get("CARGO_TARGET_DIR", REPO_ROOT / "target"))
 
 
 def load_env_sh(path: Path) -> dict[str, str]:
@@ -149,7 +166,7 @@ def _jvm_lib_basename() -> str:
 
 
 def native_jvm_src() -> Path:
-    return REPO_ROOT / "bindings" / "jvm-sys" / "target" / "release" / _jvm_lib_basename()
+    return cargo_target_dir() / "release" / _jvm_lib_basename()
 
 
 def jvm_lib_dest() -> Path:

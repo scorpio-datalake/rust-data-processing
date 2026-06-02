@@ -116,11 +116,30 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Non-login shells often omit rustup's PATH; load it when present.
-if [[ -f "${HOME}/.cargo/env" ]]; then
-  # shellcheck source=/dev/null
-  source "${HOME}/.cargo/env"
-fi
+# Non-login shells often omit rustup's PATH; ensure ~/.cargo/bin is visible.
+ensure_cargo_on_path() {
+  if [[ -z "${HOME:-}" ]]; then
+    HOME="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6 || true)"
+    export HOME
+  fi
+  if [[ -z "${HOME:-}" ]]; then
+    HOME="/home/$(id -un)"
+    export HOME
+  fi
+  if [[ -f "${HOME}/.cargo/env" ]]; then
+    # shellcheck source=/dev/null
+    source "${HOME}/.cargo/env"
+  fi
+  local cargo_bin="${HOME}/.cargo/bin"
+  if [[ -x "${cargo_bin}/cargo" ]]; then
+    case ":${PATH}:" in
+      *":${cargo_bin}:"*) ;;
+      *) export PATH="${cargo_bin}:${PATH}" ;;
+    esac
+  fi
+}
+
+ensure_cargo_on_path
 
 cd "${repo_root}"
 
@@ -249,6 +268,18 @@ ensure_java_for_build() {
 
 ensure_java_for_build
 ensure_maven_for_build
+
+# Fail fast before a long compile when the root disk is nearly full.
+min_gib="${BUILD_ALL_MIN_DISK_GIB:-8}"
+avail_kib="$(df -Pk "${repo_root}" | awk 'NR==2 {print $4}')"
+if [[ -n "${avail_kib}" && "${avail_kib}" =~ ^[0-9]+$ ]]; then
+  avail_gib=$((avail_kib / 1024 / 1024))
+  if (( avail_gib < min_gib )); then
+    echo "error: only ${avail_gib} GiB free on ${repo_root} (need ~${min_gib} GiB)." >&2
+    echo "  Free space: cargo clean; remove old target/ or .build_all_runs/run-*" >&2
+    exit 1
+  fi
+fi
 
 if [[ "${skip_upstream_clean}" != true ]]; then
   echo "== Rust: cargo clean =="

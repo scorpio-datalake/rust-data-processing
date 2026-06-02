@@ -19,6 +19,7 @@ Opt-in connector tests (Oracle, cloud, Kafka, …). **Not** run in default PR CI
 | `Oracle/run_tests.py` | Tri-language import test orchestrator |
 | `Oracle/README.md` | Oracle + Rancher setup details |
 | `libs/` | Built artifacts + `env.sh` (gitignored binaries) |
+| `.target/` | Isolated Cargo target (gitignored; avoids races with repo `build_all`) |
 | `data/` | Uber CSV (gitignored; see `data/README.md`) |
 
 Start with `Oracle/README.md`.

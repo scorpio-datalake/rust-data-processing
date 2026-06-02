@@ -176,6 +176,8 @@ python3 scripts/python_scripts/docs_java.py
 | `BUILD_ALL_NO_CARGO_PREFETCH=1` | `--offline` and empty cache | Fail instead of one online `cargo fetch` |
 | `BUILD_ALL_KEEP_LOGS=1` | You want prior `build_all.log` / `.build_all_runs/` kept | Skip log cleanup at start of `build_all.sh` / `build_all_run.sh start` |
 | `BUILD_ALL_CARGO_JOBS` | Linux test links OOM or you have more RAM | `2` default via `rust_test.py`; `4`+ on large machines; `0` = Cargo default job count |
+| `BUILD_ALL_CLEAN_BETWEEN_RUST_FEATURES` | Skip recompile between default and `ci_expanded` on a large VM | **`1` (default)** — `cargo clean` after default Rust clippy/build; set `=0` to keep artifacts |
+| `BUILD_ALL_MIN_DISK_GIB` | Preflight before `build_all` / Rust steps | `8` — fail early if root filesystem has less free space |
 | `BUILD_ALL_PYTHON_RELEASE` | Match CI `maturin develop --release` locally | Default **debug** develop (reuses repo `target/` after Rust steps; much less disk) |
 | `BUILD_ALL_PYTHON_SEPARATE_TARGET` | Isolate Python artifacts | Use `python-wrapper/target/` instead of shared repo `target/` |
 | `BUILD_ALL_SKIP_PYTHON_WHEEL_SMOKE` | Disk tight after develop | `build_all` already skips wheel smoke; set when running `python_test.py` alone |
@@ -207,6 +209,7 @@ python3 scripts/python_scripts/docs_java.py
 | `linker cc not found` | Allow `build-essential` install or `sudo apt install build-essential` |
 | `ld terminated with signal 7 [Bus error]` / rust-lld stack dump linking tests | Repo disables `lld` and uses GNU `bfd` (`.cargo/config.toml`); `cargo clean` then re-run |
 | `ld terminated with signal 9 [Killed]` linking tests or benches (OOM) | `build_all` skips Criterion bench linking in `rust_build.py` (uses `--lib --bins --tests --examples`); tests run with `cargo test -j 2` on Linux. On a bigger VM set `BUILD_ALL_CARGO_JOBS=4` (or `0` for Cargo default); then `cargo clean` and re-run |
+| `No space left on device` / `ld.bfd: final link failed` during Rust tests | Root `target/debug/` can exceed 25 GiB on a full `build_all`. Run `cargo clean`, check `df -h`. `build_all` skips Criterion benches in clippy/build, and **by default** runs `cargo clean` between default and `ci_expanded` Rust phases. Disable with `BUILD_ALL_CLEAN_BETWEEN_RUST_FEATURES=0` on a large VM when iterating. Preflight: `BUILD_ALL_MIN_DISK_GIB=8` (default) |
 | `No space left on device` during Python / maturin | Free disk (`df -h`); remove old `python-wrapper/target/` if present; re-run — Python now shares repo `target/` and uses debug `maturin develop` (not a second release tree). Optional: `BUILD_ALL_PYTHON_RELEASE=1` only when you need release parity |
 | `Unable to find libclang` / `libgssapi-sys` build failed | Re-run `build_all` (auto-installs `libclang-dev` on Debian/Ubuntu before JVM native build), or `sudo apt install libclang-dev libkrb5-dev pkg-config` |
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -19,12 +20,12 @@ from common import (  # noqa: E402
     die,
     ensure_linux_native_deps,
     find_python_extension,
-    load_cargo_env,
     log,
     mark_built,
     needs_rebuild,
     require_tool,
     run,
+    setup_integration_build_env,
     write_python_env,
 )
 
@@ -39,11 +40,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.force:
-        import os
-
         os.environ["INTEG_FORCE_REBUILD"] = "1"
 
-    load_cargo_env()
+    setup_integration_build_env()
+    log(f"Using CARGO_TARGET_DIR={os.environ['CARGO_TARGET_DIR']}")
     ensure_linux_native_deps()
     require_tool("uv")
 

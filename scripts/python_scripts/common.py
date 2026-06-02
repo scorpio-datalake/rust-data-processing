@@ -392,6 +392,40 @@ def disk_clean_enabled() -> bool:
     )
 
 
+def available_disk_gib(path: Path | str = REPO_ROOT) -> float:
+    """Free space on the filesystem containing ``path`` (GiB)."""
+    usage = shutil.disk_usage(path)
+    return usage.free / (1024**3)
+
+
+def ensure_min_disk_space(
+    *,
+    min_gib: float = 8.0,
+    path: Path | str = REPO_ROOT,
+    context: str = "build",
+) -> None:
+    """Fail fast with a clear message when the repo disk is too full to link Rust tests."""
+    free = available_disk_gib(path)
+    if free >= min_gib:
+        return
+    raise RuntimeError(
+        f"Only {free:.1f} GiB free on {path} ({context} needs ~{min_gib:.0f} GiB). "
+        "Free space (e.g. `cargo clean`, remove old `target/`, `sudo rm -rf .build_all_runs/run-*`) "
+        "then re-run `./build_all_run.sh start`."
+    )
+
+
+def should_clean_between_rust_features() -> bool:
+    """Drop default-feature artifacts before ``ci_expanded`` (default on).
+
+    Disable with ``BUILD_ALL_CLEAN_BETWEEN_RUST_FEATURES=0`` when iterating on a large VM.
+    """
+    raw = os.environ.get("BUILD_ALL_CLEAN_BETWEEN_RUST_FEATURES", "1").lower()
+    if raw in ("0", "false", "no"):
+        return False
+    return True
+
+
 def report_disk_usage(title: str, paths: list[Path]) -> None:
     banner(f"Disk: {title}")
     run(["df", "-h", "."])
@@ -506,7 +540,19 @@ def cargo_jobs_args() -> list[str]:
     return []
 
 
+def load_cargo_env() -> None:
+    """Ensure ``cargo`` is on PATH (``~/.cargo/bin`` from rustup)."""
+    home = Path.home()
+    cargo_bin = home / ".cargo" / "bin"
+    if cargo_bin.is_dir():
+        path = os.environ.get("PATH", "")
+        prefix = str(cargo_bin)
+        if prefix not in path.split(":"):
+            os.environ["PATH"] = f"{prefix}:{path}" if path else prefix
+
+
 def setup_rust_toolchain_env(*, offline: bool = False) -> None:
+    load_cargo_env()
     _ensure_native_linker_linux()
     os.environ["RUSTUP_NO_UPDATE_CHECK"] = "1"
     if offline:

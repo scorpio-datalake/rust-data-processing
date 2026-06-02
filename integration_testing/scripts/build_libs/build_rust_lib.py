@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from common import LIBS_DIR, REPO_ROOT, RUST_STAMP, ensure_linux_native_deps, load_cargo_env, log, mark_built, needs_rebuild, require_tool, run, write_rust_env  # noqa: E402
+from common import LIBS_DIR, REPO_ROOT, RUST_STAMP, ensure_linux_native_deps, log, mark_built, needs_rebuild, require_tool, run, setup_integration_build_env, write_rust_env  # noqa: E402
 
 RUST_WATCH_PATHS = ["Cargo.toml", "Cargo.lock", "src"]
 
@@ -24,11 +25,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.force:
-        import os
-
         os.environ["INTEG_FORCE_REBUILD"] = "1"
 
-    load_cargo_env()
+    setup_integration_build_env()
+    log(f"Using CARGO_TARGET_DIR={os.environ['CARGO_TARGET_DIR']}")
     ensure_linux_native_deps()
     require_tool("cargo")
 

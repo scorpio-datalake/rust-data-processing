@@ -10,11 +10,21 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import REPO_ROOT, banner, cargo_jobs_args, require_tool, run, setup_rust_toolchain_env
+from common import (
+    REPO_ROOT,
+    banner,
+    cargo_jobs_args,
+    ensure_min_disk_space,
+    report_disk_usage,
+    require_tool,
+    run,
+    setup_rust_toolchain_env,
+    should_clean_between_rust_features,
+)
 
 # Criterion benches (`deep_tests`) are exercised via `cargo test --features ci_expanded` /
 # `cargo bench`; linking them during build_all routinely OOMs on small VMs.
-RUST_CLIPPY_TARGETS = ["--all-targets"]
+RUST_CLIPPY_TARGETS = ["--lib", "--bins", "--tests", "--examples"]
 RUST_BUILD_TARGETS = ["--lib", "--bins", "--tests", "--examples"]
 
 
@@ -56,6 +66,14 @@ def build(*, expanded: bool, offline: bool) -> None:
     run(args, cwd=REPO_ROOT)
 
 
+def maybe_clean_between_feature_sets(*, after: str) -> None:
+    if not should_clean_between_rust_features():
+        return
+    banner(f"Rust: cargo clean (free disk after {after}; ci_expanded is next)")
+    report_disk_usage(f"before clean after {after}", [REPO_ROOT / "target"])
+    clean()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -78,16 +96,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     setup_rust_toolchain_env(offline=args.offline)
+    ensure_min_disk_space(context="Rust build")
     if args.clean:
         clean()
     if not args.skip_fmt:
         fmt_check()
-    if not args.skip_clippy:
-        if not args.expanded_only:
-            clippy(expanded=False, offline=args.offline)
-        clippy(expanded=True, offline=args.offline)
     if not args.expanded_only:
+        if not args.skip_clippy:
+            clippy(expanded=False, offline=args.offline)
         build(expanded=False, offline=args.offline)
+        maybe_clean_between_feature_sets(after="default features")
+    if not args.skip_clippy:
+        clippy(expanded=True, offline=args.offline)
     build(expanded=True, offline=args.offline)
     return 0
 

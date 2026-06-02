@@ -21,6 +21,8 @@ Scripts: `integration_testing/scripts/rancher/check_rancher_desktop.py`, `start_
 
 Incremental: skips rebuild unless sources changed, `--force`, or `libs/.last_test_failed` exists.
 
+Build artifacts compile into `integration_testing/.target/` (not repo `target/`) so integration builds can run alongside `build_all` without corrupting each other.
+
 ### 4. Uber NYC pickups data
 
 `scripts/data_download/download_uber_data.py` → `integration_testing/data/uber_nyc_pickups_apr2014.csv`  

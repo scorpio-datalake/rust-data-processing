@@ -10,6 +10,9 @@
 #
 # Artifacts: .build_all_runs/<run-id>/build.log, failures.txt, exit.code, meta.txt
 
+export BUILD_ALL_CLEAN_BETWEEN_RUST_FEATURES=1
+
+
 # Re-exec under bash when invoked as `sh build_all_run.sh` (dash lacks pipefail).
 if [ -z "${BASH_VERSION:-}" ]; then
   exec /usr/bin/env bash "$0" "$@"
@@ -27,7 +30,7 @@ clean_build_run_logs() {
   if [[ -n "${BUILD_ALL_KEEP_LOGS:-}" ]]; then
     return 0
   fi
-  rm -f "${LEGACY_LOG}"
+  rm -f "${LEGACY_LOG}" 2>/dev/null || true
   [[ -d "${RUNS_DIR}" ]] || return 0
   local d pid
   for d in "${RUNS_DIR}"/run-*; do
@@ -44,7 +47,11 @@ clean_build_run_logs() {
         continue
       fi
     fi
-    rm -rf "${d}"
+    if rm -rf "${d}" 2>/dev/null; then
+      continue
+    fi
+    echo "WARN: could not remove ${d} (permission denied)." >&2
+    echo "      Fix: sudo rm -rf ${d}   or run as the owner of that run directory." >&2
   done
 }
 
@@ -86,7 +93,30 @@ RUN_DIR=$(printf '%q' "${run_dir}")
 BUILD_SCRIPT=$(printf '%q' "${BUILD_SCRIPT}")
 BUILD_ARGS=(${args_quoted})
 
+ensure_cargo_on_path() {
+  if [[ -z "\${HOME:-}" ]]; then
+    HOME="\$(getent passwd "\$(id -un)" 2>/dev/null | cut -d: -f6 || true)"
+    export HOME
+  fi
+  if [[ -z "\${HOME:-}" ]]; then
+    HOME="/home/\$(id -un)"
+    export HOME
+  fi
+  if [[ -f "\${HOME}/.cargo/env" ]]; then
+    # shellcheck source=/dev/null
+    source "\${HOME}/.cargo/env"
+  fi
+  local cargo_bin="\${HOME}/.cargo/bin"
+  if [[ -x "\${cargo_bin}/cargo" ]]; then
+    case ":\${PATH}:" in
+      *":\${cargo_bin}:"*) ;;
+      *) export PATH="\${cargo_bin}:\${PATH}" ;;
+    esac
+  fi
+}
+
 cd "\${REPO_ROOT}"
+ensure_cargo_on_path
 echo \$\$ >"\${RUN_DIR}/run.pid"
 echo "started=\$(date -Is)" >"\${RUN_DIR}/meta.txt"
 echo "host=\$(hostname)" >>"\${RUN_DIR}/meta.txt"

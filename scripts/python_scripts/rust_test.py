@@ -10,6 +10,7 @@ from common import (
     REPO_ROOT,
     banner,
     cargo_jobs_args,
+    ensure_min_disk_space,
     generate_people_xlsx_fixture,
     require_tool,
     run,
@@ -50,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     setup_rust_toolchain_env(offline=args.offline)
+    ensure_min_disk_space(context="Rust tests")
     if not args.expanded_only:
         test(expanded=False)
         test_doctests()
