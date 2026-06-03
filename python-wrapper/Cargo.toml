@@ -20,6 +20,8 @@ db = ["rust-data-processing/db_connectorx"]
 cloud = ["rust-data-processing/cloud_connectors"]
 # Kafka streaming ELT (Load from BYO poll windows; native poll when parent kafka feature on).
 kafka = ["rust-data-processing/kafka"]
+# Every batch connector in docs/CONNECTORS.md for integration builds (``db`` + ``cloud``).
+integration_full = ["db", "cloud"]
 
 [dependencies]
 pyo3 = { version = "0.26", features = ["extension-module"] }

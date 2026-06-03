@@ -1,0 +1,12 @@
+{
+  "connectors": {
+    "oracle": { "table": "UBER_PICKUPS" },
+    "postgresql": { "table": "uber_pickups" }
+  },
+  "columns": [
+    { "source_field": "Date/Time", "name": "pickup_time" },
+    { "source_field": "Lat", "name": "lat" },
+    { "source_field": "Lon", "name": "lon" },
+    { "source_field": "Base", "name": "base_code" }
+  ]
+}

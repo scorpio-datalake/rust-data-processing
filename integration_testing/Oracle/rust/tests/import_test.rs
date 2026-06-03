@@ -1,8 +1,6 @@
-//! Rust Oracle integration test — uses `rust-data-processing` lib (db_connectorx) from the repo / crates.io build.
+//! Rust Oracle integration test — RDP pipeline import + RDP ingest_from_db verify.
 
-use rdp_oracle_integration_test::oracle_load::{
-    ingest_uber_csv, load_dataset, reset_table, verify_row_count,
-};
+use rdp_oracle_integration_test::rdp_pipeline::{import_csv_oracle, verify_count_oracle};
 use std::path::PathBuf;
 
 fn csv_path() -> PathBuf {
@@ -33,16 +31,9 @@ fn oracle_import_uber_csv() {
     let csv = csv_path();
     assert!(csv.is_file(), "missing Uber CSV at {}", csv.display());
 
-    reset_table(&url).expect("reset table");
+    let (ingested, loaded) = import_csv_oracle(&csv, &url, max_rows()).expect("RDP import pipeline");
+    assert!(ingested > 0, "no rows ingested from csv");
+    assert_eq!(loaded, ingested);
 
-    let ds = ingest_uber_csv(&csv).expect("ingest csv");
-    let mut rows: Vec<_> = ds.rows.into_iter().take(max_rows()).collect();
-    let expected = rows.len();
-    assert!(expected > 0, "no rows ingested from csv");
-
-    let truncated = rust_data_processing::types::DataSet::new(ds.schema.clone(), rows);
-    let loaded = load_dataset(&url, &truncated).expect("load dataset");
-    assert_eq!(loaded, expected);
-
-    verify_row_count(&url, expected).expect("verify count");
+    verify_count_oracle(&url, ingested).expect("RDP verify count");
 }

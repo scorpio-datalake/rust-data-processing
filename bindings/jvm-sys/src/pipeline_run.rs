@@ -102,6 +102,17 @@ enum SinkSpec {
         #[serde(default)]
         truncate_before_load: bool,
     },
+    /// ConnectorX-style `oracle://user:pass@host:1521/SERVICE`. Optional per-sink SQL on `df`.
+    Oracle {
+        url: String,
+        table: String,
+        #[serde(default)]
+        sql: Option<String>,
+        #[serde(default = "default_true")]
+        create_table_if_missing: bool,
+        #[serde(default)]
+        truncate_before_load: bool,
+    },
     /// Catalog / warehouse URLs are accepted for forward compatibility; connector wiring is tracked separately.
     DeltaLake {
         #[serde(default)]
@@ -820,6 +831,7 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
             SinkSpec::ParquetFile { sql, .. }
             | SinkSpec::XmlFile { sql, .. }
             | SinkSpec::Postgresql { sql, .. }
+            | SinkSpec::Oracle { sql, .. }
             | SinkSpec::DeltaLake { sql, .. }
             | SinkSpec::Iceberg { sql, .. }
             | SinkSpec::Snowflake { sql, .. }
@@ -927,6 +939,55 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                         "status": "skipped",
                         "error_code": "POSTGRES_SINK_NOT_BUILT",
                         "reason": "rebuild rdp_jvm_sys with --features sink_postgres for libpq COPY from Polars-collected rows",
+                    }));
+                }
+            }
+            SinkSpec::Oracle {
+                url,
+                table,
+                create_table_if_missing,
+                truncate_before_load,
+                ..
+            } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                #[cfg(feature = "sink_oracle")]
+                {
+                    match oracle_row_sink(
+                        &url,
+                        &table,
+                        &ds,
+                        create_table_if_missing,
+                        truncate_before_load,
+                    ) {
+                        Ok(row_count) => {
+                            sink_results.push(serde_json::json!({
+                                "kind": "oracle",
+                                "status": "ok",
+                                "table": table,
+                                "row_count": row_count,
+                            }));
+                        }
+                        Err(e) => {
+                            sink_results.push(serde_json::json!({
+                                "kind": "oracle",
+                                "status": "error",
+                                "error_code": "ORACLE_SINK_FAILED",
+                                "table": table,
+                                "error": e,
+                            }));
+                        }
+                    }
+                }
+                #[cfg(not(feature = "sink_oracle"))]
+                {
+                    let _ = (url, table, create_table_if_missing, truncate_before_load, ds);
+                    sink_results.push(serde_json::json!({
+                        "kind": "oracle",
+                        "status": "skipped",
+                        "error_code": "ORACLE_SINK_NOT_BUILT",
+                        "reason": "rebuild rdp_jvm_sys with --features sink_oracle for OCI row load",
                     }));
                 }
             }
@@ -1299,6 +1360,138 @@ fn postgres_copy_sink(
     Ok(row_count)
 }
 
+#[cfg(all(feature = "link-main", feature = "sink_oracle"))]
+fn oracle_connect_parts(url: &str) -> Result<(String, String, String), String> {
+    let rest = url
+        .strip_prefix("oracle://")
+        .ok_or_else(|| format!("expected oracle:// URL, got {url}"))?;
+    let (auth, hostpart) = rest
+        .split_once('@')
+        .ok_or_else(|| format!("invalid oracle URL (missing @): {url}"))?;
+    let (user, pass) = auth
+        .split_once(':')
+        .ok_or_else(|| format!("invalid oracle URL (missing password): {url}"))?;
+    Ok((user.to_string(), pass.to_string(), hostpart.to_string()))
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_oracle"))]
+fn oracle_type_sql(dt: &rust_data_processing::types::DataType) -> Result<&'static str, String> {
+    use rust_data_processing::types::DataType;
+    Ok(match dt {
+        DataType::Int64 => "NUMBER(19)",
+        DataType::Float64 => "NUMBER",
+        DataType::Bool => "NUMBER(1)",
+        DataType::Utf8 => "VARCHAR2(4000)",
+        DataType::Null => {
+            return Err("schema field data_type Null is not supported for oracle sink".into())
+        }
+    })
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_oracle"))]
+fn oracle_create_table_ddl(
+    table: &str,
+    schema: &rust_data_processing::types::Schema,
+) -> Result<String, String> {
+    let mut cols = Vec::new();
+    for f in &schema.fields {
+        let ty = oracle_type_sql(&f.data_type)?;
+        cols.push(format!("{} {}", f.name, ty));
+    }
+    Ok(format!("CREATE TABLE {} (\n    {}\n)", table, cols.join(",\n    ")))
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_oracle"))]
+fn oracle_value_string(
+    v: &rust_data_processing::types::Value,
+    dt: &rust_data_processing::types::DataType,
+) -> Result<String, String> {
+    use rust_data_processing::types::{DataType, Value};
+    match (v, dt) {
+        (Value::Null, _) => Ok(String::new()),
+        (Value::Utf8(s), _) => Ok(s.clone()),
+        (Value::Int64(i), DataType::Int64) => Ok(i.to_string()),
+        (Value::Float64(f), DataType::Float64) => Ok(f.to_string()),
+        (Value::Bool(b), DataType::Bool) => Ok(if *b { "1" } else { "0" }.to_string()),
+        other => Err(format!("unsupported value for oracle sink: {other:?}")),
+    }
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_oracle"))]
+fn oracle_execute_insert(
+    conn: &oracle::Connection,
+    sql: &str,
+    vals: &[Option<String>],
+) -> Result<(), String> {
+    match vals {
+        [a] => conn.execute(sql, &[a]).map(|_| ()),
+        [a, b] => conn.execute(sql, &[a, b]).map(|_| ()),
+        [a, b, c] => conn.execute(sql, &[a, b, c]).map(|_| ()),
+        [a, b, c, d] => conn.execute(sql, &[a, b, c, d]).map(|_| ()),
+        [a, b, c, d, e] => conn.execute(sql, &[a, b, c, d, e]).map(|_| ()),
+        [a, b, c, d, e, f] => conn.execute(sql, &[a, b, c, d, e, f]).map(|_| ()),
+        [a, b, c, d, e, f, g] => conn.execute(sql, &[a, b, c, d, e, f, g]).map(|_| ()),
+        [a, b, c, d, e, f, g, h] => conn.execute(sql, &[a, b, c, d, e, f, g, h]).map(|_| ()),
+        _ => Err(format!(
+            "unsupported oracle INSERT bind count {} (extend oracle_execute_insert)",
+            vals.len()
+        )),
+    }
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_oracle"))]
+fn oracle_row_sink(
+    url: &str,
+    table: &str,
+    ds: &rust_data_processing::types::DataSet,
+    create_table_if_missing: bool,
+    truncate_before_load: bool,
+) -> Result<usize, String> {
+    use oracle::Connection;
+
+    let (user, pass, hostpart) = oracle_connect_parts(url)?;
+    let conn = Connection::connect(&user, &pass, &hostpart).map_err(|e| e.to_string())?;
+
+    if truncate_before_load {
+        let _ = conn.execute(&format!("DROP TABLE {table} PURGE"), &[]);
+    }
+    if create_table_if_missing {
+        conn.execute(&oracle_create_table_ddl(table, &ds.schema)?, &[])
+            .map_err(|e| format!("oracle create table: {e}"))?;
+    }
+
+    let col_names: Vec<String> = ds
+        .schema
+        .fields
+        .iter()
+        .map(|f| f.name.clone())
+        .collect();
+    let placeholders = (1..=col_names.len())
+        .map(|i| format!(":{i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "INSERT INTO {table} ({}) VALUES ({placeholders})",
+        col_names.join(", ")
+    );
+
+    let mut inserted = 0usize;
+    for row in &ds.rows {
+        let mut vals: Vec<Option<String>> = vec![None; col_names.len()];
+        for (field, value) in ds.schema.fields.iter().zip(row.iter()) {
+            if let Some(idx) = col_names.iter().position(|n| n == &field.name) {
+                vals[idx] = Some(oracle_value_string(value, &field.data_type)?);
+            }
+        }
+        oracle_execute_insert(&conn, &sql, &vals)
+            .map_err(|e| format!("oracle insert row {inserted}: {e}"))?;
+        inserted += 1;
+    }
+    conn.commit().map_err(|e| e.to_string())?;
+    Ok(inserted)
+}
+
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]
 fn quote_pg_ident(id: &str) -> String {
     format!("\"{}\"", id.replace('"', "\"\""))
@@ -1501,7 +1694,22 @@ mod tests {
         assert_eq!(sinks[1]["kind"].as_str(), Some("iceberg"));
         assert_eq!(sinks[1]["error_code"].as_str(), Some("ICEBERG_CONNECTOR_PENDING"));
         assert_eq!(sinks[2]["kind"].as_str(), Some("postgresql"));
-        assert_eq!(sinks[2]["error_code"].as_str(), Some("POSTGRES_SINK_NOT_BUILT"));
+        #[cfg(not(feature = "sink_postgres"))]
+        {
+            assert_eq!(sinks[2]["status"].as_str(), Some("skipped"));
+            assert_eq!(
+                sinks[2]["error_code"].as_str(),
+                Some("POSTGRES_SINK_NOT_BUILT")
+            );
+        }
+        #[cfg(feature = "sink_postgres")]
+        {
+            assert_eq!(sinks[2]["status"].as_str(), Some("error"));
+            assert_eq!(
+                sinks[2]["error_code"].as_str(),
+                Some("POSTGRES_SINK_FAILED")
+            );
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 

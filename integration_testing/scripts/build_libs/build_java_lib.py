@@ -11,10 +11,14 @@ import sys
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).resolve().parent.parent
+_REPO_SCRIPTS = _SCRIPTS.parent.parent / "scripts"
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
 
 from build_libs import build_rust_lib  # noqa: E402
+from connector_features import JVM_FEATURES  # noqa: E402
 from common import (  # noqa: E402
     JAVA_STAMP,
     LIBS_DIR,
@@ -45,7 +49,7 @@ JAVA_WATCH_PATHS = [
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Build rdp_jvm_sys + JVM JAR for Oracle integration (db_connectorx)."
+        description="Build rdp_jvm_sys + JVM JAR for integration (all connectors via --features full)."
     )
     parser.add_argument("--force", action="store_true", help="Force rebuild.")
     args = parser.parse_args(argv)
@@ -61,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     build_rust_lib.main(["--force"] if args.force else [])
 
     if needs_rebuild(JAVA_STAMP, JAVA_WATCH_PATHS):
-        log("Building rdp_jvm_sys (--release --features full,db_connectorx)...")
+        log(f"Building rdp_jvm_sys (--release --features {JVM_FEATURES})...")
         run(
             [
                 "cargo",
@@ -71,12 +75,13 @@ def main(argv: list[str] | None = None) -> int:
                 "--manifest-path",
                 str(REPO_ROOT / "bindings" / "jvm-sys" / "Cargo.toml"),
                 "--features",
-                "full,db_connectorx",
+                JVM_FEATURES,
             ]
         )
 
         if shutil.which("python3"):
             run([sys.executable, str(REPO_ROOT / "scripts" / "check_jvm_ffi_manifest.py")])
+            run([sys.executable, str(REPO_ROOT / "scripts" / "check_jvm_full_features.py")])
 
         if shutil.which("mvn"):
             log("Maven package (skip tests) for rust-data-processing-jvm...")

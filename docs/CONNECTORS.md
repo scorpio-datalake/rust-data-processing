@@ -27,7 +27,7 @@ Rust (`rust-data-processing` / `rdp_jvm_sys`) performs I/O. **Python** and **Jav
 SELECT id, name, amount FROM demo.fact_scores WHERE amount > 0 LIMIT 100000;
 ```
 
-**Build features:** Rust/Python cloud I/O: `cloud_connectors` (object store, SFTP/FTP, Delta staging). SQL read: `db_connectorx` / Python `db`. JVM: `rdp_jvm_sys` with `link-main` (includes `cloud_connectors`). **Kafka streaming ELT:** `--features kafka` — see **[KAFKA_ELT.md](KAFKA_ELT.md)** (poll windows, not file batches).
+**Build features:** Validated by `scripts/check_jvm_full_features.py` (JVM, Rust, Python). **Rust integration:** `integration_full` (`db_connectorx` + `cloud_connectors` + `excel`). **Python integration:** `integration_full` (`db` + `cloud`). **JVM / CI:** `rdp_jvm_sys --features full` — all batch connectors below (`db_connectorx`, `sink_postgres`, `sink_oracle`, `cloud_connectors`, `sql`, `excel`). **Kafka streaming ELT:** add `--features kafka` — see **[KAFKA_ELT.md](KAFKA_ELT.md)** (poll windows, not file batches).
 
 ---
 
@@ -90,8 +90,8 @@ JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pip
 
 | Layer | Notes |
 | --- | --- |
-| **Rust / Python** | ConnectorX `oracle://` |
-| **Java** | Same ConnectorX URL + SQL in pipeline **`sources.db_reads`** (requires `rdp_jvm_sys` built with **`--features db_connectorx`** or **`full`**) |
+| **Rust / Python** | ConnectorX `oracle://` (`ingest_from_db` / `--features db`) |
+| **Java** | **`sources.db_reads`** (read) and **`kind: oracle`** sink (write) — build **`rdp_jvm_sys`** with **`--features full`** (includes `db_connectorx` + `sink_oracle`) |
 
 ### Rust
 
@@ -111,11 +111,13 @@ SQL = "SELECT id, name, amount FROM demo.fact_scores WHERE ROWNUM <= 100000"
 
 ### Java
 
-Rust runs the warehouse `SELECT` via ConnectorX — use **`oracle://`**. Build the native library with DB read enabled:
+Rust runs warehouse SQL via ConnectorX and row loads via OCI — use **`oracle://`**. Build the native library with DB read + sink enabled (CI uses **`--features full`**):
 
 ```bash
-cargo build -p rdp-jvm-sys --features link-main,db_connectorx
+cargo build -p rdp-jvm-sys --features full
 ```
+
+**Read** (export to Parquet):
 
 ```json
 {
@@ -136,12 +138,32 @@ cargo build -p rdp-jvm-sys --features link-main,db_connectorx
 }
 ```
 
-```java
-JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipelineJson);
-// root.optJSONArray("db_source_results") — one entry per db_reads[] with status ok
+**Write** (CSV/Parquet → Oracle table — same pattern as PostgreSQL sink):
+
+```json
+{
+  "pipeline_spec_version": 1,
+  "sources": { "paths": ["{{LOCAL_OR_CLOUD_PATH}}"], "schema": { "fields": [] }, "options": { "format": "csv" } },
+  "transform": { "sql": "SELECT id, name, amount FROM df" },
+  "sinks": [
+    {
+      "kind": "oracle",
+      "url": "oracle://etl_user:FAKE_ORA_PASS@db01.example.com:1521/ORCLPDB1",
+      "table": "DEMO.FACT_SCORES_CURATED",
+      "create_table_if_missing": true,
+      "truncate_before_load": true
+    }
+  ]
+}
 ```
 
-Without **`db_connectorx`**, `db_reads` returns **`DB_CONNECTORX_NOT_BUILT`**. Export query results to a local file and use **`sources.paths`** when you cannot rebuild with **`db_connectorx`**.
+```java
+JSONObject root = RdpNativeJson.invokeRunPipelineJson(linker, lookup, arena, pipelineJson);
+// db_reads: root.optJSONArray("db_source_results")
+// oracle sink: root.getJSONObject("interchange").optJSONArray("sink_results")
+```
+
+Without **`db_connectorx`**, `db_reads` returns **`DB_CONNECTORX_NOT_BUILT`**. Without **`sink_oracle`**, `kind: oracle` returns **`ORACLE_SINK_NOT_BUILT`**. Use **`--features full`** for both. Export query results to a local file and use **`sources.paths`** when you cannot rebuild.
 
 ---
 

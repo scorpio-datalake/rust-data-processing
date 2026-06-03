@@ -1,3 +1,3 @@
-//! Oracle integration helpers — lives under `integration_testing/Oracle/` only.
+//! Oracle integration — RDP pipeline via ``librdp_jvm_sys`` only.
 
-pub mod oracle_load;
+pub mod rdp_pipeline;

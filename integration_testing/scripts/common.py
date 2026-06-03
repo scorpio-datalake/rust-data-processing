@@ -29,6 +29,18 @@ for sub in ("rust", "java", "python"):
     (LIBS_DIR / sub).mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+# Feature flags for CONNECTORS.md batch connectors (see scripts/connector_features.py).
+INTEGRATION_RUST_FEATURES = "integration_full"
+INTEGRATION_JVM_FEATURES = "full"
+INTEGRATION_PYTHON_FEATURES = "integration_full"
+
+INTEGRATION_BUILD_HELP = f"""Build libraries and data first:
+  python3 integration_testing/scripts/build_libs/build_all_libs.py
+    Rust  → --features {INTEGRATION_RUST_FEATURES} (db_connectorx + cloud_connectors + excel)
+    Java  → rdp_jvm_sys --features {INTEGRATION_JVM_FEATURES} (all batch connectors + PG/Oracle sinks)
+    Python → maturin --features {INTEGRATION_PYTHON_FEATURES} (db + cloud; load uses librdp_jvm_sys)
+  python3 integration_testing/scripts/data_download/download_uber_data.py --sample"""
+
 
 def log(msg: str) -> None:
     print(f"[integration] {msg}", flush=True)
@@ -37,6 +49,27 @@ def log(msg: str) -> None:
 def die(msg: str, code: int = 1) -> None:
     print(f"[integration] ERROR: {msg}", file=sys.stderr, flush=True)
     raise SystemExit(code)
+
+
+def require_integration_libs(*, require_data: bool = True) -> None:
+    """Fail fast when integration_testing/libs/ or Uber CSV is missing."""
+    missing = False
+    for leg, rel in (
+        ("rust", "rust/env.sh"),
+        ("java", "java/env.sh"),
+        ("python", "python/env.sh"),
+    ):
+        if not (LIBS_DIR / rel).is_file():
+            log(f"missing libs/{leg} — run build_libs/build_{leg}_lib.py or build_all_libs.py")
+            missing = True
+    if require_data:
+        sample = DATA_DIR / "uber_nyc_pickups_sample.csv"
+        full = DATA_DIR / "uber_nyc_pickups_apr2014.csv"
+        if not sample.is_file() and not full.is_file():
+            log("missing Uber CSV — run data_download/download_uber_data.py")
+            missing = True
+    if missing:
+        die(INTEGRATION_BUILD_HELP)
 
 
 def require_tool(name: str) -> None:
@@ -194,23 +227,36 @@ def assert_safe_to_clean_repo_target() -> None:
         )
 
 
-def cleanup_disk_before_integration_build(*, force_integr_target: bool = False) -> None:
-    """Drop repo ``build_all`` artifacts and stale JVM/Python targets before integration builds.
+def cleanup_disk_before_integration_build(
+    *,
+    force_integr_target: bool = False,
+    force_repo_target: bool = False,
+) -> None:
+    """Drop stale build artifacts before integration lib builds.
 
-    Always removes repo ``target/`` so integration libs do not stack on a full ``build_all`` tree.
     Removes ``integration_testing/.target/`` only when ``force_integr_target`` (``--force``).
+    Keeps repo ``target/`` when the integration Rust lib stamp exists unless ``force_repo_target``.
     """
     if not disk_clean_enabled():
         return
     assert_safe_to_clean_repo_target()
-    paths = [
-        REPO_ROOT / "target",
-        REPO_ROOT / "bindings" / "jvm-sys" / "target",
-        REPO_ROOT / "python-wrapper" / "target",
-        REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm" / "target",
-    ]
+    paths: list[Path] = []
     if force_integr_target:
-        paths.insert(0, INTEG_TARGET_DIR)
+        paths.append(INTEG_TARGET_DIR)
+    repo_target = REPO_ROOT / "target"
+    if force_repo_target:
+        paths.append(repo_target)
+    elif not (RUST_STAMP.is_file() and repo_target.exists()):
+        paths.append(repo_target)
+    else:
+        log("Disk: keeping repo target/ (integration lib built; use --force to remove)")
+    paths.extend(
+        [
+            REPO_ROOT / "bindings" / "jvm-sys" / "target",
+            REPO_ROOT / "python-wrapper" / "target",
+            REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm" / "target",
+        ]
+    )
     report_disk_usage("before integration cleanup", paths)
     log("Disk: integration phase cleanup")
     for path in paths:
@@ -222,7 +268,10 @@ def prepare_integration_disk(*, force: bool = False) -> None:
     """Free conflicting artifacts, then verify minimum free space."""
     if os.environ.get("INTEG_DISK_PREPARED") == "1":
         return
-    cleanup_disk_before_integration_build(force_integr_target=force)
+    cleanup_disk_before_integration_build(
+        force_integr_target=force,
+        force_repo_target=force,
+    )
     ensure_min_disk_space(context="integration lib build")
     os.environ["INTEG_DISK_PREPARED"] = "1"
 
@@ -258,6 +307,138 @@ def apply_env_sh(path: Path) -> None:
             os.environ[key] = f"{val}:{os.environ[key]}"
         else:
             os.environ[key] = val
+
+
+# Smoke-test binary name per connector folder (``integration_testing/<Name>/rust/``).
+# Pre-built by build_rust_lib.py; run_tests.py only executes (incremental link at most).
+INTEGRATION_RUST_TEST_FILTER: dict[str, str] = {
+    "Oracle": "oracle_import_uber_csv",
+    "PostgreSQL": "postgresql_import_uber_csv",
+}
+
+INTEGRATION_RUST_PACKAGES: dict[str, str] = {
+    "Oracle": "rdp-oracle-integration-test",
+    "PostgreSQL": "rdp-postgresql-integration-test",
+}
+
+INTEGRATION_PREBUILD_PROFILE = "integration"
+INTEGRATION_RUN_PROFILE = "release"
+
+
+def integration_rust_manifests() -> list[Path]:
+    """``integration_testing/<Connector>/rust/Cargo.toml`` for each connector leg."""
+    return sorted(p for p in INTEG_ROOT.glob("*/rust/Cargo.toml") if p.is_file())
+
+
+def integration_rust_test_filter(connector_dir_name: str) -> str | None:
+    return INTEGRATION_RUST_TEST_FILTER.get(connector_dir_name)
+
+
+def skip_prebuild_enabled() -> bool:
+    return os.environ.get("INTEG_SKIP_PREBUILD", "").lower() in ("1", "true", "yes")
+
+
+def integration_prebuild_profile() -> str:
+    return os.environ.get("RDP_INTEGRATION_CARGO_PROFILE", INTEGRATION_PREBUILD_PROFILE)
+
+
+def integration_rust_package_name(connector_dir_name: str) -> str:
+    try:
+        return INTEGRATION_RUST_PACKAGES[connector_dir_name]
+    except KeyError:
+        die(f"unknown connector for Rust prebuild: {connector_dir_name}")
+
+
+def connector_prebuild_stamp(connector_dir_name: str) -> Path:
+    slug = connector_dir_name.lower()
+    return LIBS_DIR / "rust" / f".{slug}_test_built_at"
+
+
+def connector_prebuild_watch_paths(manifest: Path) -> list[str]:
+    rel = manifest.parent.relative_to(REPO_ROOT)
+    return [
+        "Cargo.toml",
+        "Cargo.lock",
+        str(rel / "Cargo.toml"),
+        str(rel / "src"),
+    ]
+
+
+def needs_connector_prebuild(connector_dir_name: str, manifest: Path) -> bool:
+    if skip_prebuild_enabled():
+        return False
+    return needs_rebuild(
+        connector_prebuild_stamp(connector_dir_name),
+        connector_prebuild_watch_paths(manifest),
+    )
+
+
+def integration_rust_prebuild_cmd(
+    connector_dir_name: str,
+    test_filter: str | None,
+    *,
+    profile: str | None = None,
+) -> list[str]:
+    """Argv for ``cargo test --no-run`` on a workspace connector crate (prebuild only)."""
+    prof = profile or integration_prebuild_profile()
+    cmd = [
+        "cargo",
+        "test",
+        f"--profile={prof}",
+        "--locked",
+        "--no-run",
+        "-p",
+        integration_rust_package_name(connector_dir_name),
+    ]
+    if test_filter:
+        cmd.append(test_filter)
+    return cmd
+
+
+def integration_rust_test_cmd(manifest: Path, test_filter: str) -> list[str]:
+    """Argv for ``cargo test`` when executing connector tests (release profile)."""
+    connector = manifest.parent.parent.name
+    return [
+        "cargo",
+        "test",
+        f"--profile={INTEGRATION_RUN_PROFILE}",
+        "--locked",
+        "-p",
+        integration_rust_package_name(connector),
+        test_filter,
+        "--",
+        "--nocapture",
+    ]
+
+
+def integration_rust_watch_paths() -> list[str]:
+    """Repo-relative paths that should invalidate the Rust integration stamp."""
+    paths: list[str] = ["Cargo.toml", "Cargo.lock", "src"]
+    for manifest in integration_rust_manifests():
+        rel = manifest.parent.relative_to(REPO_ROOT)
+        paths.extend([str(rel / "Cargo.toml"), str(rel / "src")])
+    return paths
+
+
+def prebuild_integration_rust_tests() -> None:
+    """Compile connector integration test binaries once (``cargo test --no-run``).
+
+    Uses ``integration_testing/.target/`` (same as run_tests.py) so Polars / rust-data-processing
+    artifacts are shared across Oracle, PostgreSQL, and future ``*/rust/`` connectors.
+    """
+    if skip_prebuild_enabled():
+        log("Skipping connector prebuild (INTEG_SKIP_PREBUILD=1).")
+        return
+    profile = integration_prebuild_profile()
+    for manifest in integration_rust_manifests():
+        connector = manifest.parent.parent.name
+        if not needs_connector_prebuild(connector, manifest):
+            log(f"Rust integration tests ({connector}) up to date (skip prebuild).")
+            continue
+        test_filter = integration_rust_test_filter(connector)
+        log(f"Pre-building Rust integration tests ({connector}, profile={profile})...")
+        run(integration_rust_prebuild_cmd(connector, test_filter, profile=profile))
+        mark_built(connector_prebuild_stamp(connector))
 
 
 def needs_rebuild(stamp_file: Path, watch_paths: list[str]) -> bool:
@@ -346,6 +527,7 @@ def write_java_env() -> None:
     (LIBS_DIR / "java" / "env.sh").write_text(
         f"""# Source before Java integration tests: source integration_testing/libs/java/env.sh
 export RDP_JVM_SYS="{dest}"
+export RDP_INTEGRATION_JVM_FEATURES={INTEGRATION_JVM_FEATURES}
 export RDP_INTEGRATION_JAVA_BUILT=1
 """,
         encoding="utf-8",
@@ -355,8 +537,14 @@ export RDP_INTEGRATION_JAVA_BUILT=1
 def write_rust_env() -> None:
     (LIBS_DIR / "rust" / "env.sh").write_text(
         f"""# Source before Rust integration tests: source integration_testing/libs/rust/env.sh
+# Connector test crates (integration_testing/*/rust/) are pre-built by build_rust_lib.py into:
+#   {INTEG_TARGET_DIR}
 export RDP_REPO_ROOT="{REPO_ROOT}"
-export RDP_INTEGRATION_RUST_FEATURES=db_connectorx
+export CARGO_TARGET_DIR="{INTEG_TARGET_DIR}"
+export RDP_INTEGRATION_RUST_FEATURES={INTEGRATION_RUST_FEATURES}
+export RDP_INTEGRATION_JVM_FEATURES={INTEGRATION_JVM_FEATURES}
+export RDP_INTEGRATION_PYTHON_FEATURES={INTEGRATION_PYTHON_FEATURES}
+export RDP_INTEGRATION_CARGO_PROFILE={INTEGRATION_PREBUILD_PROFILE}
 export RDP_INTEGRATION_RUST_BUILT=1
 """,
         encoding="utf-8",
@@ -367,11 +555,38 @@ def write_python_env(ext_path: Path) -> None:
     (LIBS_DIR / "python" / "env.sh").write_text(
         f"""# Source before Python integration tests: source integration_testing/libs/python/env.sh
 export RDP_INTEGRATION_PYTHON_EXT="{ext_path}"
+export RDP_INTEGRATION_PYTHON_FEATURES={INTEGRATION_PYTHON_FEATURES}
 export RDP_INTEGRATION_PYTHON_BUILT=1
 export PYTHONPATH="{REPO_ROOT / 'python-wrapper'}:${{PYTHONPATH:-}}"
 """,
         encoding="utf-8",
     )
+
+
+def stage_integration_python_ext() -> Path:
+    """Copy prebuilt extension into python-wrapper so pytest does not trigger maturin."""
+    ext_var = os.environ.get("RDP_INTEGRATION_PYTHON_EXT")
+    if not ext_var:
+        die("RDP_INTEGRATION_PYTHON_EXT not set — run build_libs/build_python_lib.py")
+    src = Path(ext_var)
+    if not src.is_file():
+        die(f"Integration Python extension missing: {src}")
+    dest_dir = REPO_ROOT / "python-wrapper" / "rust_data_processing"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for old in dest_dir.glob("_rust_data_processing*.so"):
+        if old.name != src.name:
+            old.unlink()
+    dest = dest_dir / src.name
+    if not dest.exists() or src.stat().st_size != dest.stat().st_size:
+        shutil.copy2(src, dest)
+        log(f"Staged Python extension → {dest} ({dest.stat().st_size} bytes)")
+    # uv/maturin may install a non-db .so in site-packages that shadows the staged copy.
+    site_root = REPO_ROOT / "python-wrapper" / ".venv" / "lib"
+    for site in site_root.glob("python*/site-packages/_rust_data_processing*.so"):
+        if site.stat().st_size != src.stat().st_size:
+            site.unlink()
+            log(f"Removed non-integration extension {site}")
+    return dest
 
 
 def ensure_linux_native_deps() -> None:

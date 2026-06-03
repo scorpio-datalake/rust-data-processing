@@ -90,6 +90,9 @@ file_transfer = [
   "dep:webpki-roots",
 ]
 cloud_connectors = ["object_store", "delta_lake", "snowflake", "file_transfer"]
+# Every batch connector in docs/CONNECTORS.md for integration builds (parity with rdp_jvm_sys `full`).
+# JVM-only DB sinks (PostgreSQL COPY, Oracle OCI) live in bindings/jvm-sys, not here.
+integration_full = ["db_connectorx", "cloud_connectors", "excel"]
 # Kafka streaming via librdkafka (system lib on Linux CI; see docs/adr/007-kafka-rdkafka-connector-abi.md).
 kafka = ["dep:rdkafka"]
 # Same feature set as `rust_ci.yml` “expanded” job: deep tests + Arrow/serde_arrow + Excel writer,
@@ -170,3 +173,22 @@ strip = "debuginfo"
 # link pressure; Linux also uses bfd ld via `.cargo/config.toml`.
 [profile.dev]
 debug = 1
+
+# Integration connector prebuild (`cargo test --no-run`); faster than full release link.
+[profile.integration]
+inherits = "release"
+opt-level = 1
+debug = 1
+lto = false
+codegen-units = 16
+strip = "debuginfo"
+
+[workspace]
+members = [
+  ".",
+  "bindings/jvm-sys",
+  "python-wrapper",
+  "integration_testing/Oracle/rust",
+  "integration_testing/PostgreSQL/rust",
+]
+resolver = "2"

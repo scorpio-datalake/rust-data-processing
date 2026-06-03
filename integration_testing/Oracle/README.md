@@ -33,7 +33,7 @@ python3 integration_testing/scripts/rancher/stop_rancher_desktop.py
 
 **Oracle Database Express Edition (XE)** and **Oracle Database Free** may be used in Docker for **development and testing**. This compose file uses [`gvenzl/oracle-xe`](https://hub.docker.com/r/gvenzl/oracle-xe) (21c XE, slim image).
 
-That is sufficient for RDP **`db_connectorx`** / **`ingest_from_db`** integration tests (read/write smoke tests, Uber CSV load, etc.).
+That is sufficient for RDP integration tests: **`rdp_run_pipeline_json`** with `kind: oracle` sink (OCI inside RDP) and **`ingest_from_db`** verify (ConnectorX). Build Java with `--features full`; Python/Rust with `integration_full`.
 
 **Not covered here:**
 
@@ -46,7 +46,7 @@ If your organization **cannot** run Oracle in local Docker (policy or edition re
 export ORACLE_CONNECT_URL='oracle://user:pass@your-host:1521/SERVICE'
 ```
 
-Then skip `docker compose` and point `run_tests.py` at that URL (future step).
+Then skip `docker compose` and point `run_oracle_tests.py` at that URL (future step).
 
 ### Start Oracle XE
 
@@ -81,8 +81,8 @@ docker compose down -v       # remove data volume (fresh DB)
 python3 integration_testing/scripts/rancher/stop_rancher_desktop.py
 ```
 
-## Next steps (see `notes.txt`)
+## Next steps (see `oracle_notes.txt`)
 
-3. Build Rust / Java / Python libs (`integration_testing/scripts/build_libs/`)  
+3. Build all integration libs (`build_all_libs.py` — Rust `integration_full`, Java `full`, Python `integration_full`)  
 4. Uber NYC CSV in `integration_testing/data/`  
-5. `run_tests.py` — start Rancher → compose → tri-language import tests
+5. `run_oracle_tests.py` — start Rancher → compose → tri-language RDP import tests

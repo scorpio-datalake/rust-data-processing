@@ -1,0 +1,39 @@
+# PostgreSQL integration testing
+
+Uses the same built libraries as Oracle (`integration_testing/libs/`). Same CONNECTORS.md / RDP-only pattern as Oracle.
+
+## Done
+
+1. `docker-compose.yml` — PostgreSQL 16 Alpine (`rdp-postgres-test`)
+2. `run_tests.py` — orchestrator (stops other containers, prunes unused Docker resources, runs tri-language tests)
+3. Shared schemas — `integration_testing/schema/uber_pickups.{schema,table}.json`
+4. Tri-language import tests — **RDP only** (no JDBC, psycopg, or direct libpq in test code)
+
+| Leg | Load | Verify |
+| --- | --- | --- |
+| Java | `rdp_run_pipeline_json` → `kind: postgresql` sink | db_reads pipeline + parquet read |
+| Python | `scripts/rdp_pipeline.py` (ctypes → `librdp_jvm_sys`) | `ingest_from_db` |
+| Rust | `librdp_jvm_sys` via `libloading` | `ingest_from_db` |
+
+## Build (required once)
+
+```bash
+python3 integration_testing/scripts/build_libs/build_all_libs.py
+```
+
+| Leg | Feature flag |
+| --- | --- |
+| Rust | `integration_full` |
+| Java | `rdp_jvm_sys --features full` |
+| Python | `integration_full` (`db` + `cloud`) |
+
+## Run
+
+```bash
+python3 integration_testing/scripts/data_download/download_uber_data.py --sample
+python3 integration_testing/PostgreSQL/run_tests.py
+```
+
+Rust: `build_rust_lib.py` pre-compiles `PostgreSQL/rust/` into `integration_testing/.target/`. `run_tests.py` only executes tests.
+
+See `README.md` for flags (`--no-rancher`, `--keep-postgres`, `--no-isolate`).

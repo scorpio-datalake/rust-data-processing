@@ -12,8 +12,12 @@ cargo test  --manifest-path bindings/jvm-sys/Cargo.toml
 # Phase 3 pipeline (`jvm_ffi` aliases `link-main`)
 cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features jvm_ffi
 
-# Full linkage (Polars default stack; crates.io-parity builds).
+# Full linkage — every batch connector in docs/CONNECTORS.md (`--features full`).
+# CI validates the feature set via scripts/check_jvm_full_features.py.
 cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
+
+# Kafka streaming ELT (add to full on Linux in CI):
+cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full,kafka
 ```
 
 Output: **`bindings/jvm-sys/target/release/`**

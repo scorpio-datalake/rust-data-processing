@@ -9,8 +9,6 @@ description = "Opt-in Oracle integration tests (self-contained under integration
 path = "src/lib.rs"
 
 [dependencies]
-oracle = "0.6"
-rust-data-processing = { path = "../../../", features = ["db_connectorx"] }
-
-[dev-dependencies]
+libloading = "0.8"
 serde_json = "1"
+rust-data-processing = { path = "../../../", features = ["integration_full"] }

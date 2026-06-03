@@ -10,9 +10,13 @@ import sys
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).resolve().parent.parent
+_REPO_SCRIPTS = _SCRIPTS.parent.parent / "scripts"
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
+if str(_REPO_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_REPO_SCRIPTS))
 
+from connector_features import PYTHON_INTEGRATION_FEATURES  # noqa: E402
 from common import (  # noqa: E402
     LIBS_DIR,
     PYTHON_STAMP,
@@ -35,7 +39,9 @@ PYTHON_WATCH_PATHS = ["python-wrapper", "src", "Cargo.toml", "Cargo.lock"]
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Build Python wrapper with db feature for Oracle integration tests."
+        description=(
+            "Build Python wrapper with integration_full (db + cloud) for connector integration tests."
+        )
     )
     parser.add_argument("--force", action="store_true", help="Force rebuild.")
     args = parser.parse_args(argv)
@@ -52,13 +58,23 @@ def main(argv: list[str] | None = None) -> int:
     dest_so: Path | None = None
 
     if needs_rebuild(PYTHON_STAMP, PYTHON_WATCH_PATHS):
-        log("Building Python wrapper (maturin develop --release --features db)...")
+        log(
+            f"Building Python wrapper (maturin develop --release --features {PYTHON_INTEGRATION_FEATURES})..."
+        )
         run(
             ["uv", "sync", "--group", "dev", "--quiet"],
             cwd=REPO_ROOT / "python-wrapper",
         )
         run(
-            ["uv", "run", "maturin", "develop", "--release", "--features", "db"],
+            [
+                "uv",
+                "run",
+                "maturin",
+                "develop",
+                "--release",
+                "--features",
+                PYTHON_INTEGRATION_FEATURES,
+            ],
             cwd=REPO_ROOT / "python-wrapper",
         )
         ext = find_python_extension()

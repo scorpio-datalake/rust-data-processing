@@ -1,2 +1,4 @@
 # Isolated Cargo target for integration lib builds (see scripts/common.py)
 .target/
+# OCI client libs extracted from gvenzl/oracle-xe for Rust integration tests
+.oracle/

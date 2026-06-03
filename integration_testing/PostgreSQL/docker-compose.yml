@@ -1,0 +1,37 @@
+# Local PostgreSQL for RDP integration testing (development / CI opt-in only).
+#
+# Image: postgres:16-alpine — not for production.
+#
+# Usage:
+#   cd integration_testing/PostgreSQL
+#   cp .env.example .env   # optional — defaults match ConnectorX fixture URLs
+#   docker compose up -d
+#   docker compose ps
+#   docker compose logs -f postgres
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rdp-postgres-test
+    restart: "no"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_APP_USER:-etl_user}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:-rdp_test_etl}
+      POSTGRES_DB: ${POSTGRES_DB:-rdp_test}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_APP_USER:-etl_user} -d ${POSTGRES_DB:-rdp_test}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+
+volumes:
+  postgres-data:
