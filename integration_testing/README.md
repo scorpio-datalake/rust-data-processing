@@ -22,6 +22,8 @@ Opt-in connector tests (Oracle, cloud, Kafka, …). **Not** run in default PR CI
 | `.target/` | Isolated Cargo target (gitignored; avoids races with repo `build_all`) |
 | `data/` | Uber CSV (gitignored; see `data/README.md`) |
 
+**Disk:** `build_all_libs.py` removes repo `target/` before building (so it does not stack on `build_all`). **Wait until `build_all` finishes** — deleting `target/` mid-build causes linker failures. Set `INTEG_NO_DISK_CLEAN=1` to skip cleanup; `INTEG_MIN_DISK_GIB=6` (default) for preflight.
+
 Start with `Oracle/README.md`.
 
 **Quick prep:**

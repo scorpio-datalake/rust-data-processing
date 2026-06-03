@@ -12,7 +12,7 @@ _SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
-from common import LIBS_DIR, REPO_ROOT, RUST_STAMP, ensure_linux_native_deps, log, mark_built, needs_rebuild, require_tool, run, setup_integration_build_env, write_rust_env  # noqa: E402
+from common import LIBS_DIR, REPO_ROOT, RUST_STAMP, ensure_linux_native_deps, log, mark_built, needs_rebuild, prepare_integration_disk, require_tool, run, setup_integration_build_env, write_rust_env  # noqa: E402
 
 RUST_WATCH_PATHS = ["Cargo.toml", "Cargo.lock", "src"]
 
@@ -28,6 +28,7 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["INTEG_FORCE_REBUILD"] = "1"
 
     setup_integration_build_env()
+    prepare_integration_disk(force=args.force)
     log(f"Using CARGO_TARGET_DIR={os.environ['CARGO_TARGET_DIR']}")
     ensure_linux_native_deps()
     require_tool("cargo")

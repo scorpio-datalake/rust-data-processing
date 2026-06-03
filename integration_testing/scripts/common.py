@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import os
 import platform
 import shlex
@@ -71,6 +72,159 @@ def setup_integration_build_env() -> None:
     if "CARGO_BUILD_JOBS" not in os.environ:
         jobs = os.environ.get("INTEG_CARGO_JOBS", "2")
         os.environ["CARGO_BUILD_JOBS"] = jobs
+
+
+def disk_clean_enabled() -> bool:
+    """When false (``INTEG_NO_DISK_CLEAN=1``), skip pre-build disk cleanup."""
+    return os.environ.get("INTEG_NO_DISK_CLEAN", "").lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def available_disk_gib(path: Path | str = INTEG_ROOT) -> float:
+    """Free space on the filesystem containing ``path`` (GiB)."""
+    return shutil.disk_usage(path).free / (1024**3)
+
+
+def ensure_min_disk_space(
+    *,
+    min_gib: float | None = None,
+    path: Path | str = INTEG_ROOT,
+    context: str = "integration build",
+) -> None:
+    """Fail fast when the disk is too full to link release Polars artifacts."""
+    if min_gib is None:
+        raw = os.environ.get("INTEG_MIN_DISK_GIB", "6")
+        min_gib = float(raw)
+    free = available_disk_gib(path)
+    if free >= min_gib:
+        return
+    die(
+        f"Only {free:.1f} GiB free on {path} ({context} needs ~{min_gib:.0f} GiB). "
+        "Free space (e.g. remove repo target/, run build_all_libs after build_all finishes) "
+        "or set INTEGR_NO_DISK_CLEAN=1 only if you manage disk manually."
+    )
+
+
+def report_disk_usage(title: str, paths: list[Path]) -> None:
+    log(f"Disk: {title}")
+    subprocess.run(["df", "-h", str(INTEG_ROOT)], check=False)
+    existing = [p for p in paths if p.exists()]
+    if not existing:
+        log("  (nothing on disk yet for listed paths)")
+        return
+    subprocess.run(["du", "-sh", *[str(p) for p in existing]], check=False)
+
+
+def _remove_path(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        display = path.relative_to(REPO_ROOT)
+    except ValueError:
+        display = path
+    log(f"  removing {display}")
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def build_all_run_in_progress() -> bool:
+    """True when ``build_all_run.sh`` still has a live launcher or build shell."""
+    runs_dir = REPO_ROOT / ".build_all_runs"
+    if not runs_dir.is_dir():
+        return False
+    for run_dir in runs_dir.glob("run-*"):
+        if not run_dir.is_dir():
+            continue
+        for name in ("run.pid", "launcher.pid"):
+            pid_file = run_dir / name
+            if not pid_file.is_file():
+                continue
+            try:
+                pid = int(pid_file.read_text(encoding="utf-8").strip())
+            except ValueError:
+                continue
+            if _pid_alive(pid):
+                return True
+    return False
+
+
+def repo_cargo_build_in_progress() -> bool:
+    """True when ``cargo``/``rustc`` is compiling in this repo (any ``target/`` dir)."""
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-af", "cargo|rustc"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return False
+    root = str(REPO_ROOT)
+    for line in proc.stdout.splitlines():
+        if root in line and "integration_testing" not in line:
+            return True
+    return False
+
+
+def assert_safe_to_clean_repo_target() -> None:
+    """Refuse to delete repo ``target/`` while ``build_all`` or repo ``cargo`` is active."""
+    if build_all_run_in_progress():
+        die(
+            "build_all is still running (check ./build_all_run.sh status). "
+            "Wait for it to finish before integration lib builds — removing repo target/ "
+            "mid-build causes linker 'No such file or directory' errors."
+        )
+    if repo_cargo_build_in_progress():
+        die(
+            "cargo/rustc is still compiling under the repo. "
+            "Wait for it to finish before integration lib builds."
+        )
+
+
+def cleanup_disk_before_integration_build(*, force_integr_target: bool = False) -> None:
+    """Drop repo ``build_all`` artifacts and stale JVM/Python targets before integration builds.
+
+    Always removes repo ``target/`` so integration libs do not stack on a full ``build_all`` tree.
+    Removes ``integration_testing/.target/`` only when ``force_integr_target`` (``--force``).
+    """
+    if not disk_clean_enabled():
+        return
+    assert_safe_to_clean_repo_target()
+    paths = [
+        REPO_ROOT / "target",
+        REPO_ROOT / "bindings" / "jvm-sys" / "target",
+        REPO_ROOT / "python-wrapper" / "target",
+        REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm" / "target",
+    ]
+    if force_integr_target:
+        paths.insert(0, INTEG_TARGET_DIR)
+    report_disk_usage("before integration cleanup", paths)
+    log("Disk: integration phase cleanup")
+    for path in paths:
+        _remove_path(path)
+    gc.collect()
+
+
+def prepare_integration_disk(*, force: bool = False) -> None:
+    """Free conflicting artifacts, then verify minimum free space."""
+    if os.environ.get("INTEG_DISK_PREPARED") == "1":
+        return
+    cleanup_disk_before_integration_build(force_integr_target=force)
+    ensure_min_disk_space(context="integration lib build")
+    os.environ["INTEG_DISK_PREPARED"] = "1"
 
 
 def cargo_target_dir() -> Path:

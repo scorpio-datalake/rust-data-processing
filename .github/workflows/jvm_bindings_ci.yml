@@ -8,9 +8,7 @@ name: JVM bindings CI
 
 on:
   push:
-    branches:
-      - main
-      - phase*
+    branches: [main]
     paths:
       - bindings/**
       - docs/java/**
@@ -19,6 +17,7 @@ on:
       - scripts/check_java_version_consistency.py
       - .github/workflows/jvm_bindings_ci.yml
   pull_request:
+    branches: [main]
     paths:
       - bindings/**
       - docs/java/**

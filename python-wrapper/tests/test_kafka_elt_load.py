@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 import rust_data_processing as rdp
 
 KAFKA = hasattr(rdp, "elt_load_kafka_records_json")

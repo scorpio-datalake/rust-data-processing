@@ -56,7 +56,7 @@ final class FfiExportedSymbolsContractTest {
           "Bundled ffi_manifest.json missing from classpath (expected under"
               + " src/main/resources/io/github/scorpio_datalake/rust_data_processing/ in rust-data-processing-jvm).");
       JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-      assertEquals(405, o.getInt("abi_version_constant"));
+      assertEquals(406, o.getInt("abi_version_constant"));
       JSONArray syms = o.getJSONArray("exported_symbols");
       boolean hasAbi = false;
       for (int i = 0; i < syms.length(); i++) {

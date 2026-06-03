@@ -23,6 +23,7 @@ from common import (  # noqa: E402
     log,
     mark_built,
     needs_rebuild,
+    prepare_integration_disk,
     require_tool,
     run,
     setup_integration_build_env,
@@ -43,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["INTEG_FORCE_REBUILD"] = "1"
 
     setup_integration_build_env()
+    prepare_integration_disk(force=args.force)
     log(f"Using CARGO_TARGET_DIR={os.environ['CARGO_TARGET_DIR']}")
     ensure_linux_native_deps()
     require_tool("uv")

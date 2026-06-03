@@ -1,12 +1,12 @@
 package io.github.scorpio_datalake.rust_data_processing.jmh;
 
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -41,10 +41,12 @@ public class RdpAbiVersionBenchmark {
 
   @Setup
   public void setup() throws Throwable {
-    Path lib = resolveNativeLibraryPath();
-    if (lib == null || !Files.exists(lib)) {
+    Path lib = RdpNativeJson.resolveNativeLibraryFromEnvOrProperty();
+    if (lib == null) {
       throw new IllegalStateException(
-          "Set RDP_JVM_SYS or -Drdp.jvm.sys.library to the built rdp_jvm_sys native library.");
+          "rdp_jvm_sys not found. Run: cargo build --manifest-path bindings/jvm-sys/Cargo.toml"
+              + " --features full --release"
+              + " (or set RDP_JVM_SYS / -Drdp.jvm.sys.library).");
     }
     arena = Arena.ofConfined();
     Linker linker = Linker.nativeLinker();
@@ -66,23 +68,5 @@ public class RdpAbiVersionBenchmark {
   @Benchmark
   public int abiVersion() throws Throwable {
     return (int) abiHandle.invokeExact();
-  }
-
-  private static Path resolveNativeLibraryPath() {
-    String env = strip(System.getenv("RDP_JVM_SYS"));
-    if (!env.isEmpty()) {
-      Path p = Path.of(env).toAbsolutePath();
-      return Files.exists(p) ? p : null;
-    }
-    String prop = strip(System.getProperty("rdp.jvm.sys.library"));
-    if (!prop.isEmpty()) {
-      Path p = Path.of(prop).toAbsolutePath();
-      return Files.exists(p) ? p : null;
-    }
-    return null;
-  }
-
-  private static String strip(String s) {
-    return s == null ? "" : s.strip();
   }
 }

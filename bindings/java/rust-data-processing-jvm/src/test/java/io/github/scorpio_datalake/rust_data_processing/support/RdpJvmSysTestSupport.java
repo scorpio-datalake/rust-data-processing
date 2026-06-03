@@ -1,5 +1,6 @@
 package io.github.scorpio_datalake.rust_data_processing.support;
 
+import io.github.scorpio_datalake.rust_data_processing.ffi.RdpNativeJson;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
@@ -15,17 +16,11 @@ public final class RdpJvmSysTestSupport {
         + "or -Drdp.jvm.sys.library=… See bindings/java/rust-data-processing-jvm/README.md";
   }
 
-  /** Path to {@code rdp_jvm_sys} native library, when CI or developer sets env / property. */
+  /**
+   * Path to {@code rdp_jvm_sys} native library (env, property, or built {@code jvm-sys/target}).
+   */
   public static Optional<Path> resolveNativeLibraryPath() {
-    String env = strip(System.getenv("RDP_JVM_SYS"));
-    if (!env.isEmpty()) {
-      return Optional.of(Path.of(env)).map(Path::toAbsolutePath).filter(Files::exists);
-    }
-    String prop = strip(System.getProperty("rdp.jvm.sys.library"));
-    if (!prop.isEmpty()) {
-      return Optional.of(Path.of(prop)).map(Path::toAbsolutePath).filter(Files::exists);
-    }
-    return Optional.empty();
+    return Optional.ofNullable(RdpNativeJson.resolveNativeLibraryFromEnvOrProperty());
   }
 
   private static String strip(String s) {

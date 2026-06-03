@@ -12,7 +12,7 @@ if str(_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS))
 
 from build_libs import build_java_lib, build_python_lib, build_rust_lib  # noqa: E402
-from common import LIBS_DIR, log  # noqa: E402
+from common import LIBS_DIR, log, prepare_integration_disk  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     extra = ["--force"] if args.force else []
+    prepare_integration_disk(force=args.force)
     build_rust_lib.main(extra)
     build_java_lib.main(extra)
     build_python_lib.main(extra)

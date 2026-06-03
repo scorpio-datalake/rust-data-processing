@@ -1,6 +1,7 @@
 //! Kafka streaming ELT over FFI — Extract / Load / sink (JSON envelopes like ingest_path).
 
 use crate::parity_support::{json_err, write_slice, RdpJsonSlice};
+use std::os::raw::c_char;
 
 #[cfg(all(feature = "link-main", feature = "kafka"))]
 use crate::parity_support::json_ok;
@@ -8,8 +9,6 @@ use crate::parity_support::json_ok;
 use serde::Deserialize;
 #[cfg(all(feature = "link-main", feature = "kafka"))]
 use std::ffi::CStr;
-#[cfg(all(feature = "link-main", feature = "kafka"))]
-use std::os::raw::c_char;
 
 #[cfg(all(feature = "link-main", feature = "kafka"))]
 unsafe fn cstr_to_str<'a>(ptr: *const c_char, label: &str) -> Result<&'a str, String> {

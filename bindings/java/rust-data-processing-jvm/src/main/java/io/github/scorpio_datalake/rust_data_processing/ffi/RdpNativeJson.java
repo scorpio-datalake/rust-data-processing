@@ -37,8 +37,9 @@ public final class RdpNativeJson {
 
   /**
    * Resolves an existing native library path from {@code RDP_JVM_SYS} or system property {@code
-   * rdp.jvm.sys.library} (first match wins). Returns {@code null} if unset, blank, or the path is
-   * not a regular file (symlinks to files count as present).
+   * rdp.jvm.sys.library} (first match wins), then {@code bindings/jvm-sys/target/{release,debug}/}
+   * under {@code GITHUB_WORKSPACE} or by walking up from the working directory. Returns {@code
+   * null} if nothing is found.
    */
   public static Path resolveNativeLibraryFromEnvOrProperty() {
     String env = System.getenv("RDP_JVM_SYS");
@@ -55,7 +56,51 @@ public final class RdpNativeJson {
         return p;
       }
     }
+    return discoverBuiltNativeLibrary();
+  }
+
+  private static Path discoverBuiltNativeLibrary() {
+    String gw = System.getenv("GITHUB_WORKSPACE");
+    if (gw != null && !gw.isBlank()) {
+      Path fromWorkspace =
+          tryJvmSysTargetProfiles(Path.of(gw.strip()).resolve("bindings").resolve("jvm-sys"));
+      if (fromWorkspace != null) {
+        return fromWorkspace;
+      }
+    }
+    Path cwd = Path.of("").toAbsolutePath();
+    for (Path cur = cwd; cur != null; cur = cur.getParent()) {
+      Path jvmSys = cur.resolve("bindings").resolve("jvm-sys");
+      if (!Files.isDirectory(jvmSys)) {
+        continue;
+      }
+      Path found = tryJvmSysTargetProfiles(jvmSys);
+      if (found != null) {
+        return found;
+      }
+    }
     return null;
+  }
+
+  private static Path tryJvmSysTargetProfiles(Path jvmSysRoot) {
+    for (String profile : new String[] {"release", "debug"}) {
+      Path lib = jvmSysRoot.resolve("target").resolve(profile).resolve(nativeLibraryBasename());
+      if (Files.isRegularFile(lib)) {
+        return lib.toAbsolutePath().normalize();
+      }
+    }
+    return null;
+  }
+
+  private static String nativeLibraryBasename() {
+    String os = System.getProperty("os.name", "").toLowerCase();
+    if (os.contains("mac") || os.contains("darwin")) {
+      return "librdp_jvm_sys.dylib";
+    }
+    if (os.contains("win")) {
+      return "rdp_jvm_sys.dll";
+    }
+    return "librdp_jvm_sys.so";
   }
 
   /**
