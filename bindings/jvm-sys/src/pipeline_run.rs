@@ -1295,7 +1295,6 @@ fn postgres_copy_sink(
     truncate_before_load: bool,
 ) -> Result<usize, String> {
     use postgres::{Client, NoTls};
-    use rust_data_processing::types::{DataType, Value};
 
     let mut client = Client::connect(url, NoTls).map_err(|e| format!("postgres connect: {e}"))?;
 
@@ -1315,7 +1314,7 @@ fn postgres_copy_sink(
 
     if truncate_before_load {
         client
-            .execute(&format!("TRUNCATE TABLE {fq}"), [])
+            .execute(&format!("TRUNCATE TABLE {fq}"), &[])
             .map_err(|e| format!("postgres truncate: {e}"))?;
     }
 
@@ -1382,9 +1381,6 @@ fn oracle_type_sql(dt: &rust_data_processing::types::DataType) -> Result<&'stati
         DataType::Float64 => "NUMBER",
         DataType::Bool => "NUMBER(1)",
         DataType::Utf8 => "VARCHAR2(4000)",
-        DataType::Null => {
-            return Err("schema field data_type Null is not supported for oracle sink".into())
-        }
     })
 }
 
@@ -1424,20 +1420,37 @@ fn oracle_execute_insert(
     vals: &[Option<String>],
 ) -> Result<(), String> {
     match vals {
-        [a] => conn.execute(sql, &[a]).map(|_| ()),
-        [a, b] => conn.execute(sql, &[a, b]).map(|_| ()),
-        [a, b, c] => conn.execute(sql, &[a, b, c]).map(|_| ()),
-        [a, b, c, d] => conn.execute(sql, &[a, b, c, d]).map(|_| ()),
-        [a, b, c, d, e] => conn.execute(sql, &[a, b, c, d, e]).map(|_| ()),
-        [a, b, c, d, e, f] => conn.execute(sql, &[a, b, c, d, e, f]).map(|_| ()),
-        [a, b, c, d, e, f, g] => conn.execute(sql, &[a, b, c, d, e, f, g]).map(|_| ()),
-        [a, b, c, d, e, f, g, h] => conn.execute(sql, &[a, b, c, d, e, f, g, h]).map(|_| ()),
+        [a] => conn.execute(sql, &[a]).map(|_| ()).map_err(|e| e.to_string()),
+        [a, b] => conn.execute(sql, &[a, b]).map(|_| ()).map_err(|e| e.to_string()),
+        [a, b, c] => conn
+            .execute(sql, &[a, b, c])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        [a, b, c, d] => conn
+            .execute(sql, &[a, b, c, d])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        [a, b, c, d, e] => conn
+            .execute(sql, &[a, b, c, d, e])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        [a, b, c, d, e, f] => conn
+            .execute(sql, &[a, b, c, d, e, f])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        [a, b, c, d, e, f, g] => conn
+            .execute(sql, &[a, b, c, d, e, f, g])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        [a, b, c, d, e, f, g, h] => conn
+            .execute(sql, &[a, b, c, d, e, f, g, h])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
         _ => Err(format!(
             "unsupported oracle INSERT bind count {} (extend oracle_execute_insert)",
             vals.len()
         )),
     }
-    .map_err(|e| e.to_string())
 }
 
 #[cfg(all(feature = "link-main", feature = "sink_oracle"))]
@@ -1529,9 +1542,6 @@ fn pg_type_sql(dt: &rust_data_processing::types::DataType) -> Result<&'static st
         DataType::Float64 => "DOUBLE PRECISION",
         DataType::Bool => "BOOLEAN",
         DataType::Utf8 => "TEXT",
-        DataType::Null => {
-            return Err("schema field data_type Null is not supported for postgresql sink".into())
-        }
     })
 }
 
@@ -1551,7 +1561,6 @@ fn pg_create_table_ddl(fq: &str, schema: &rust_data_processing::types::Schema) -
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]
 fn append_copy_text_field<W: std::io::Write>(w: &mut W, v: &rust_data_processing::types::Value) -> Result<(), String> {
     use rust_data_processing::types::Value;
-    use std::io::Write;
     match v {
         Value::Null => w.write_all(br"\N").map_err(|e| e.to_string()),
         Value::Int64(i) => write!(w, "{i}").map_err(|e| e.to_string()),

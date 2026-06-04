@@ -44,4 +44,6 @@ bindings/java/**/.gradle/
 bindings/java/**/target/
 bindings/java/**/build/
 scripts/git_scripts/
+build_all_libs.log
+to_do_notes.md
 
