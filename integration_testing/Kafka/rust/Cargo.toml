@@ -1,0 +1,13 @@
+[package]
+name = "rdp-kafka-integration-test"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Opt-in Kafka streaming integration tests."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libloading = "0.8"
+serde_json = "1"

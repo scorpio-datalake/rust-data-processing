@@ -21,6 +21,22 @@ See also: [docs/adr/007-kafka-streaming-elt.md](adr/007-kafka-streaming-elt.md).
 
 ---
 
+## Integration validation (Docker)
+
+Tri-language test: **`python3 integration_testing/Kafka/run_kafka_tests.py --no-rancher`** (Redpanda on `127.0.0.1:19092`, topic `rdp-uber-pickups`).
+
+| Step | What happens | Code reference |
+| --- | --- | --- |
+| 1 | Start Redpanda + create topic | `integration_testing/Kafka/docker-compose.yml` |
+| 2 | For each Uber CSV row, build a one-row `DataSet` JSON (`{"Utf8":…}`, `{"Float64":…}`) | `integration_testing/scripts/kafka_stream.py` → `_dataset_envelope` |
+| 3 | **Produce:** `rdp_kafka_export_dataset_json(producer_config, dataset_json)` | Java: `KafkaStreamIntegrationTest` · Rust: `rdp_kafka.rs` |
+| 4 | **Consume:** `rdp_kafka_poll_window_loaded_json(consumer_config, landing_schema)` | Assert landed row count == produced |
+| 5 | Repeat for Java, Python, Rust legs | Look for `PASSED:` in log |
+
+First run rebuilds `librdp_jvm_sys` with **`--features full,kafka`**. Details: [`integration_testing/integration_testing_details.md`](../integration_testing/integration_testing_details.md) § Kafka.
+
+---
+
 ## Rust (implementation)
 
 ### Load step (fixture / tests — no broker)
@@ -248,3 +264,12 @@ Optional landing schema columns (filled from broker metadata):
 - `_kafka_topic`, `_kafka_partition`, `_kafka_offset`, `_kafka_timestamp_ms`, `_kafka_key`
 
 Payload JSON keys map to other columns during **Load** only.
+
+---
+
+## Related
+
+- [`docs/CONNECTORS.md`](CONNECTORS.md) — connector index (Kafka row + build features)
+- [`integration_testing/Kafka/`](../integration_testing/Kafka/) — Redpanda Docker + tri-language tests
+- [`integration_testing/integration_testing_details.md`](../integration_testing/integration_testing_details.md) — step-by-step flows
+- [`docs/java/examples/KafkaEltStreamExample.java`](java/examples/KafkaEltStreamExample.java) — runnable Java tour

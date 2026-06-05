@@ -536,6 +536,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "asynchronous-codec"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4057f2c32adbb2fc158e22fb38433c8e9bbf76b75a4732c7c0cbaf695fb65568"
+dependencies = [
+ "bytes",
+ "futures-sink",
+ "futures-util",
+ "memchr",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -611,7 +624,7 @@ dependencies = [
  "bb8",
  "futures",
  "thiserror 1.0.69",
- "tiberius",
+ "tiberius 0.7.3",
  "tokio",
  "tokio-util 0.6.10",
 ]
@@ -1132,6 +1145,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "connection-string"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "510ca239cf13b7f8d16a2b48f263de7b4f8c566f0af58d901031473c76afb1e3"
+
+[[package]]
 name = "connectorx"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1169,7 +1188,7 @@ dependencies = [
  "serde_json",
  "sqlparser 0.37.0",
  "thiserror 1.0.69",
- "tiberius",
+ "tiberius 0.7.3",
  "tokio",
  "tokio-util 0.7.18",
  "url",
@@ -2817,9 +2836,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.31"
+version = "0.4.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "113b30b4cd05f7c06868fdb2854f66a7b9fece9a48425351cd532e810d74024f"
+checksum = "953f07c43838f8e6f9758cab68bf5bed85465e7587ebe0b823f1bcd81978ad3a"
 
 [[package]]
 name = "lru"
@@ -4309,6 +4328,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be91bcc43e73799dc46a6c194a55e7aae1d86cc867c860fd4a436019af21bd8c"
 
 [[package]]
+name = "pretty-hex"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6fa0831dd7cc608c38a5e323422a0077678fa5744aa2be4ad91c4ece8eec8d5"
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4787,6 +4812,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rdp-cloud-integration-test"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "rust-data-processing",
+ "serde_json",
+]
+
+[[package]]
+name = "rdp-databricks-integration-test"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "rust-data-processing",
+ "serde_json",
+]
+
+[[package]]
 name = "rdp-jvm-sys"
 version = "0.1.0"
 dependencies = [
@@ -4795,6 +4838,18 @@ dependencies = [
  "postgres",
  "rust-data-processing",
  "serde",
+ "serde_json",
+ "tiberius 0.12.3",
+ "tokio",
+ "tokio-util 0.7.18",
+ "url",
+]
+
+[[package]]
+name = "rdp-kafka-integration-test"
+version = "0.1.0"
+dependencies = [
+ "libloading",
  "serde_json",
 ]
 
@@ -4809,6 +4864,34 @@ dependencies = [
 
 [[package]]
 name = "rdp-postgresql-integration-test"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "rust-data-processing",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "rdp-snowflake-integration-test"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "rust-data-processing",
+ "serde_json",
+]
+
+[[package]]
+name = "rdp-spark-integration-test"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "rust-data-processing",
+ "serde_json",
+]
+
+[[package]]
+name = "rdp-sqlserver-integration-test"
 version = "0.1.0"
 dependencies = [
  "libloading",
@@ -5044,6 +5127,7 @@ dependencies = [
  "suppaftp",
  "thiserror 2.0.18",
  "tokio",
+ "ureq",
  "url",
  "walkdir",
  "webpki-roots 0.26.11",
@@ -5814,11 +5898,11 @@ checksum = "833311bc8e26e96c73ad1b5c1f488c588808c747a318905ec67e43d422ea2c08"
 dependencies = [
  "async-native-tls",
  "async-trait",
- "asynchronous-codec",
+ "asynchronous-codec 0.5.0",
  "byteorder",
  "bytes",
  "chrono",
- "connection-string",
+ "connection-string 0.1.13",
  "encoding",
  "enumflags2",
  "futures",
@@ -5829,7 +5913,7 @@ dependencies = [
  "once_cell",
  "opentls",
  "pin-project-lite",
- "pretty-hex",
+ "pretty-hex 0.1.1",
  "rust_decimal",
  "thiserror 1.0.69",
  "tokio",
@@ -5837,6 +5921,30 @@ dependencies = [
  "tracing",
  "uuid 0.8.2",
  "winauth",
+]
+
+[[package]]
+name = "tiberius"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1446cb4198848d1562301a3340424b4f425ef79f35ef9ee034769a9dd92c10d"
+dependencies = [
+ "async-trait",
+ "asynchronous-codec 0.6.2",
+ "byteorder",
+ "bytes",
+ "chrono",
+ "connection-string 0.2.0",
+ "encoding_rs",
+ "enumflags2",
+ "futures-util",
+ "num-traits",
+ "once_cell",
+ "pin-project-lite",
+ "pretty-hex 0.3.0",
+ "thiserror 1.0.69",
+ "tracing",
+ "uuid 1.23.2",
 ]
 
 [[package]]
@@ -6244,6 +6352,18 @@ name = "unty"
 version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
+
+[[package]]
+name = "ureq"
+version = "2.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
+dependencies = [
+ "base64 0.22.1",
+ "log",
+ "once_cell",
+ "url",
+]
 
 [[package]]
 name = "url"

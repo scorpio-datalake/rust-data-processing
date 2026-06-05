@@ -20,6 +20,14 @@ Opt-in connector tests (Oracle, cloud, Kafka, …). **Not** run in default PR CI
 | `Oracle/README.md` | Oracle + Rancher setup details |
 | `PostgreSQL/run_tests.py` | Same RDP pattern for PostgreSQL (no JDBC / psycopg) |
 | `PostgreSQL/README.md` | PostgreSQL Docker + build/run |
+| `SQLServer/run_mssql_tests.py` | Uber CSV → **`kind: mssql`** sink (Docker SQL Server 2022) |
+| `MinIO/docker-compose.yml` | Shared S3-compatible storage for platform connector tests |
+| `Snowflake/run_snowflake_tests.py` | Uber CSV → **`kind: snowflake`** `s3://` stage (MinIO Docker) |
+| `Databricks/run_databricks_tests.py` | Uber CSV → **`kind: databricks`** `s3://` warehouse (MinIO Docker) |
+| `Spark/run_spark_tests.py` | Uber CSV → **`kind: spark`** `s3://` handoff + Spark standalone Docker |
+| `CloudConnectors/run_cloud_tests.py` | Uber CSV → **S3 / GCS / Azure** export + read-back; **SFTP / FTP** import |
+| `Kafka/run_kafka_tests.py` | Uber CSV → **Kafka** one row per message (Redpanda Docker) |
+| `integration_testing_details.md` | Step-by-step flows (Java / Python / Rust) per connector suite |
 | `schema/` | Shared `uber_pickups.{schema,table}.json` for connector tests |
 | `scripts/rdp_pipeline.py` | Python/Rust ctypes wrapper → `rdp_run_pipeline_json` |
 | `libs/` | Built artifacts + `env.sh` (gitignored binaries) |
@@ -55,9 +63,9 @@ cargo generate-lockfile
 
 **Disk:** Integration builds use `integration_testing/.target/` (`CARGO_TARGET_DIR`). `INTEG_MIN_DISK_GIB=6` (default) for preflight.
 
-**Connector tests:** Oracle and PostgreSQL use **`rdp_run_pipeline_json`** for load and **`ingest_from_db`** for verify. Requires `build_all_libs.py` (Rust `integration_full`, Java `full`, Python `integration_full`). See `docs/CONNECTORS.md`.
+**Connector tests:** Warehouse DB connectors (PostgreSQL, Oracle, SQL Server) use **`rdp_run_pipeline_json`** for load and **`ingest_from_db`** for verify. Platform connectors (Snowflake, Databricks, Spark) write to **`s3://`** on **MinIO**, then **`platform_sql.py`** runs warehouse SQL (`CREATE TABLE`, load from stage, `SELECT COUNT(*)`): Snowflake **emulator** + **spark-sql** for Databricks/Spark. Requires `build_all_libs.py`, **uv** + `uv pip install` into `python-wrapper/.venv` (see `scripts/platform_deps.py`), and Docker. See `MinIO/README.md` and per-connector READMEs.
 
-Start with `Oracle/README.md` or `PostgreSQL/README.md`.
+Start with `Oracle/README.md`, `PostgreSQL/README.md`, `SQLServer/README.md`, or the platform connector READMEs.
 
 **Quick prep:**
 

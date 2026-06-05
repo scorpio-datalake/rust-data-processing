@@ -1,0 +1,14 @@
+[package]
+name = "rdp-cloud-integration-test"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Opt-in cloud storage integration tests (S3, GCS, Azure, SFTP, FTP)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libloading = "0.8"
+serde_json = "1"
+rust-data-processing = { path = "../../../", features = ["integration_full"] }

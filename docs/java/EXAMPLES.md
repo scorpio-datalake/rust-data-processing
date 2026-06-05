@@ -157,7 +157,7 @@ Class-level Javadoc in each `.java` file explains **why** that sketch exists, **
 
 ## Example catalog {#example-catalog}
 
-All **35** classes in [`docs/java/examples/`](examples/):
+All **37** classes in [`docs/java/examples/`](examples/):
 
 ### Pipelines, SQL, and multi-format ETL
 
@@ -180,6 +180,8 @@ All **35** classes in [`docs/java/examples/`](examples/):
 | [`PlatformConnectorsPipelineExample.java`](examples/PlatformConnectorsPipelineExample.java) | Full Snowflake / Databricks / Spark / S3·GCS·ABFS URLs; `object_store_uris` + Rust sinks | `rdp_run_pipeline_json` | `cloud_connectors` |
 | [`ObjectStoreUrlsExample.java`](examples/ObjectStoreUrlsExample.java) | S3, GCS, Azure Blob read URIs + working local `parquet_file` sink | `rdp_run_pipeline_json` | `cloud_connectors` |
 | [`SftpFtpConnectorsExample.java`](examples/SftpFtpConnectorsExample.java) | SFTP / FTP / FTPS in `file_transfer_uris` | `rdp_run_pipeline_json` | `file_transfer` |
+| [`KafkaEltStreamExample.java`](examples/KafkaEltStreamExample.java) | Kafka **Extract → Load** on a broker (one row per message in integration) | `rdp_kafka_export_dataset_json`, `rdp_kafka_poll_window_loaded_json` | (broker) — build **`full,kafka`** |
+| [`KafkaEltLoadExample.java`](examples/KafkaEltLoadExample.java) | Kafka **Load** from fixture JSON (no broker) | `rdp_kafka_elt_load_records_json` | `tests/fixtures/kafka/` |
 | [`DbReadPipelineExample.java`](examples/DbReadPipelineExample.java) | ConnectorX `sources.db_reads` pipeline sketch (run locally) | `rdp_run_pipeline_json` | `cloud_connectors` |
 | [`WarehouseExportHandoffExample.java`](examples/WarehouseExportHandoffExample.java) | Export Parquet locally → `rdp_ingest_parquet_path` | `rdp_run_pipeline_json`, `rdp_ingest_parquet_path` | `people` |
 | [`SparkParquetHandoffExample.java`](examples/SparkParquetHandoffExample.java) | Working `rdp_export_parquet_temp`; documents pending `kind: spark` sink | `rdp_export_parquet_temp`, (pipeline JSON in sibling example) | `jvm_contract` (export sample) |
@@ -301,7 +303,7 @@ JSONObject root =
         PipelineJsonFixtures.defaultPathIngestOptionsJson());
 ```
 
-**Do not** pass `s3://your-bucket/...` as a **source** path in `rdp_run_pipeline_json` unless your deployment explicitly supports object-store sources—current JVM pipeline runs expect **local** `sources.paths` (see `OBJECT_STORE_SOURCE_NOT_SUPPORTED` in pipeline orchestration). Production pattern: sync `s3://` objects to disk (or mount) → substitute **local** absolutes in JSON, as [`RDPOnlyETLExample`](examples/RDPOnlyETLExample.java) does for `student_etl/data/part-0000*.json` instead of the conceptual [`example_s3_json_source_paths.json`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/tests/fixtures/student_etl/data/example_s3_json_source_paths.json) `s3://school-rdp/...` list.
+**Do not** put `s3://your-bucket/...` in **`sources.paths`** — use **`sources.object_store_uris`** for cloud ingest (validated in [`CloudImportIntegrationTest`](../../integration_testing/CloudConnectors/java/src/test/java/io/github/scorpio_datalake/rust_data_processing/integration/CloudImportIntegrationTest.java) and [`cloud_pipeline.py`](../../integration_testing/scripts/cloud_pipeline.py)). For a local staging pattern, sync objects to disk first → substitute **local** absolutes in `paths`, as [`RDPOnlyETLExample`](examples/RDPOnlyETLExample.java) does for `student_etl/data/part-0000*.json`.
 
 **Partitioned / Hive-style layouts** — Java discovers files (glob), builds a sorted `paths` array of **local** absolutes, and calls `rdp_ingest_ordered_paths_json` with watermark options—[`OrderedPaths`](examples/OrderedPaths.java). That mirrors scanning `s3://your_lake/events/dt=*/part-*.parquet` **after** you list or sync keys to local paths.
 
@@ -309,9 +311,9 @@ More background: [`docs/LAKE_TABLE_READ.md`](../LAKE_TABLE_READ.md), [`DeltaLake
 
 ### Connector cookbook: PostgreSQL, Oracle, SQL Server, Snowflake, Databricks, Spark, object stores {#connector-cookbook}
 
-Cross-language reference with **the same fake URLs** in Rust, Python, and Java: [`docs/CONNECTORS.md`](../CONNECTORS.md) (SFTP/FTP via `sources.file_transfer_uris` — see [`SftpFtpConnectorsExample.java`](examples/SftpFtpConnectorsExample.java)).
+Cross-language reference with **the same fake URLs** in Rust, Python, and Java: [`docs/CONNECTORS.md`](../CONNECTORS.md) (SFTP/FTP via `sources.file_transfer_uris` — see [`SftpFtpConnectorsExample.java`](examples/SftpFtpConnectorsExample.java)). **Docker-validated flows:** [`integration_testing/integration_testing_details.md`](../../integration_testing/integration_testing_details.md).
 
-**Runnable JVM examples (no external CI):** [`PlatformConnectorsPipelineExample.java`](examples/PlatformConnectorsPipelineExample.java), [`ObjectStoreUrlsExample.java`](examples/ObjectStoreUrlsExample.java), [`SparkParquetHandoffExample.java`](examples/SparkParquetHandoffExample.java). Fixtures: `tests/fixtures/cloud_connectors/`. Build `rdp_jvm_sys` with **`cloud_connectors`** (enabled on `link-main`). CI uses `file://`; production uses `s3://` / `gs://` / `abfss://` in the same JSON fields — Java never ingests files for ETL.
+**Runnable JVM examples (no external CI):** [`PlatformConnectorsPipelineExample.java`](examples/PlatformConnectorsPipelineExample.java), [`ObjectStoreUrlsExample.java`](examples/ObjectStoreUrlsExample.java), [`SparkParquetHandoffExample.java`](examples/SparkParquetHandoffExample.java), [`KafkaEltStreamExample.java`](examples/KafkaEltStreamExample.java). Fixtures: `tests/fixtures/cloud_connectors/`. Build `rdp_jvm_sys` with **`cloud_connectors`** (enabled on `link-main`); add **`kafka`** for streaming. CI uses `file://`; production and **integration tests** use `s3://` / `gs://` / `azure://` in the same JSON fields — Java never opens cloud clients; Rust does I/O.
 
 | Platform | JVM `rdp_run_pipeline_json` | JVM ingest today | Example class / fixture |
 | --- | --- | --- | --- |
@@ -320,7 +322,9 @@ Cross-language reference with **the same fake URLs** in Rust, Python, and Java: 
 | **Snowflake** | `kind: snowflake` — Rust writes stage Parquet (`stage_uri`); optional `COPY INTO` | `sources.object_store_uris` | [`PlatformConnectorsPipelineExample`](examples/PlatformConnectorsPipelineExample.java) |
 | **Databricks** | `kind: databricks` — Rust writes Parquet under `warehouse` path | same | Same |
 | **Apache Spark** | `kind: spark` — Rust writes `handoff_uri` Parquet (driver reads outside FFI) | same | [`SparkParquetHandoffExample`](examples/SparkParquetHandoffExample.java) |
-| **S3 / GCS / Azure** | `sources.object_store_uris` + `kind: object_store` sink (Rust `object_store` crate) | URIs in JSON only | [`ObjectStoreUrlsExample`](examples/ObjectStoreUrlsExample.java) |
+| **S3 / GCS / Azure** | `sources.object_store_uris` + `kind: object_store` sink (Rust `object_store` crate) | URIs in JSON only | [`ObjectStoreUrlsExample`](examples/ObjectStoreUrlsExample.java) · integration: [`CloudImportIntegrationTest`](../../integration_testing/CloudConnectors/java/src/test/java/io/github/scorpio_datalake/rust_data_processing/integration/CloudImportIntegrationTest.java) |
+| **SFTP / FTP** | `sources.file_transfer_uris` | URIs + env passwords | [`SftpFtpConnectorsExample`](examples/SftpFtpConnectorsExample.java) · integration: same CloudConnectors suite |
+| **Kafka (streaming)** | `rdp_kafka_export_dataset_json` / `rdp_kafka_poll_window_loaded_json` | Broker config JSON | [`KafkaEltStreamExample`](examples/KafkaEltStreamExample.java) · integration: [`KafkaStreamIntegrationTest`](../../integration_testing/Kafka/java/src/test/java/io/github/scorpio_datalake/rust_data_processing/integration/KafkaStreamIntegrationTest.java) |
 | **Delta / Iceberg** | `delta_lake` — Rust stages Parquet at `warehouse/.../table/`; Iceberg still pending | URIs in JSON | [`PlatformConnectorsPipelineExample`](examples/PlatformConnectorsPipelineExample.java) |
 
 #### Two kinds of SQL on the JVM

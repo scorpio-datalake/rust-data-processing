@@ -19,6 +19,11 @@ import org.json.JSONObject;
  *
  * <p>Run: set {@code RDP_JVM_SYS} to the built {@code librdp_jvm_sys.so} / {@code .dylib} / {@code
  * .dll}, then {@code java KafkaEltStreamExample} (or pass broker, group, topic as args).
+ *
+ * <p><strong>Integration-tested</strong> (Redpanda Docker, one Uber CSV row per message): {@code
+ * integration_testing/Kafka/} — {@code KafkaStreamIntegrationTest}, {@code kafka_stream.py}, {@code
+ * integration_testing/Kafka/rust/src/rdp_kafka.rs}. See {@code docs/KAFKA_ELT.md} and {@code
+ * integration_testing/integration_testing_details.md}.
  */
 public final class KafkaEltStreamExample {
 

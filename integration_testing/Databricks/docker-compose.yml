@@ -1,0 +1,10 @@
+# Databricks integration: MinIO S3 warehouse (object_store Delta staging path).
+# No Databricks cluster Docker — in-tree writes go to warehouse s3:// per CONNECTORS.md.
+#
+# Usage:
+#   cd integration_testing/Databricks
+#   docker compose up -d
+#   python3 run_databricks_tests.py --no-rancher
+
+include:
+  - path: ../MinIO/docker-compose.yml

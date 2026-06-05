@@ -1,5 +1,8 @@
 //! Example: ingest over SFTP or FTP (requires `--features cloud_connectors`).
 //!
+//! Integration tests use the same Rust API via pipeline `file_transfer_uris`:
+//! `integration_testing/CloudConnectors/` + `integration_testing/scripts/cloud_pipeline.py`.
+//!
 //! ```bash
 //! cargo run --features cloud_connectors --example file_transfer_ingest -- \
 //!   'ftp://etl_user:PASS@127.0.0.1:21/rdp/incoming/data.json'

@@ -47,3 +47,7 @@ scripts/git_scripts/
 build_all_libs.log
 to_do_notes.md
 
+integration_testing/logs/*
+integration_testing/.staging/
+integration_testing/.target/
+integration_testing/libs/

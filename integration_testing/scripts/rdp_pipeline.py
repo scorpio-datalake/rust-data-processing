@@ -72,10 +72,18 @@ def import_csv_pipeline(
     *,
     connector: str,
     csv_path: str | Path,
-    connect_url: str,
+    connect_url: str = "",
     max_rows: int | None = None,
 ) -> dict[str, Any]:
     """CSV ingest → column transform → connector sink (RDP pipeline only)."""
+    if connector in ("snowflake", "databricks", "spark"):
+        from platform_pipeline import import_csv_platform_pipeline
+
+        return import_csv_platform_pipeline(
+            connector=connector,
+            csv_path=csv_path,
+            max_rows=max_rows,
+        )
     if connector == "postgresql":
         from postgresql_common import strip_url_query_for_libpq
 
@@ -83,6 +91,14 @@ def import_csv_pipeline(
     spec = load_table_spec()
     table = connector_table(connector, spec)
     schema = json.loads(load_dataset_schema_json())
+    sink: dict[str, Any] = {
+        "kind": connector,
+        "table": table,
+        "create_table_if_missing": True,
+        "truncate_before_load": True,
+    }
+    if connector in ("postgresql", "oracle", "mssql"):
+        sink["url"] = connect_url
     payload: dict[str, Any] = {
         "pipeline_spec_version": 1,
         "sources": {
@@ -91,17 +107,10 @@ def import_csv_pipeline(
             "options": {"format": "csv"},
         },
         "transform": {"sql": transform_sql(spec)},
-        "sinks": [
-            {
-                "kind": connector,
-                "url": connect_url,
-                "table": table,
-                "create_table_if_missing": True,
-                "truncate_before_load": True,
-            }
-        ],
+        "sinks": [sink],
     }
     if max_rows and max_rows > 0:
+        payload["sources"]["options"]["max_rows"] = max_rows
         payload["orchestration"] = {"max_ingested_rows": max_rows}
     root = run_pipeline_json(payload)
     inter = root["interchange"]

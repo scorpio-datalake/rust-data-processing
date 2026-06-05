@@ -113,6 +113,17 @@ enum SinkSpec {
         #[serde(default)]
         truncate_before_load: bool,
     },
+    /// ConnectorX-style `mssql://user:pass@host:1433/DB`. Optional per-sink SQL on `df`.
+    Mssql {
+        url: String,
+        table: String,
+        #[serde(default)]
+        sql: Option<String>,
+        #[serde(default = "default_true")]
+        create_table_if_missing: bool,
+        #[serde(default)]
+        truncate_before_load: bool,
+    },
     /// Catalog / warehouse URLs are accepted for forward compatibility; connector wiring is tracked separately.
     DeltaLake {
         #[serde(default)]
@@ -832,6 +843,7 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
             | SinkSpec::XmlFile { sql, .. }
             | SinkSpec::Postgresql { sql, .. }
             | SinkSpec::Oracle { sql, .. }
+            | SinkSpec::Mssql { sql, .. }
             | SinkSpec::DeltaLake { sql, .. }
             | SinkSpec::Iceberg { sql, .. }
             | SinkSpec::Snowflake { sql, .. }
@@ -988,6 +1000,55 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                         "status": "skipped",
                         "error_code": "ORACLE_SINK_NOT_BUILT",
                         "reason": "rebuild rdp_jvm_sys with --features sink_oracle for OCI row load",
+                    }));
+                }
+            }
+            SinkSpec::Mssql {
+                url,
+                table,
+                create_table_if_missing,
+                truncate_before_load,
+                ..
+            } => {
+                let ds = branch.collect().map_err(|e| {
+                    PipelineErr::structured("SINK_MATERIALIZATION_FAILED", e.to_string(), "sink")
+                })?;
+                #[cfg(feature = "sink_mssql")]
+                {
+                    match mssql_row_sink(
+                        &url,
+                        &table,
+                        &ds,
+                        create_table_if_missing,
+                        truncate_before_load,
+                    ) {
+                        Ok(row_count) => {
+                            sink_results.push(serde_json::json!({
+                                "kind": "mssql",
+                                "status": "ok",
+                                "table": table,
+                                "row_count": row_count,
+                            }));
+                        }
+                        Err(e) => {
+                            sink_results.push(serde_json::json!({
+                                "kind": "mssql",
+                                "status": "error",
+                                "error_code": "MSSQL_SINK_FAILED",
+                                "table": table,
+                                "error": e,
+                            }));
+                        }
+                    }
+                }
+                #[cfg(not(feature = "sink_mssql"))]
+                {
+                    let _ = (url, table, create_table_if_missing, truncate_before_load, ds);
+                    sink_results.push(serde_json::json!({
+                        "kind": "mssql",
+                        "status": "skipped",
+                        "error_code": "MSSQL_SINK_NOT_BUILT",
+                        "reason": "rebuild rdp_jvm_sys with --features sink_mssql for TDS row load",
                     }));
                 }
             }
@@ -1503,6 +1564,169 @@ fn oracle_row_sink(
     }
     conn.commit().map_err(|e| e.to_string())?;
     Ok(inserted)
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_mssql"))]
+fn mssql_connect_config(url: &str) -> Result<tiberius::Config, String> {
+    use tiberius::AuthMethod;
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid mssql URL: {e}"))?;
+    if parsed.scheme() != "mssql" {
+        return Err(format!("expected mssql:// URL, got {url}"));
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("mssql URL missing host: {url}"))?;
+    let port = parsed.port().unwrap_or(1433);
+    let user = parsed.username();
+    if user.is_empty() {
+        return Err(format!("mssql URL missing user: {url}"));
+    }
+    let pass = parsed.password().unwrap_or_default();
+    let db = parsed.path().trim_start_matches('/');
+    let mut config = tiberius::Config::new();
+    config.host(host);
+    config.port(port);
+    config.authentication(AuthMethod::sql_server(user, pass));
+    if !db.is_empty() {
+        config.database(db);
+    }
+    let encrypt = parsed
+        .query_pairs()
+        .find(|(k, _)| k.eq_ignore_ascii_case("encrypt"))
+        .map(|(_, v)| v != "false" && v != "0")
+        .unwrap_or(true);
+    let trust = parsed
+        .query_pairs()
+        .any(|(k, v)| {
+            k.eq_ignore_ascii_case("trustservercertificate") && (v == "true" || v == "1")
+        });
+    if !encrypt || trust {
+        config.trust_cert();
+    }
+    Ok(config)
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_mssql"))]
+fn mssql_type_sql(dt: &rust_data_processing::types::DataType) -> Result<&'static str, String> {
+    use rust_data_processing::types::DataType;
+    Ok(match dt {
+        DataType::Int64 => "BIGINT",
+        DataType::Float64 => "FLOAT",
+        DataType::Bool => "BIT",
+        DataType::Utf8 => "NVARCHAR(4000)",
+    })
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_mssql"))]
+fn mssql_create_table_ddl(
+    table: &str,
+    schema: &rust_data_processing::types::Schema,
+) -> Result<String, String> {
+    let mut cols = Vec::new();
+    for f in &schema.fields {
+        let ty = mssql_type_sql(&f.data_type)?;
+        cols.push(format!("[{}] {}", f.name, ty));
+    }
+    Ok(format!(
+        "IF OBJECT_ID(N'{table}', N'U') IS NULL CREATE TABLE {table} ({})",
+        cols.join(", ")
+    ))
+}
+
+#[cfg(all(feature = "link-main", feature = "sink_mssql"))]
+fn mssql_row_sink(
+    url: &str,
+    table: &str,
+    ds: &rust_data_processing::types::DataSet,
+    create_table_if_missing: bool,
+    truncate_before_load: bool,
+) -> Result<usize, String> {
+    use tiberius::{Client, Query};
+    use tokio_util::compat::TokioAsyncWriteCompatExt;
+
+    let config = mssql_connect_config(url)?;
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+    rt.block_on(async {
+        let tcp = tokio::net::TcpStream::connect(config.get_addr())
+            .await
+            .map_err(|e| format!("mssql tcp connect: {e}"))?
+            .compat_write();
+        let mut client = Client::connect(config, tcp)
+            .await
+            .map_err(|e| format!("mssql connect: {e}"))?;
+
+        if create_table_if_missing {
+            let ddl = mssql_create_table_ddl(table, &ds.schema)?;
+            client
+                .simple_query(&ddl)
+                .await
+                .map_err(|e| format!("mssql create table: {e}"))?
+                .into_results()
+                .await
+                .map_err(|e| format!("mssql create table results: {e}"))?;
+        }
+        if truncate_before_load {
+            let sql = format!("IF OBJECT_ID(N'{table}', N'U') IS NOT NULL TRUNCATE TABLE {table}");
+            client
+                .simple_query(&sql)
+                .await
+                .map_err(|e| format!("mssql truncate: {e}"))?
+                .into_results()
+                .await
+                .map_err(|e| format!("mssql truncate results: {e}"))?;
+        }
+
+        let col_names: Vec<String> = ds.schema.fields.iter().map(|f| f.name.clone()).collect();
+        let placeholders = (1..=col_names.len())
+            .map(|i| format!("@P{i}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!(
+            "INSERT INTO {table} ({}) VALUES ({placeholders})",
+            col_names
+                .iter()
+                .map(|n| format!("[{n}]"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
+        let mut inserted = 0usize;
+        for row in &ds.rows {
+            let mut query = Query::new(&sql);
+            for (field, value) in ds.schema.fields.iter().zip(row.iter()) {
+                use rust_data_processing::types::{DataType, Value};
+                match (value, &field.data_type) {
+                    (Value::Null, _) => {
+                        query.bind(None::<&str>);
+                    }
+                    (Value::Utf8(s), _) => {
+                        query.bind(s.as_str());
+                    }
+                    (Value::Int64(i), DataType::Int64) => {
+                        query.bind(*i);
+                    }
+                    (Value::Float64(f), DataType::Float64) => {
+                        query.bind(*f);
+                    }
+                    (Value::Bool(b), DataType::Bool) => {
+                        query.bind(*b);
+                    }
+                    other => {
+                        return Err(format!("unsupported value for mssql sink: {other:?}"));
+                    }
+                }
+            }
+            query
+                .execute(&mut client)
+                .await
+                .map_err(|e| format!("mssql insert row {inserted}: {e}"))?;
+            inserted += 1;
+        }
+        Ok(inserted)
+    })
 }
 
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]

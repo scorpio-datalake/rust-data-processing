@@ -46,6 +46,17 @@ def connector_table(connector: str, spec: dict[str, Any] | None = None) -> str:
     return str(spec["connectors"][connector]["table"])
 
 
+def curated_dataset_schema(spec: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Schema after ``transform_sql`` (warehouse column names)."""
+    spec = spec or load_table_spec()
+    src_types = {f["name"]: f["data_type"] for f in json.loads(load_dataset_schema_json())["fields"]}
+    fields = [
+        {"name": col["name"], "data_type": src_types.get(col["source_field"], "Utf8")}
+        for col in spec["columns"]
+    ]
+    return {"fields": fields}
+
+
 def transform_sql(spec: dict[str, Any] | None = None) -> str:
     """Polars SQL renaming CSV/RDP fields to warehouse columns (registered as ``df``)."""
     spec = spec or load_table_spec()
@@ -63,6 +74,8 @@ def transform_sql(spec: dict[str, Any] | None = None) -> str:
 def count_verify_query(connector: str, table: str) -> str:
     if connector == "oracle":
         return f"SELECT CAST(COUNT(*) AS NUMBER(19)) AS CNT FROM {table}"
+    if connector == "mssql":
+        return f"SELECT CAST(COUNT(*) AS BIGINT) AS cnt FROM {table}"
     return f"SELECT COUNT(*)::bigint AS cnt FROM {table}"
 
 

@@ -1,0 +1,2 @@
+# Platform SQL verify uses stdlib HTTP against snowflake-emulator REST API v2.
+# No extra packages required (snowflake-connector-python gzip breaks local emulator login).

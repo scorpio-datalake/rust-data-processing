@@ -95,6 +95,18 @@ fn unified_ingest_csv_explicit_format() {
 }
 
 #[test]
+fn unified_ingest_csv_max_rows_truncates() {
+    let schema = people_schema();
+    let opts = IngestionOptions {
+        format: Some(IngestionFormat::Csv),
+        max_rows: Some(1),
+        ..Default::default()
+    };
+    let ds = ingest_from_path("tests/fixtures/people.csv", &schema, &opts).unwrap();
+    assert_eq!(ds.row_count(), 1);
+}
+
+#[test]
 fn unified_ingest_json_explicit_format_errors_with_flat_schema() {
     let schema = people_schema();
     let opts = IngestionOptions {

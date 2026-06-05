@@ -1,0 +1,25 @@
+# Snowflake integration: MinIO S3 stage + Snowflake SQL emulator (CREATE TABLE / COPY INTO).
+#
+# Usage:
+#   cd integration_testing/Snowflake
+#   docker compose up -d
+#   python3 run_snowflake_tests.py --no-rancher
+
+include:
+  - path: ../MinIO/docker-compose.yml
+
+services:
+  snowflake-emulator:
+    image: ghcr.io/nnnkkk7/snowflake-emulator:latest
+    container_name: rdp-snowflake-emulator
+    restart: "no"
+    ports:
+      - "${SNOWFLAKE_PORT:-8080}:8080"
+    networks:
+      - rdp-platform
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s

@@ -24,6 +24,7 @@ from common import (  # noqa: E402
     die,
     ensure_linux_native_deps,
     find_python_extension,
+    integration_cargo_build_lock,
     log,
     mark_built,
     needs_rebuild,
@@ -57,39 +58,40 @@ def main(argv: list[str] | None = None) -> int:
 
     dest_so: Path | None = None
 
-    if needs_rebuild(PYTHON_STAMP, PYTHON_WATCH_PATHS):
-        log(
-            f"Building Python wrapper (maturin develop --release --features {PYTHON_INTEGRATION_FEATURES})..."
-        )
-        run(
-            ["uv", "sync", "--group", "dev", "--quiet"],
-            cwd=REPO_ROOT / "python-wrapper",
-        )
-        run(
-            [
-                "uv",
-                "run",
-                "maturin",
-                "develop",
-                "--release",
-                "--features",
-                PYTHON_INTEGRATION_FEATURES,
-            ],
-            cwd=REPO_ROOT / "python-wrapper",
-        )
-        ext = find_python_extension()
-        if ext is None:
-            die("Python extension .so not found after maturin develop")
-        shutil.copy2(ext, LIBS_DIR / "python" / ext.name)
-        dest_so = LIBS_DIR / "python" / ext.name
-        mark_built(PYTHON_STAMP)
-        log(f"Python extension → {dest_so}")
-    else:
-        log("Python lib up to date (skip rebuild). Use --force to rebuild.")
-        matches = list((LIBS_DIR / "python").glob("_rust_data_processing*.so"))
-        if not matches:
-            die("stamp exists but extension missing — run with --force")
-        dest_so = matches[0]
+    with integration_cargo_build_lock():
+        if needs_rebuild(PYTHON_STAMP, PYTHON_WATCH_PATHS):
+            log(
+                f"Building Python wrapper (maturin develop --release --features {PYTHON_INTEGRATION_FEATURES})..."
+            )
+            run(
+                ["uv", "sync", "--group", "dev", "--quiet"],
+                cwd=REPO_ROOT / "python-wrapper",
+            )
+            run(
+                [
+                    "uv",
+                    "run",
+                    "maturin",
+                    "develop",
+                    "--release",
+                    "--features",
+                    PYTHON_INTEGRATION_FEATURES,
+                ],
+                cwd=REPO_ROOT / "python-wrapper",
+            )
+            ext = find_python_extension()
+            if ext is None:
+                die("Python extension .so not found after maturin develop")
+            shutil.copy2(ext, LIBS_DIR / "python" / ext.name)
+            dest_so = LIBS_DIR / "python" / ext.name
+            mark_built(PYTHON_STAMP)
+            log(f"Python extension → {dest_so}")
+        else:
+            log("Python lib up to date (skip rebuild). Use --force to rebuild.")
+            matches = list((LIBS_DIR / "python").glob("_rust_data_processing*.so"))
+            if not matches:
+                die("stamp exists but extension missing — run with --force")
+            dest_so = matches[0]
 
     write_python_env(dest_so)
     log(f"Wrote {LIBS_DIR / 'python' / 'env.sh'}")

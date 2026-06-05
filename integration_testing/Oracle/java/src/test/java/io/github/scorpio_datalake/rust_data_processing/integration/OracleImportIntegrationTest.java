@@ -85,7 +85,9 @@ final class OracleImportIntegrationTest {
                 new JSONObject()
                     .put("paths", new JSONArray().put(csv.toString()))
                     .put("schema", schema)
-                    .put("options", new JSONObject().put("format", "csv")))
+                    .put(
+                        "options",
+                        new JSONObject().put("format", "csv").put("max_rows", maxRows)))
             .put("transform", new JSONObject().put("sql", transformSql(tableSpec)))
             .put(
                 "sinks",

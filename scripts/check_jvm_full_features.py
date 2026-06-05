@@ -25,6 +25,7 @@ JVM_REQUIRED_IN_FULL: dict[str, str] = {
     "db_connectorx": "sources.db_reads — PostgreSQL, Oracle, SQL Server (ConnectorX)",
     "sink_postgres": "kind: postgresql sink (libpq COPY)",
     "sink_oracle": "kind: oracle sink (OCI row load)",
+    "sink_mssql": "kind: mssql sink (TDS row load)",
     "rust-data-processing/cloud_connectors": "S3, GCS, Azure ADLS, SFTP/FTP, Snowflake stage, Databricks warehouse, Spark handoff",
     "rust-data-processing/sql": "Polars SQL transforms in pipeline JSON",
     "rust-data-processing/excel": "Excel ingest FFI paths",

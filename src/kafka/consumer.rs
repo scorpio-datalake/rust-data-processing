@@ -1,6 +1,6 @@
 //! Native Kafka consumer — **Extract** step (bounded poll windows).
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rdkafka::consumer::{BaseConsumer, Consumer};
 use rdkafka::message::{Headers, Message};
@@ -55,8 +55,9 @@ impl KafkaStreamSource for BaseConsumer {
             return Ok(Vec::new());
         }
         let timeout = Duration::from_millis(500);
+        let deadline = Instant::now() + Duration::from_secs(15);
         let mut out = Vec::with_capacity(max_records);
-        while out.len() < max_records {
+        while out.len() < max_records && Instant::now() < deadline {
             match self.poll(timeout) {
                 Some(Ok(message)) => {
                     let headers = message
@@ -92,7 +93,7 @@ impl KafkaStreamSource for BaseConsumer {
                         source: Box::new(e),
                     });
                 }
-                None => break,
+                None => continue,
             }
         }
         Ok(out)

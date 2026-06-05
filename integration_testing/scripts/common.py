@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import fcntl
 import gc
 import os
 import platform
+from contextlib import contextmanager
 import shlex
 import shutil
 import subprocess
@@ -24,6 +26,9 @@ RUST_STAMP = LIBS_DIR / "rust" / ".built_at"
 JAVA_STAMP = LIBS_DIR / "java" / ".built_at"
 PYTHON_STAMP = LIBS_DIR / "python" / ".built_at"
 FAILURE_FLAG = LIBS_DIR / ".last_test_failed"
+# One integration cargo/maturin build at a time (shared ``integration_testing/.target/``).
+INTEG_CARGO_BUILD_LOCK = LIBS_DIR / ".integration_cargo_build.lock"
+_integration_cargo_lock_depth = 0
 
 for sub in ("rust", "java", "python"):
     (LIBS_DIR / sub).mkdir(parents=True, exist_ok=True)
@@ -44,6 +49,20 @@ INTEGRATION_BUILD_HELP = f"""Build libraries and data first:
 
 def log(msg: str) -> None:
     print(f"[integration] {msg}", flush=True)
+
+
+def log_test_passed(leg: str) -> None:
+    log(f"PASSED: {leg} integration test")
+
+
+def log_test_failed(leg: str) -> None:
+    log(f"FAILED: {leg} integration test")
+
+
+def log_test_summary(results: list[tuple[str, bool]]) -> None:
+    log("--- Test summary ---")
+    for leg, ok in results:
+        log(f"  {leg}: {'PASSED' if ok else 'FAILED'}")
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -105,6 +124,60 @@ def setup_integration_build_env() -> None:
     if "CARGO_BUILD_JOBS" not in os.environ:
         jobs = os.environ.get("INTEG_CARGO_JOBS", "2")
         os.environ["CARGO_BUILD_JOBS"] = jobs
+
+
+def _integration_lock_holder_pid(lock_path: Path) -> int | None:
+    if not lock_path.is_file():
+        return None
+    try:
+        return int(lock_path.read_text(encoding="utf-8").strip().split()[0])
+    except ValueError:
+        return None
+
+
+@contextmanager
+def integration_cargo_build_lock():
+    """Exclusive lock for scripts that write ``integration_testing/.target/``.
+
+    Prevents concurrent ``build_rust_lib.py`` / ``build_python_lib.py`` runs from blocking
+    indefinitely on Cargo's artifact-directory lock. Re-entrant within one process (e.g.
+    ``build_java_lib.py`` calling ``build_rust_lib.main()``).
+    """
+    global _integration_cargo_lock_depth
+    if _integration_cargo_lock_depth > 0:
+        _integration_cargo_lock_depth += 1
+        try:
+            yield
+        finally:
+            _integration_cargo_lock_depth -= 1
+        return
+
+    INTEG_CARGO_BUILD_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with open(INTEG_CARGO_BUILD_LOCK, "a+", encoding="utf-8") as lf:
+        try:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            holder = _integration_lock_holder_pid(INTEG_CARGO_BUILD_LOCK)
+            rel = INTEG_CARGO_BUILD_LOCK.relative_to(REPO_ROOT)
+            msg = (
+                f"Another integration cargo build is already running (lock: {rel}). "
+                "Wait for it to finish before starting build_rust_lib.py or build_all_libs.py."
+            )
+            if holder is not None:
+                msg += f" Lock holder PID: {holder}."
+                if not _pid_alive(holder):
+                    msg += " That process has exited; retry in a few seconds."
+            die(msg)
+        lf.seek(0)
+        lf.truncate()
+        lf.write(f"{os.getpid()}\n")
+        lf.flush()
+        _integration_cargo_lock_depth = 1
+        try:
+            yield
+        finally:
+            _integration_cargo_lock_depth = 0
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
 
 
 def disk_clean_enabled() -> bool:
@@ -314,11 +387,23 @@ def apply_env_sh(path: Path) -> None:
 INTEGRATION_RUST_TEST_FILTER: dict[str, str] = {
     "Oracle": "oracle_import_uber_csv",
     "PostgreSQL": "postgresql_import_uber_csv",
+    "SQLServer": "mssql_import_uber_csv",
+    "Snowflake": "snowflake_import_uber_csv",
+    "Databricks": "databricks_import_uber_csv",
+    "Spark": "spark_import_uber_csv",
+    "CloudConnectors": "cloud_import_uber_csv",
+    "Kafka": "kafka_stream_uber_csv",
 }
 
 INTEGRATION_RUST_PACKAGES: dict[str, str] = {
     "Oracle": "rdp-oracle-integration-test",
     "PostgreSQL": "rdp-postgresql-integration-test",
+    "SQLServer": "rdp-sqlserver-integration-test",
+    "Snowflake": "rdp-snowflake-integration-test",
+    "Databricks": "rdp-databricks-integration-test",
+    "Spark": "rdp-spark-integration-test",
+    "CloudConnectors": "rdp-cloud-integration-test",
+    "Kafka": "rdp-kafka-integration-test",
 }
 
 INTEGRATION_PREBUILD_PROFILE = "integration"

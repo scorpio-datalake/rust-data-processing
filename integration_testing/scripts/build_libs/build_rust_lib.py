@@ -21,6 +21,7 @@ from common import (  # noqa: E402
     REPO_ROOT,
     RUST_STAMP,
     ensure_linux_native_deps,
+    integration_cargo_build_lock,
     integration_rust_watch_paths,
     log,
     mark_built,
@@ -60,28 +61,29 @@ def main(argv: list[str] | None = None) -> int:
     ensure_linux_native_deps()
     require_tool("cargo")
 
-    watch = integration_rust_watch_paths()
-    if needs_rebuild(RUST_STAMP, watch):
-        log(f"Building Rust workspace (--release --features {RUST_INTEGRATION_FEATURES})...")
-        run(
-            [
-                "cargo",
-                "build",
-                "--release",
-                "--locked",
-                "--features",
-                RUST_INTEGRATION_FEATURES,
-                "-p",
-                "rust-data-processing",
-            ]
-        )
-        mark_built(RUST_STAMP)
-        log("Rust lib build complete.")
-    else:
-        log("Rust lib up to date (skip rebuild). Use --force to rebuild.")
+    with integration_cargo_build_lock():
+        watch = integration_rust_watch_paths()
+        if needs_rebuild(RUST_STAMP, watch):
+            log(f"Building Rust workspace (--release --features {RUST_INTEGRATION_FEATURES})...")
+            run(
+                [
+                    "cargo",
+                    "build",
+                    "--release",
+                    "--locked",
+                    "--features",
+                    RUST_INTEGRATION_FEATURES,
+                    "-p",
+                    "rust-data-processing",
+                ]
+            )
+            mark_built(RUST_STAMP)
+            log("Rust lib build complete.")
+        else:
+            log("Rust lib up to date (skip rebuild). Use --force to rebuild.")
 
-    # One-time compile per connector test crate; run_tests.py only executes tests.
-    prebuild_integration_rust_tests()
+        # One-time compile per connector test crate; run_tests.py only executes tests.
+        prebuild_integration_rust_tests()
 
     write_rust_env()
     log(f"Wrote {LIBS_DIR / 'rust' / 'env.sh'}")

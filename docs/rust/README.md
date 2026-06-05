@@ -164,6 +164,33 @@ let ds = ingest_from_file_transfer_uri(
 
 JVM pipelines use `sources.file_transfer_uris` in JSON (same URIs; Rust performs the download).
 
+**Integration-tested (Docker):** `integration_testing/CloudConnectors/` — SFTP/FTP import and S3/GCS/Azure export + read-back via pipeline JSON. Step-by-step: [`integration_testing/integration_testing_details.md`](../../integration_testing/integration_testing_details.md).
+
+## Object store (S3 / GCS / Azure) (feature-gated)
+
+```rust
+use rust_data_processing::ingestion::{
+    export_dataset_to_object_store_uri, ingest_from_object_store_uri, IngestionOptions,
+    IngestionFormat,
+};
+
+// Set AWS_*, GOOGLE_APPLICATION_CREDENTIALS, or AZURE_* on this process (see CONNECTORS.md).
+let ds = ingest_from_object_store_uri(
+    "s3://rdp-cloud-s3/out.parquet",
+    &schema,
+    &IngestionOptions { format: Some(IngestionFormat::Parquet), ..Default::default() },
+)?;
+export_dataset_to_object_store_uri("gs://rdp-cloud-gcs/out.parquet", &ds)?;
+```
+
+Integration tests use **`kind: object_store`** pipeline sinks and **`object_store_uris`** read-back — see [`integration_testing/scripts/cloud_pipeline.py`](../../integration_testing/scripts/cloud_pipeline.py).
+
+## Kafka streaming ELT (feature-gated)
+
+Build: `cargo build --features kafka`. Examples: `examples/kafka_elt_stream.rs`, `examples/kafka_elt_byo_load.rs`. Full guide: [KAFKA_ELT.md](../KAFKA_ELT.md).
+
+**Integration-tested:** `integration_testing/Kafka/` — one Uber CSV row per message via `rdp_kafka_export_dataset_json` / poll FFI (see `integration_testing/Kafka/rust/src/rdp_kafka.rs`).
+
 ## End-user transformation spec (TransformSpec) (Phase 1)
 
 `transform::TransformSpec` is a serde-friendly “mapping spec” that compiles to our Polars-backed pipeline wrappers

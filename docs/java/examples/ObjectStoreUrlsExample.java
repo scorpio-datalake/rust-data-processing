@@ -16,6 +16,10 @@ import org.json.JSONObject;
  * <p>CI uses {@code file://} paths under {@code tests/fixtures/cloud_connectors/cloud/}. Production uses
  * {@code s3://}, {@code gs://}, or {@code azure://} in the same JSON fields. Optional local {@code parquet_file}
  * sink path is a temp file path substituted into the pipeline (Rust writes it).
+ *
+ * <p><strong>Integration-tested roundtrip</strong> (export Parquet to cloud, read back, assert row counts): {@code
+ * integration_testing/CloudConnectors/} — same pipeline shape as {@code
+ * integration_testing/scripts/cloud_pipeline.py} and {@code CloudImportIntegrationTest}.
  */
 public final class ObjectStoreUrlsExample {
 

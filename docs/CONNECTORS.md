@@ -31,6 +31,79 @@ SELECT id, name, amount FROM demo.fact_scores WHERE amount > 0 LIMIT 100000;
 
 ---
 
+## Integration validation (Docker)
+
+Tri-language tests under [`integration_testing/`](../integration_testing/) run **Java, Python, and Rust** against Docker emulators. Rust performs all protocol I/O; Java and Python call `rdp_run_pipeline_json` or Kafka FFI (`librdp_jvm_sys`).
+
+| Suite | Run command | Protocols / pattern |
+| --- | --- | --- |
+| **CloudConnectors** | `python3 integration_testing/CloudConnectors/run_cloud_tests.py --no-rancher` | **S3** (MinIO), **GCS** (fake-gcs), **Azure** (Azurite): CSV → transform → `kind: object_store` export → read-back via `object_store_uris`. **SFTP / FTP**: import seeded CSV via `file_transfer_uris`. |
+| **Kafka** | `python3 integration_testing/Kafka/run_kafka_tests.py --no-rancher` | One Uber CSV row per message → `rdp_kafka_export_dataset_json` → `rdp_kafka_poll_window_loaded_json` (Redpanda). |
+| **Snowflake / Databricks / Spark** | `run_snowflake_tests.py`, `run_databricks_tests.py`, `run_spark_tests.py` | Platform `kind:` sinks → MinIO / Spark verify. |
+| **SQL Server / Oracle / PostgreSQL** | `run_mssql_tests.py`, `run_oracle_tests.py`, `PostgreSQL/run_tests.py` | DB sink or ConnectorX import. |
+
+**Prerequisites:** `python3 integration_testing/scripts/build_libs/build_all_libs.py`, Uber sample CSV (`download_uber_data.py --sample`). See [`integration_testing/README.md`](../integration_testing/README.md) and [`integration_testing/integration_testing_details.md`](../integration_testing/integration_testing_details.md).
+
+### Object-store roundtrip (S3 / GCS / Azure)
+
+Reference: [`integration_testing/scripts/cloud_pipeline.py`](../integration_testing/scripts/cloud_pipeline.py) — used by all three languages in CloudConnectors.
+
+**Export** (local CSV → transform → cloud Parquet):
+
+```json
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": ["/path/to/uber_nyc_pickups_sample.csv"],
+    "schema": { "fields": [ … raw CSV columns … ] },
+    "options": { "format": "csv", "max_rows": 500 }
+  },
+  "transform": { "sql": "SELECT \"Date/Time\" AS pickup_time, Lat AS lat, Lon AS lon, Base AS base_code FROM df" },
+  "sinks": [{ "kind": "object_store", "uri": "s3://rdp-cloud-s3/out.parquet", "format": "parquet" }],
+  "orchestration": { "max_ingested_rows": 500 }
+}
+```
+
+Integration URIs (local emulators — see `integration_testing/CloudConnectors/.env.example`):
+
+| Protocol | Export / read URI | Auth (process env) |
+| --- | --- | --- |
+| S3 | `s3://rdp-cloud-s3/out.parquet` | `AWS_*` → MinIO `:9000` |
+| GCS | `gs://rdp-cloud-gcs/out.parquet` | `GOOGLE_APPLICATION_CREDENTIALS`, `STORAGE_EMULATOR_HOST` / `gcs_base_url` → fake-gcs `:4443` |
+| Azure | `azure://rdp-cloud-azure/out.parquet` | `AZURE_STORAGE_USE_EMULATOR=true`, `AZURE_ENDPOINT` → Azurite `:10000` |
+
+**Read-back** uses `sources.object_store_uris` with the **curated** schema (transformed column names) and a local `parquet_file` sink for verification.
+
+### File transfer import (SFTP / FTP)
+
+Reference: `cloud_pipeline.import_from_file_transfer` — `sources.file_transfer_uris` + `file_transfer` Rust download.
+
+```json
+{
+  "sources": {
+    "paths": [],
+    "file_transfer_uris": ["sftp://rdp:rdp_sftp_secret@127.0.0.1:2222/upload/incoming.csv"],
+    "schema": { "fields": [ … ] },
+    "options": { "format": "csv", "max_rows": 500 }
+  },
+  "sinks": [{ "kind": "parquet_file", "path": "/tmp/rdp-cloud-sftp-import.parquet" }]
+}
+```
+
+### Kafka streaming (one row per message)
+
+Reference: [`integration_testing/scripts/kafka_stream.py`](../integration_testing/scripts/kafka_stream.py). Dataset JSON uses tagged Rust `Value` cells: `{"Utf8": "…"}`, `{"Float64": 40.7}`.
+
+```python
+# Python integration helper (FFI to rdp_kafka_export_dataset_json / rdp_kafka_poll_window_loaded_json)
+from kafka_stream import verify_uber_kafka_stream
+count = verify_uber_kafka_stream("integration_testing/data/uber_nyc_pickups_sample.csv", max_rows=500)
+```
+
+Java: [`KafkaEltStreamExample.java`](java/examples/KafkaEltStreamExample.java) · Rust: [`integration_testing/Kafka/rust/src/rdp_kafka.rs`](../integration_testing/Kafka/rust/src/rdp_kafka.rs).
+
+---
+
 ## PostgreSQL
 
 | Layer | Connector-only usage |
@@ -348,6 +421,8 @@ MASTER = "spark://spark-master.example.com:7077"
 
 **URI (location only):** `s3://demo-bucket-us-east-1/rdp/incoming/part-00000.parquet`
 
+**Integration (MinIO):** `s3://rdp-cloud-s3/out.parquet` with `AWS_ENDPOINT=http://127.0.0.1:9000` — see [Integration validation](#integration-validation-docker).
+
 ### Rust
 
 ```rust
@@ -396,6 +471,8 @@ ds = rdp.ingest_from_object_store_uri(URI, schema, {"format": "parquet"})  # --f
 
 **URI:** `gs://demo-gcs-project/rdp/incoming/part-00000.parquet` (alias `gcs://` accepted in validation)
 
+**Local emulator (integration tests):** set `STORAGE_EMULATOR_HOST=http://127.0.0.1:4443` and `gcs_base_url` (or `GOOGLE_APPLICATION_CREDENTIALS` pointing at a fake service account with `gcs_base_url`). Rust uses the GCS JSON API against [fake-gcs-server](https://github.com/fsouza/fake-gcs-server) when those vars are set. Validated: `integration_testing/CloudConnectors/` → `gs://rdp-cloud-gcs/out.parquet`.
+
 ### Rust
 
 ```rust
@@ -430,7 +507,9 @@ Full guide: **[AZURE_ADLS.md](AZURE_ADLS.md)** (service principal env vars, mana
 | Account key | `AZURE_STORAGE_ACCOUNT_NAME`, `AZURE_STORAGE_ACCOUNT_KEY` |
 | Managed identity / CLI | Identity on host or `az login` — see CLOUD_AUTH.md |
 
-**URI:** `abfss://container@storacc01.dfs.core.windows.net/rdp/incoming/part-00000.parquet`
+**URI:** `abfss://container@storacc01.dfs.core.windows.net/rdp/incoming/part-00000.parquet` · **`azure://container/path`** also accepted (Azurite integration uses `azure://rdp-cloud-azure/out.parquet`)
+
+**Local emulator (integration tests):** `AZURE_STORAGE_USE_EMULATOR=true`, `AZURE_ENDPOINT=http://127.0.0.1:10000`. Do not set a truncated `AZURE_STORAGE_ACCOUNT_KEY` — Rust uses the well-known Azurite key when emulator mode is on. Validated: `integration_testing/CloudConnectors/`.
 
 ### Rust
 
@@ -488,7 +567,7 @@ ds = rdp.ingest_from_file_transfer_uri(URI, schema, {"format": "parquet"})
 "file_transfer_uris": ["sftp://etl_user:FAKE_SFTP_PASS@sftp.example.com:22/rdp/incoming/data.parquet"]
 ```
 
-See [`SftpFtpConnectorsExample.java`](java/examples/SftpFtpConnectorsExample.java) and fixture `tests/fixtures/file_transfer/`.
+See [`SftpFtpConnectorsExample.java`](java/examples/SftpFtpConnectorsExample.java) and fixture `tests/fixtures/file_transfer/`. **Docker-validated:** `integration_testing/CloudConnectors/` (seeded CSV on SFTP/FTP containers).
 
 ---
 
@@ -529,12 +608,29 @@ ds = rdp.ingest_from_file_transfer_uri(
 
 ---
 
+## Kafka (streaming ELT)
+
+Not a batch file connector — poll **windows** from a topic, land rows, transform separately. Full guide: **[KAFKA_ELT.md](KAFKA_ELT.md)**.
+
+| Language | Entry point | Integration reference |
+| --- | --- | --- |
+| Rust | `export_dataset_to_kafka`, `poll_kafka_window_loaded` | `integration_testing/Kafka/rust/src/rdp_kafka.rs` |
+| Python | `rdp.export_dataset_to_kafka`, `rdp.poll_kafka_window_loaded` (feature **`kafka`**) | `integration_testing/scripts/kafka_stream.py` |
+| Java | `rdp_kafka_export_dataset_json`, `rdp_kafka_poll_window_loaded_json` (build **`full,kafka`**) | `KafkaStreamIntegrationTest`, [`KafkaEltStreamExample.java`](java/examples/KafkaEltStreamExample.java) |
+
+**Run:** `python3 integration_testing/Kafka/run_kafka_tests.py --no-rancher` (Redpanda on `127.0.0.1:19092`).
+
+---
+
 ## Runnable Java tour
 
 [`docs/java/EXAMPLES.md`](java/EXAMPLES.md) · [`PlatformConnectorsPipelineExample.java`](java/examples/PlatformConnectorsPipelineExample.java) · fixture bundle `tests/fixtures/cloud_connectors/`.
 
 ## Related
 
+- **[KAFKA_ELT.md](KAFKA_ELT.md)** — streaming Extract → Load → Transform
+- **[integration_testing/README.md](../integration_testing/README.md)** — Docker tri-language connector tests
+- **[integration_testing/integration_testing_details.md](../integration_testing/integration_testing_details.md)** — step-by-step per connector
 - **[CLOUD_AUTH.md](CLOUD_AUTH.md)** — where OS env vars must be set (not Java JSON); Docker / K8s overview
 - **[AMAZON_S3.md](AMAZON_S3.md)** — Amazon S3 (`AWS_*`, IAM role, Docker, K8s)
 - **[AZURE_ADLS.md](AZURE_ADLS.md)** — Azure ADLS / Blob (`AZURE_*`, Docker, K8s)

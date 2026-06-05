@@ -8,7 +8,7 @@ Authentication for `s3://` URIs in `rust-data-processing` / `rdp_jvm_sys`.
 
 Credentials are **system/OS environment variables** on the process that loads the native library — not Java properties or entries in pipeline JSON. See [CLOUD_AUTH.md — System environment variables](CLOUD_AUTH.md#system-environment-variables-not-java-specific) for Docker `.env`, `docker run --env-file`, and Kubernetes `env` / Secrets.
 
-**URI in JSON = location only.** No `AWS_ACCESS_KEY_ID` in pipeline JSON. Rust uses the [AWS default credential chain](https://docs.aws.amazon.com/sdkref/latest/guide/feature-static-credentials.html) via [`object_store`](https://docs.rs/object_store/latest/object_store/aws/index.html) when opening the bucket.
+**URI in JSON = location only.** No `AWS_ACCESS_KEY_ID` in pipeline JSON. Rust passes `AWS_*` from the **process environment** into [`object_store::parse_url_opts`](https://docs.rs/object_store/latest/object_store/fn.parse_url_opts.html) when opening `s3://` buckets (static keys, `AWS_ENDPOINT` for MinIO, or instance metadata if no keys are set).
 
 ---
 

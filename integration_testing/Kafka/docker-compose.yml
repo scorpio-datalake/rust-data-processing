@@ -1,0 +1,61 @@
+# Kafka streaming integration — Redpanda (Kafka-compatible broker).
+#
+# Usage:
+#   cd integration_testing/Kafka
+#   cp .env.example .env
+#   docker compose up -d
+#   python3 run_kafka_tests.py --no-rancher
+
+networks:
+  rdp-platform:
+    name: rdp-kafka-net
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+    container_name: rdp-redpanda
+    restart: "no"
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://127.0.0.1:19092
+      - --check=false
+    ports:
+      - "${KAFKA_PORT:-19092}:19092"
+    networks:
+      - rdp-platform
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/19092' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+
+  kafka-init:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.4
+    container_name: rdp-kafka-init
+    restart: "no"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - rdp-platform
+    environment:
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-rdp-uber-pickups}
+    entrypoint: >
+      /bin/sh -c "
+      rpk topic create $$KAFKA_TOPIC -p 1 -r 1 --brokers redpanda:9092 || true;
+      echo 'Kafka topic ready';
+      "

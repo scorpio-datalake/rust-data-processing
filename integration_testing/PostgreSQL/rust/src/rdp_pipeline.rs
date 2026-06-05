@@ -119,7 +119,10 @@ pub fn import_csv_postgresql(
         "sources": {
             "paths": [csv.to_string_lossy()],
             "schema": dataset_schema,
-            "options": { "format": "csv" },
+            "options": {
+                "format": "csv",
+                "max_rows": max_rows,
+            },
         },
         "transform": { "sql": transform_sql(&table_spec)? },
         "sinks": [{

@@ -18,6 +18,10 @@ import org.json.JSONObject;
  * CI substitutes a loopback {@code ftp://} URL (see {@code tests/file_transfer_ftp_integration.rs}).
  * Production: use real hosts; set {@code SFTP_PASSWORD}, {@code FTP_PASSWORD}, or {@code
  * SFTP_PRIVATE_KEY_PATH} on the process — not in pipeline JSON (see {@code docs/CLOUD_AUTH.md}).
+ *
+ * <p><strong>Integration-tested import</strong> (Docker SFTP + FTP with seeded Uber CSV): {@code
+ * integration_testing/CloudConnectors/} — {@code file_transfer_uris} via {@code cloud_pipeline.py} and {@code
+ * CloudImportIntegrationTest.javaSftpFileTransferImport} / {@code javaFtpFileTransferImport}.
  */
 public final class SftpFtpConnectorsExample {
 

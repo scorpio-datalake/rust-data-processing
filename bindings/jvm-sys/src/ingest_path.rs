@@ -66,6 +66,10 @@ pub(crate) fn parse_ingestion_options(
         opts.watermark_exclusive_above = Some(json_scalar_to_value(w)?);
     }
 
+    if let Some(n) = obj.get("max_rows").and_then(|x| x.as_u64()) {
+        opts.max_rows = Some(n as usize);
+    }
+
     Ok(opts)
 }
 
