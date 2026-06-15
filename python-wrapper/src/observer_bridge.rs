@@ -130,7 +130,7 @@ pub fn apply_ingestion_observer_options(
     }
     if let Some(v) = d.get_item("observer")? {
         if !v.is_none() {
-            let od = v.downcast::<PyDict>()?;
+            let od = v.cast::<PyDict>()?;
             o.observer = Some(Arc::new(PyIngestionObserver::from_pydict(py, od)?));
         }
     }

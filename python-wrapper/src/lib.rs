@@ -154,7 +154,7 @@ fn merge_ingestion_options(
 ) -> PyResult<IngestionOptions> {
     let mut opts = ingestion_options_from_py(options)?;
     if let Some(o) = options {
-        if let Ok(d) = o.downcast::<PyDict>() {
+        if let Ok(d) = o.cast::<PyDict>() {
             observer_bridge::apply_ingestion_observer_options(py, d, &mut opts)?;
         }
     }
@@ -371,7 +371,7 @@ impl PyDataFrame {
         let key_refs: Vec<&str> = keys.iter().map(|s| s.as_str()).collect();
         let mut out_aggs = Vec::with_capacity(aggs.len());
         for item in aggs.iter() {
-            let d = item.downcast::<PyDict>()?;
+            let d = item.cast::<PyDict>()?;
             out_aggs.push(agg_from_py(&d)?);
         }
         self.inner
@@ -599,7 +599,7 @@ impl PyExecutionEngine {
                         }
                     }
                     match mapper.bind(py).call1((list,)) {
-                        Ok(new_row) => match new_row.downcast::<PyList>() {
+                        Ok(new_row) => match new_row.cast::<PyList>() {
                             Ok(py_row) => {
                                 if py_row.len() != ncols {
                                     *err_ref.lock().unwrap() =
@@ -1078,7 +1078,7 @@ fn processing_map(
         }
         let new_list = mapper.call1((list,))?;
         let py_row = new_list
-            .downcast::<PyList>()
+            .cast::<PyList>()
             .map_err(|_| PyValueError::new_err("mapper must return a list of cell values"))?;
         let n = py_row.len();
         if n != ds.inner.schema.fields.len() {

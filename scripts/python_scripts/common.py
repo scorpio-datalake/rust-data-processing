@@ -86,6 +86,25 @@ def ensure_maven() -> None:
     require_mvn()
 
 
+def ensure_cargo_audit(*, offline: bool = False) -> None:
+    """RustSec audit binary (same version as ``rust_ci.yml`` audit job)."""
+    if shutil.which("cargo-audit") is not None:
+        return
+    install_hint = "cargo install cargo-audit --vers 0.22.0 --locked"
+    if offline:
+        raise SystemExit(
+            f"error: `cargo-audit` not found and --offline prevents install. {install_hint}",
+        )
+    if os.environ.get("BUILD_ALL_NO_AUTO_CARGO_AUDIT"):
+        raise SystemExit(
+            f"error: `cargo-audit` not found. {install_hint} "
+            "or unset BUILD_ALL_NO_AUTO_CARGO_AUDIT to allow auto-install.",
+        )
+    banner("Rust: installing cargo-audit 0.22.0 (matches rust_ci.yml)")
+    require_tool("cargo")
+    run(["cargo", "install", "cargo-audit", "--vers", "0.22.0", "--locked"])
+
+
 JVM_MAVEN_MODULE_SPECS: tuple[tuple[Path, str], ...] = (
     (JVM_MAVEN_MAIN, "main"),
     (JVM_MAVEN_EXAMPLES, "examples"),

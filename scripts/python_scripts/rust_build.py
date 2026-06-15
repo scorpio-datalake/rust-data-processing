@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Rust workspace: optional clean, fmt --check, clippy, build (default + ci_expanded).
+"""Rust workspace: optional clean, fmt --check, cargo audit, clippy, build (default + ci_expanded).
 
-Recommended order mirrors CI rationale: format first (cheap), then clippy (lint + compile),
-then plain build. Optional ``cargo clean`` runs first only when requested.
+Recommended order mirrors CI rationale: format first (cheap), RustSec audit, then clippy (lint +
+compile), then plain build. Optional ``cargo clean`` runs first only when requested.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from common import (
     REPO_ROOT,
     banner,
     cargo_jobs_args,
+    ensure_cargo_audit,
     ensure_min_disk_space,
     report_disk_usage,
     require_tool,
@@ -38,6 +39,15 @@ def fmt_check() -> None:
     banner("Rust: cargo fmt (--check)")
     require_tool("cargo")
     run(["cargo", "fmt", "--all", "--", "--check"], cwd=REPO_ROOT)
+
+
+def audit(*, offline: bool) -> None:
+    ensure_cargo_audit(offline=offline)
+    banner("Rust: cargo audit (RustSec)")
+    args = ["cargo", "audit"]
+    if offline:
+        args.append("--offline")
+    run(args, cwd=REPO_ROOT)
 
 
 def clippy(*, expanded: bool, offline: bool) -> None:
@@ -93,6 +103,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip cargo clippy.",
     )
+    parser.add_argument(
+        "--skip-audit",
+        action="store_true",
+        help="Skip cargo audit (RustSec).",
+    )
     args = parser.parse_args(argv)
 
     setup_rust_toolchain_env(offline=args.offline)
@@ -101,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         clean()
     if not args.skip_fmt:
         fmt_check()
+    if not args.skip_audit:
+        audit(offline=args.offline)
     if not args.expanded_only:
         if not args.skip_clippy:
             clippy(expanded=False, offline=args.offline)
