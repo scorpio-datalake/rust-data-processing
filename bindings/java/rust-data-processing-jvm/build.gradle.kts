@@ -86,8 +86,8 @@ jmh {
     // Panama FFM on JDK 21; also required by jmhRunBytecodeGenerator (not a JavaExec task).
     jvmArgs.add("--enable-preview")
     jvmArgs.add("--enable-native-access=ALL-UNNAMED")
-    val lib = providers.environmentVariable("RDP_JVM_SYS").orElse("")
-    environment.put("RDP_JVM_SYS", lib)
+    val lib = providers.environmentVariable("RDP_JVM_SYS")
+    environment.put("RDP_JVM_SYS", lib.orElse("").get())
 }
 
 tasks.named<JmhBytecodeGeneratorTask>("jmhRunBytecodeGenerator") {

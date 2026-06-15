@@ -158,7 +158,9 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libkrb5-dev pkg-config libclang-dev
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libkrb5-dev pkg-config libclang-dev \
+            cmake libssl-dev zlib1g-dev libcurl4-openssl-dev
 
       - name: Build native rdp_jvm_sys (tests, full Rust linkage)
         if: steps.gate.outputs.skip != 'true'
