@@ -2,7 +2,8 @@ use rdp_kafka_integration_test::rdp_kafka::verify_uber_kafka_stream;
 use std::path::PathBuf;
 
 fn csv_path() -> PathBuf {
-    let root = std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
+    let root =
+        std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
     let sample = PathBuf::from(&root).join("data/uber_nyc_pickups_sample.csv");
     if sample.is_file() {
         sample

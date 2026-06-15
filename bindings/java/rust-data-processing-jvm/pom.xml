@@ -203,7 +203,7 @@
               <include>src/jmh/java/**/*.java</include>
             </includes>
             <googleJavaFormat>
-              <version>1.23.0</version>
+              <version>1.28.0</version>
               <style>GOOGLE</style>
             </googleJavaFormat>
           </java>

@@ -49,6 +49,9 @@ polars-sql = { version = "0.53.0", optional = true }
 rust_xlsxwriter = { version = "0.93", optional = true }
 arrow = { version = "54", optional = true }
 connectorx = { version = "0.4.5", default-features = false, features = ["dst_arrow", "fptr"], optional = true }
+# Pin transitive postgres stack (RUSTSEC-2026-0178/0179/0180 via ConnectorX).
+postgres-protocol = { version = "0.6.12", optional = true }
+tokio-postgres = { version = "0.7.18", optional = true, default-features = false, features = ["runtime"] }
 object_store = { version = "0.13.1", optional = true, default-features = false, features = ["aws", "gcp", "azure", "fs"] }
 tokio = { version = "1", optional = true, features = ["rt"] }
 url = { version = "2", optional = true }
@@ -75,6 +78,8 @@ serde_arrow = ["arrow", "dep:serde_arrow"]
 db_connectorx = [
   "arrow",
   "dep:connectorx",
+  "dep:postgres-protocol",
+  "dep:tokio-postgres",
   "connectorx/src_postgres",
   "connectorx/src_mysql",
   "connectorx/src_mssql",

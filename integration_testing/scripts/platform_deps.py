@@ -9,6 +9,11 @@ import sys
 from pathlib import Path
 
 _SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+from common import ensure_uv  # noqa: E402
+
 _REPO = _SCRIPTS.parent.parent
 _PY_WRAPPER = _REPO / "python-wrapper"
 _REQ = _SCRIPTS / "requirements-platform.txt"
@@ -27,13 +32,9 @@ def platform_python() -> Path:
 
 def ensure_platform_sql_deps() -> None:
     """Ensure python-wrapper venv exists for platform_sql.py (stdlib only; no snowflake-connector)."""
-    if shutil.which("uv") is None:
-        raise SystemExit(
-            "[integration] uv not found — install uv or run: "
-            "cd python-wrapper && uv sync --group dev"
-        )
+    ensure_uv()
     subprocess.run(
-        ["uv", "sync", "--group", "dev", "--quiet"],
+        ["uv", "sync", "--group", "dev", "--no-install-project", "--quiet"],
         cwd=_PY_WRAPPER,
         check=True,
     )

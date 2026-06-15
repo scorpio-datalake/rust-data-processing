@@ -20,6 +20,14 @@ fi
 
 set -euo pipefail
 
+# Non-login shells (nohup/setsid) skip /etc/profile.d; source JDK 21 when configured.
+ensure_java_env() {
+  if [[ -f /etc/profile.d/java21.sh ]]; then
+    # shellcheck source=/dev/null
+    source /etc/profile.d/java21.sh
+  fi
+}
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNS_DIR="${REPO_ROOT}/.build_all_runs"
 LATEST_LINK="${RUNS_DIR}/latest"
@@ -93,6 +101,13 @@ RUN_DIR=$(printf '%q' "${run_dir}")
 BUILD_SCRIPT=$(printf '%q' "${BUILD_SCRIPT}")
 BUILD_ARGS=(${args_quoted})
 
+ensure_java_env() {
+  if [[ -f /etc/profile.d/java21.sh ]]; then
+    # shellcheck source=/dev/null
+    source /etc/profile.d/java21.sh
+  fi
+}
+
 ensure_cargo_on_path() {
   if [[ -z "\${HOME:-}" ]]; then
     HOME="\$(getent passwd "\$(id -un)" 2>/dev/null | cut -d: -f6 || true)"
@@ -116,6 +131,7 @@ ensure_cargo_on_path() {
 }
 
 cd "\${REPO_ROOT}"
+ensure_java_env
 ensure_cargo_on_path
 echo \$\$ >"\${RUN_DIR}/run.pid"
 echo "started=\$(date -Is)" >"\${RUN_DIR}/meta.txt"
@@ -360,5 +376,6 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  ensure_java_env
   main "$@"
 fi

@@ -772,8 +772,8 @@ fn ingest_from_db_infer_py(
 /// **Load** step: map a JSON poll window into a landing `DataSet` (ELT).
 #[cfg(feature = "kafka")]
 use rust_data_processing::kafka::{
-    elt_load_kafka_records_json, export_dataset_to_kafka, poll_kafka_window,
-    poll_kafka_window_loaded, KafkaConsumerBuilder, KafkaProducerBuilder,
+    KafkaConsumerBuilder, KafkaProducerBuilder, elt_load_kafka_records_json,
+    export_dataset_to_kafka, poll_kafka_window, poll_kafka_window_loaded,
 };
 
 #[cfg(feature = "kafka")]
@@ -846,7 +846,8 @@ fn export_dataset_to_kafka_py(
     value_column: Option<&str>,
     message_timeout_ms: u64,
 ) -> PyResult<usize> {
-    let mut builder = KafkaProducerBuilder::new(brokers, topic).message_timeout_ms(message_timeout_ms);
+    let mut builder =
+        KafkaProducerBuilder::new(brokers, topic).message_timeout_ms(message_timeout_ms);
     if let Some(col) = key_column {
         builder = builder.key_column(col);
     }

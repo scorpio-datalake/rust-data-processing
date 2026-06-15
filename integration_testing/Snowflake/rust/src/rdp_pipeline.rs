@@ -49,7 +49,9 @@ fn transform_sql(table_spec: &Value) -> Result<String, String> {
         .ok_or("table spec missing columns")?;
     let mut parts = Vec::new();
     for col in columns {
-        let src = col["source_field"].as_str().ok_or("column missing source_field")?;
+        let src = col["source_field"]
+            .as_str()
+            .ok_or("column missing source_field")?;
         let name = col["name"].as_str().ok_or("column missing name")?;
         if src.contains(' ') || src.contains('/') {
             parts.push(format!("\"{src}\" AS {name}"));
@@ -63,9 +65,13 @@ fn transform_sql(table_spec: &Value) -> Result<String, String> {
 fn run_pipeline(payload: Value) -> Result<Value, String> {
     let lib_path = lib_path()?;
     unsafe {
-        let lib = Library::new(&lib_path).map_err(|e| format!("load {}: {e}", lib_path.display()))?;
-        let run: Symbol<RunPipelineFn> = lib.get(b"rdp_run_pipeline_json").map_err(|e| e.to_string())?;
-        let free: Symbol<JsonSliceFreeFn> = lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
+        let lib =
+            Library::new(&lib_path).map_err(|e| format!("load {}: {e}", lib_path.display()))?;
+        let run: Symbol<RunPipelineFn> = lib
+            .get(b"rdp_run_pipeline_json")
+            .map_err(|e| e.to_string())?;
+        let free: Symbol<JsonSliceFreeFn> =
+            lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
         let text = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
         let c_text = std::ffi::CString::new(text).map_err(|e| e.to_string())?;
         let mut out = RdpJsonSlice {
@@ -88,7 +94,8 @@ fn run_pipeline(payload: Value) -> Result<Value, String> {
 }
 
 fn snowflake_stage_uri() -> Result<String, String> {
-    let uri = std::env::var("SNOWFLAKE_STAGE_URI").map_err(|_| "SNOWFLAKE_STAGE_URI".to_string())?;
+    let uri =
+        std::env::var("SNOWFLAKE_STAGE_URI").map_err(|_| "SNOWFLAKE_STAGE_URI".to_string())?;
     if !uri.starts_with("s3://") {
         return Err(format!("SNOWFLAKE_STAGE_URI must be s3://, got {uri}"));
     }
@@ -127,7 +134,9 @@ pub fn import_csv_snowflake(csv: &Path, max_rows: usize) -> Result<(usize, usize
         "orchestration": { "max_ingested_rows": max_rows },
     });
     let inter = run_pipeline(payload)?;
-    let ingested = inter["ingested_row_count"].as_u64().ok_or("missing ingested_row_count")? as usize;
+    let ingested = inter["ingested_row_count"]
+        .as_u64()
+        .ok_or("missing ingested_row_count")? as usize;
     let sink = inter["sink_results"]
         .as_array()
         .and_then(|a| a.iter().find(|s| s["kind"] == "snowflake"))
@@ -144,9 +153,9 @@ pub fn verify_snowflake_sql(expected: usize) -> Result<usize, String> {
     if !script.is_file() {
         return Err("platform_sql.py missing".into());
     }
-    let python = std::env::var("RDP_PLATFORM_PYTHON").map(PathBuf::from).unwrap_or_else(|_| {
-        integration_root().join("python-wrapper/.venv/bin/python")
-    });
+    let python = std::env::var("RDP_PLATFORM_PYTHON")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| integration_root().join("python-wrapper/.venv/bin/python"));
     let out = std::process::Command::new(&python)
         .arg(&script)
         .arg("snowflake")

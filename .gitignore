@@ -51,3 +51,4 @@ integration_testing/logs/*
 integration_testing/.staging/
 integration_testing/.target/
 integration_testing/libs/
+scripts/setup_java21_os_env.sh

@@ -909,14 +909,15 @@ public final class JvmNativeContractScenarios {
     Path work = Files.createTempDirectory("rdp_contract_db_read_template_");
     try {
       Path sink = work.resolve("curated.parquet");
+      String curatedParquet = PipelineFixtureSupport.pipelinePathBinding(sink);
       String pipeline =
           PipelineFixtureSupport.resolvePipelineJson(
               bundle,
               "pipelines/oracle_db_read.pipeline.json",
-              Map.of("CURATED_PARQUET", sink.toAbsolutePath().normalize().toString()));
+              Map.of("CURATED_PARQUET", curatedParquet));
       assertTrue(pipeline.contains("db_reads"));
       assertTrue(pipeline.contains("oracle://"));
-      assertTrue(pipeline.contains(sink.toString().replace('\\', '/')));
+      assertTrue(pipeline.contains(curatedParquet));
     } finally {
       deleteTree(work);
     }

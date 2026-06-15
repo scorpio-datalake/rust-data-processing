@@ -6,11 +6,11 @@
 #[cfg(feature = "link-main")]
 use rust_data_processing as _;
 
-mod parity_support;
-mod parity;
-mod parity_mirrors;
 mod ingest_path;
 mod kafka;
+mod parity;
+mod parity_mirrors;
+mod parity_support;
 mod pipeline_run;
 
 /// Bump only when ABI / calling conventions for exported symbols break.

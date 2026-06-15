@@ -27,9 +27,7 @@ public final class DbReadPipelineExample {
     return PipelineJsonFixtures.resolvePipelineJson(
         bundle,
         PIPELINE,
-        Map.of(
-            "CURATED_PARQUET",
-            curatedParquet.toAbsolutePath().normalize().toString()));
+        Map.of("CURATED_PARQUET", PipelineJsonFixtures.pipelinePathBinding(curatedParquet)));
   }
 
   public static void demonstrate() throws Exception {

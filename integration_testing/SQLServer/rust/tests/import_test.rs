@@ -4,7 +4,8 @@ use rdp_sqlserver_integration_test::rdp_pipeline::{import_csv_mssql, verify_coun
 use std::path::PathBuf;
 
 fn csv_path() -> PathBuf {
-    let root = std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
+    let root =
+        std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
     let sample = PathBuf::from(&root).join("data/uber_nyc_pickups_sample.csv");
     let full = PathBuf::from(&root).join("data/uber_nyc_pickups_apr2014.csv");
     if sample.is_file() {
@@ -31,8 +32,7 @@ fn mssql_import_uber_csv() {
     let csv = csv_path();
     assert!(csv.is_file(), "missing Uber CSV at {}", csv.display());
 
-    let (ingested, loaded) =
-        import_csv_mssql(&csv, &url, max_rows()).expect("RDP import pipeline");
+    let (ingested, loaded) = import_csv_mssql(&csv, &url, max_rows()).expect("RDP import pipeline");
     assert!(ingested > 0, "no rows ingested from csv");
     assert_eq!(loaded, ingested);
 

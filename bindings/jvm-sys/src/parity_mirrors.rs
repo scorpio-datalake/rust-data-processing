@@ -54,16 +54,8 @@ fn mirror_bindings_impl() -> Result<serde_json::Value, String> {
     let ds = DataSet::new(
         schema.clone(),
         vec![
-            vec![
-                Value::Int64(1),
-                Value::Bool(true),
-                Value::Float64(10.0),
-            ],
-            vec![
-                Value::Int64(2),
-                Value::Bool(false),
-                Value::Float64(20.0),
-            ],
+            vec![Value::Int64(1), Value::Bool(true), Value::Float64(10.0)],
+            vec![Value::Int64(2), Value::Bool(false), Value::Float64(20.0)],
             vec![Value::Int64(3), Value::Bool(true), Value::Null],
         ],
     );
@@ -127,7 +119,11 @@ fn mirror_bindings_impl() -> Result<serde_json::Value, String> {
     // test_profile_validate_outliers_helpers (subset)
     let px = DataSet::new(
         Schema::new(vec![Field::new("x", DataType::Float64)]),
-        vec![vec![Value::Float64(1.0)], vec![Value::Null], vec![Value::Float64(3.0)]],
+        vec![
+            vec![Value::Float64(1.0)],
+            vec![Value::Null],
+            vec![Value::Float64(3.0)],
+        ],
     );
     let prof = profile_dataset(
         &px,
@@ -175,7 +171,11 @@ fn mirror_bindings_impl() -> Result<serde_json::Value, String> {
     // test_execution_engine_reduce_metrics
     let ds_n = DataSet::new(
         Schema::new(vec![Field::new("n", DataType::Int64)]),
-        vec![vec![Value::Int64(1)], vec![Value::Int64(2)], vec![Value::Int64(3)]],
+        vec![
+            vec![Value::Int64(1)],
+            vec![Value::Int64(2)],
+            vec![Value::Int64(3)],
+        ],
     );
     let eng = ExecutionEngine::new(ExecutionOptions {
         chunk_size: 2,
@@ -257,16 +257,8 @@ fn mirror_mapping_spec_impl() -> Result<serde_json::Value, String> {
             Field::new("name", DataType::Utf8),
         ]),
         vec![
-            vec![
-                Value::Int64(1),
-                Value::Int64(10),
-                Value::Utf8("Ada".into()),
-            ],
-            vec![
-                Value::Int64(2),
-                Value::Null,
-                Value::Utf8("Grace".into()),
-            ],
+            vec![Value::Int64(1), Value::Int64(10), Value::Utf8("Ada".into())],
+            vec![Value::Int64(2), Value::Null, Value::Utf8("Grace".into())],
         ],
     );
     let out_schema = Schema::new(vec![
@@ -452,8 +444,10 @@ fn mirror_sql_suite_impl() -> Result<serde_json::Value, String> {
     let df_left = DataFrame::from_dataset(&left).map_err(|e| e.to_string())?;
     let df_right = DataFrame::from_dataset(&right).map_err(|e| e.to_string())?;
     let mut ctx = sql::Context::new();
-    ctx.register("people", &df_left).map_err(|e| e.to_string())?;
-    ctx.register("scores", &df_right).map_err(|e| e.to_string())?;
+    ctx.register("people", &df_left)
+        .map_err(|e| e.to_string())?;
+    ctx.register("scores", &df_right)
+        .map_err(|e| e.to_string())?;
     let joined = ctx
         .execute(&join_sql)
         .map_err(|e| e.to_string())?
@@ -559,7 +553,7 @@ fn parity_watermark_mirror() -> RdpJsonSlice {
 
 #[cfg(feature = "link-main")]
 fn mirror_watermark_impl() -> Result<serde_json::Value, String> {
-    use rust_data_processing::ingestion::{IngestionOptions, ingest_from_path};
+    use rust_data_processing::ingestion::{ingest_from_path, IngestionOptions};
     use rust_data_processing::types::{DataType, Field, Schema, Value};
 
     let schema = Schema::new(vec![
@@ -623,11 +617,11 @@ fn parity_deep_seattle_mirror() -> RdpJsonSlice {
 
 #[cfg(feature = "link-main")]
 fn mirror_deep_seattle_impl() -> Result<serde_json::Value, String> {
-    use rust_data_processing::ingestion::{IngestionOptions, ingest_from_path};
+    use rust_data_processing::ingestion::{ingest_from_path, IngestionOptions};
     use rust_data_processing::pipeline::{Agg, DataFrame};
     use rust_data_processing::processing::{
-        ReduceOp, VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce,
-        top_k_by_frequency,
+        arg_max_row, arg_min_row, feature_wise_mean_std, reduce, top_k_by_frequency, ReduceOp,
+        VarianceKind,
     };
     use rust_data_processing::types::{DataType, Field, Schema, Value};
 
@@ -640,7 +634,8 @@ fn mirror_deep_seattle_impl() -> Result<serde_json::Value, String> {
         Field::new("weather", DataType::Utf8),
     ]);
     let path = fixtures().join("deep/seattle-weather.csv");
-    let ds = ingest_from_path(&path, &schema, &IngestionOptions::default()).map_err(|e| e.to_string())?;
+    let ds = ingest_from_path(&path, &schema, &IngestionOptions::default())
+        .map_err(|e| e.to_string())?;
 
     let mean_mem = reduce(&ds, "temp_max", ReduceOp::Mean);
     let mean_pol = DataFrame::from_dataset(&ds)
@@ -752,7 +747,7 @@ fn parity_sft_sample_mirror() -> RdpJsonSlice {
 #[cfg(feature = "link-main")]
 fn mirror_sft_sample_impl() -> Result<serde_json::Value, String> {
     use rust_data_processing::export::dataset_to_jsonl;
-    use rust_data_processing::ingestion::{IngestionOptions, ingest_from_path};
+    use rust_data_processing::ingestion::{ingest_from_path, IngestionOptions};
     use rust_data_processing::types::{DataType, Field, Schema};
 
     let path = repo_root().join("examples/sft/sample_alpaca.ndjson");
@@ -761,9 +756,13 @@ fn mirror_sft_sample_impl() -> Result<serde_json::Value, String> {
         Field::new("input", DataType::Utf8),
         Field::new("output", DataType::Utf8),
     ]);
-    let ds = ingest_from_path(&path, &schema, &IngestionOptions::default()).map_err(|e| e.to_string())?;
-    let jsonl = dataset_to_jsonl(&ds, &["instruction".into(), "input".into(), "output".into()])
+    let ds = ingest_from_path(&path, &schema, &IngestionOptions::default())
         .map_err(|e| e.to_string())?;
+    let jsonl = dataset_to_jsonl(
+        &ds,
+        &["instruction".into(), "input".into(), "output".into()],
+    )
+    .map_err(|e| e.to_string())?;
     let lines: Vec<&str> = jsonl.lines().collect();
 
     Ok(serde_json::json!({
@@ -897,7 +896,7 @@ fn parity_observability_mirror() -> RdpJsonSlice {
 
 #[cfg(feature = "link-main")]
 fn mirror_observability_impl() -> Result<serde_json::Value, String> {
-    use rust_data_processing::ingestion::{IngestionOptions, ingest_from_path};
+    use rust_data_processing::ingestion::{ingest_from_path, IngestionOptions};
     use rust_data_processing::types::{DataType, Field, Schema};
 
     let schema = Schema::new(vec![Field::new("id", DataType::Int64)]);

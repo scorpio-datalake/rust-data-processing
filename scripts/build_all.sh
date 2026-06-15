@@ -116,7 +116,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Non-login shells often omit rustup's PATH; ensure ~/.cargo/bin is visible.
+# Non-login shells often omit /etc/profile.d and rustup's PATH.
+ensure_java_env() {
+  if [[ -f /etc/profile.d/java21.sh ]]; then
+    # shellcheck source=/dev/null
+    source /etc/profile.d/java21.sh
+  fi
+}
+
 ensure_cargo_on_path() {
   if [[ -z "${HOME:-}" ]]; then
     HOME="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6 || true)"
@@ -139,6 +146,7 @@ ensure_cargo_on_path() {
   fi
 }
 
+ensure_java_env
 ensure_cargo_on_path
 
 cd "${repo_root}"

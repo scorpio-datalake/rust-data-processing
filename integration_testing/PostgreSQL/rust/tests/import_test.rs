@@ -1,10 +1,13 @@
 //! Rust PostgreSQL integration test — RDP pipeline import + RDP ingest_from_db verify.
 
-use rdp_postgresql_integration_test::rdp_pipeline::{import_csv_postgresql, verify_count_postgresql};
+use rdp_postgresql_integration_test::rdp_pipeline::{
+    import_csv_postgresql, verify_count_postgresql,
+};
 use std::path::PathBuf;
 
 fn csv_path() -> PathBuf {
-    let root = std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
+    let root =
+        std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
     let sample = PathBuf::from(&root).join("data/uber_nyc_pickups_sample.csv");
     let full = PathBuf::from(&root).join("data/uber_nyc_pickups_apr2014.csv");
     if sample.is_file() {

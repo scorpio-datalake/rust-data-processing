@@ -47,7 +47,9 @@ fn transform_sql(table_spec: &Value) -> Result<String, String> {
         .ok_or("table spec missing columns")?;
     let mut parts = Vec::new();
     for col in columns {
-        let src = col["source_field"].as_str().ok_or("column missing source_field")?;
+        let src = col["source_field"]
+            .as_str()
+            .ok_or("column missing source_field")?;
         let name = col["name"].as_str().ok_or("column missing name")?;
         if src.contains(' ') || src.contains('/') {
             parts.push(format!("\"{src}\" AS {name}"));
@@ -61,7 +63,8 @@ fn transform_sql(table_spec: &Value) -> Result<String, String> {
 fn run_pipeline(payload: Value) -> Result<Value, String> {
     let lib_path = lib_path()?;
     unsafe {
-        let lib = Library::new(&lib_path).map_err(|e| format!("load {}: {e}", lib_path.display()))?;
+        let lib =
+            Library::new(&lib_path).map_err(|e| format!("load {}: {e}", lib_path.display()))?;
         let run: Symbol<RunPipelineFn> = lib
             .get(b"rdp_run_pipeline_json")
             .map_err(|e| format!("symbol rdp_run_pipeline_json: {e}"))?;
@@ -70,8 +73,7 @@ fn run_pipeline(payload: Value) -> Result<Value, String> {
             .map_err(|e| format!("symbol rdp_json_slice_free: {e}"))?;
 
         let text = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
-        let c_text =
-            std::ffi::CString::new(text).map_err(|e| format!("pipeline json nul: {e}"))?;
+        let c_text = std::ffi::CString::new(text).map_err(|e| format!("pipeline json nul: {e}"))?;
         let mut out = RdpJsonSlice {
             ptr: std::ptr::null_mut(),
             len: 0,

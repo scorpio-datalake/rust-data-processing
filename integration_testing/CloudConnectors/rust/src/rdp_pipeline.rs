@@ -43,7 +43,9 @@ fn transform_sql(table_spec: &Value) -> Result<String, String> {
         .ok_or("table spec missing columns")?;
     let mut parts = Vec::new();
     for col in columns {
-        let src = col["source_field"].as_str().ok_or("column missing source_field")?;
+        let src = col["source_field"]
+            .as_str()
+            .ok_or("column missing source_field")?;
         let name = col["name"].as_str().ok_or("column missing name")?;
         if src.contains(' ') || src.contains('/') {
             parts.push(format!("\"{src}\" AS {name}"));
@@ -61,8 +63,11 @@ fn run_pipeline(payload: Value) -> Result<Value, String> {
     }
     unsafe {
         let lib = Library::new(&lib_path).map_err(|e| e.to_string())?;
-        let run: Symbol<RunPipelineFn> = lib.get(b"rdp_run_pipeline_json").map_err(|e| e.to_string())?;
-        let free: Symbol<JsonSliceFreeFn> = lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
+        let run: Symbol<RunPipelineFn> = lib
+            .get(b"rdp_run_pipeline_json")
+            .map_err(|e| e.to_string())?;
+        let free: Symbol<JsonSliceFreeFn> =
+            lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
         let text = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
         let c_text = std::ffi::CString::new(text).map_err(|e| e.to_string())?;
         let mut out = RdpJsonSlice {
@@ -100,14 +105,20 @@ fn curated_schema(table_spec: &Value, dataset_schema: &Value) -> Result<Value, S
     let mut fields = Vec::new();
     for col in table_spec["columns"].as_array().ok_or("missing columns")? {
         let name = col["name"].as_str().ok_or("column missing name")?;
-        let src = col["source_field"].as_str().ok_or("column missing source_field")?;
+        let src = col["source_field"]
+            .as_str()
+            .ok_or("column missing source_field")?;
         let dt = src_types.get(src).cloned().unwrap_or_else(|| "Utf8".into());
         fields.push(json!({"name": name, "data_type": dt}));
     }
     Ok(json!({"fields": fields}))
 }
 
-pub fn verify_object_store_roundtrip(protocol: &str, csv: &Path, max_rows: usize) -> Result<usize, String> {
+pub fn verify_object_store_roundtrip(
+    protocol: &str,
+    csv: &Path,
+    max_rows: usize,
+) -> Result<usize, String> {
     let table_spec = load_json(&schema_dir().join("uber_pickups.table.json"))?;
     let dataset_schema = load_json(&schema_dir().join("uber_pickups.schema.json"))?;
     let curated = curated_schema(&table_spec, &dataset_schema)?;
@@ -132,7 +143,9 @@ pub fn verify_object_store_roundtrip(protocol: &str, csv: &Path, max_rows: usize
         "orchestration": { "max_ingested_rows": max_rows },
     });
     let inter = run_pipeline(export)?;
-    let expected = inter["ingested_row_count"].as_u64().ok_or("missing ingested_row_count")? as usize;
+    let expected = inter["ingested_row_count"]
+        .as_u64()
+        .ok_or("missing ingested_row_count")? as usize;
     let read_back = run_pipeline(json!({
         "pipeline_spec_version": 1,
         "sources": {
@@ -146,9 +159,13 @@ pub fn verify_object_store_roundtrip(protocol: &str, csv: &Path, max_rows: usize
             "path": format!("/tmp/rdp-cloud-{protocol}-readback.parquet"),
         }],
     }))?;
-    let got = read_back["ingested_row_count"].as_u64().ok_or("missing read count")? as usize;
+    let got = read_back["ingested_row_count"]
+        .as_u64()
+        .ok_or("missing read count")? as usize;
     if got != expected {
-        return Err(format!("{protocol} roundtrip: expected {expected}, got {got}"));
+        return Err(format!(
+            "{protocol} roundtrip: expected {expected}, got {got}"
+        ));
     }
     Ok(expected)
 }
@@ -183,7 +200,9 @@ pub fn verify_file_transfer_import(protocol: &str) -> Result<usize, String> {
         }],
     });
     let inter = run_pipeline(import)?;
-    let count = inter["ingested_row_count"].as_u64().ok_or("missing ingested_row_count")? as usize;
+    let count = inter["ingested_row_count"]
+        .as_u64()
+        .ok_or("missing ingested_row_count")? as usize;
     if count == 0 {
         return Err(format!("{protocol} import returned no rows"));
     }

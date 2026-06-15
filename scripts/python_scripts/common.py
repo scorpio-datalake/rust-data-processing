@@ -567,12 +567,47 @@ def setup_rust_toolchain_env(*, offline: bool = False) -> None:
         _prefetch_cargo_for_offline_workflow()
 
 
-def native_lib_release() -> Path:
+def _jvm_sys_lib_basename() -> str:
     if platform.system() == "Windows":
-        return JVM_SYS_DIR / "target" / "release" / "rdp_jvm_sys.dll"
+        return "rdp_jvm_sys.dll"
     if platform.system() == "Darwin":
-        return JVM_SYS_DIR / "target" / "release" / "librdp_jvm_sys.dylib"
-    return JVM_SYS_DIR / "target" / "release" / "librdp_jvm_sys.so"
+        return "librdp_jvm_sys.dylib"
+    return "librdp_jvm_sys.so"
+
+
+def _jvm_sys_target_roots() -> list[Path]:
+    """Cargo output dirs for ``rdp-jvm-sys`` (workspace → repo ``target/``)."""
+    roots: list[Path] = []
+    cargo_target = os.environ.get("CARGO_TARGET_DIR", "").strip()
+    if cargo_target:
+        roots.append(Path(cargo_target))
+    roots.append(REPO_ROOT / "target")
+    roots.append(JVM_SYS_DIR / "target")
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for root in roots:
+        if root not in seen:
+            seen.add(root)
+            out.append(root)
+    return out
+
+
+def native_lib_release() -> Path:
+    name = _jvm_sys_lib_basename()
+    for root in _jvm_sys_target_roots():
+        candidate = root / "release" / name
+        if candidate.is_file():
+            return candidate
+    return REPO_ROOT / "target" / "release" / name
+
+
+def native_lib_debug() -> Path:
+    name = _jvm_sys_lib_basename()
+    for root in _jvm_sys_target_roots():
+        candidate = root / "debug" / name
+        if candidate.is_file():
+            return candidate
+    return REPO_ROOT / "target" / "debug" / name
 
 
 def gradlew_path() -> Path:

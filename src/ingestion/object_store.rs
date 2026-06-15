@@ -49,14 +49,18 @@ fn object_store_url_options() -> Vec<(String, String)> {
             key.as_str() == "google_base_url"
         })
         .collect();
-    if let Ok(url) = std::env::var("gcs_base_url").or_else(|_| std::env::var("STORAGE_EMULATOR_HOST"))
+    if let Ok(url) =
+        std::env::var("gcs_base_url").or_else(|_| std::env::var("STORAGE_EMULATOR_HOST"))
     {
         opts.push(("google_base_url".into(), url));
         opts.push(("google_skip_signature".into(), "true".into()));
     }
     if azure_emulator {
         opts.push(("azure_storage_use_emulator".into(), "true".into()));
-        opts.push(("azure_storage_account_name".into(), "devstoreaccount1".into()));
+        opts.push((
+            "azure_storage_account_name".into(),
+            "devstoreaccount1".into(),
+        ));
     }
     opts
 }
@@ -115,7 +119,12 @@ fn gcs_emulator_get_bytes(base: &str, bucket: &str, object: &str) -> IngestionRe
     Ok(body)
 }
 
-fn gcs_emulator_put_bytes(base: &str, bucket: &str, object: &str, body: &[u8]) -> IngestionResult<()> {
+fn gcs_emulator_put_bytes(
+    base: &str,
+    bucket: &str,
+    object: &str,
+    body: &[u8],
+) -> IngestionResult<()> {
     let url = format!(
         "{}/upload/storage/v1/b/{}/o?uploadType=media&name={}",
         base.trim_end_matches('/'),
@@ -146,13 +155,11 @@ pub fn resolve_object_store_uri(uri: &str) -> IngestionResult<(Arc<dyn ObjectSto
         message: format!("invalid object-store URI `{uri}`: {e}"),
     })?;
     let opts = object_store_url_options();
-    let (store, path) = object_store::parse_url_opts(
-        &url,
-        opts.iter().map(|(k, v)| (k.as_str(), v.as_str())),
-    )
-    .map_err(|e| IngestionError::SchemaMismatch {
-        message: format!("invalid object-store URI `{uri}`: {e}"),
-    })?;
+    let (store, path) =
+        object_store::parse_url_opts(&url, opts.iter().map(|(k, v)| (k.as_str(), v.as_str())))
+            .map_err(|e| IngestionError::SchemaMismatch {
+                message: format!("invalid object-store URI `{uri}`: {e}"),
+            })?;
     Ok((Arc::from(store), path))
 }
 

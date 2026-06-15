@@ -65,7 +65,9 @@ fn default_auto_offset_reset() -> String {
 }
 
 #[cfg(all(feature = "link-main", feature = "kafka"))]
-fn consumer_from_config(cfg: &KafkaConsumerConfig) -> rust_data_processing::kafka::KafkaConsumerBuilder {
+fn consumer_from_config(
+    cfg: &KafkaConsumerConfig,
+) -> rust_data_processing::kafka::KafkaConsumerBuilder {
     use rust_data_processing::kafka::KafkaConsumerBuilder;
     let mut b = KafkaConsumerBuilder::new(&cfg.brokers, &cfg.group_id, &cfg.topic)
         .auto_offset_reset(&cfg.auto_offset_reset);
@@ -94,7 +96,9 @@ fn default_message_timeout_ms() -> u64 {
 }
 
 #[cfg(all(feature = "link-main", feature = "kafka"))]
-fn producer_from_config(cfg: &KafkaProducerConfig) -> rust_data_processing::kafka::KafkaProducerBuilder {
+fn producer_from_config(
+    cfg: &KafkaProducerConfig,
+) -> rust_data_processing::kafka::KafkaProducerBuilder {
     use rust_data_processing::kafka::KafkaProducerBuilder;
     let mut b = KafkaProducerBuilder::new(&cfg.brokers, &cfg.topic)
         .message_timeout_ms(cfg.message_timeout_ms);
@@ -119,7 +123,10 @@ pub unsafe extern "C" fn rdp_kafka_elt_load_records_json(
     records_json_ptr: *const c_char,
     schema_json_ptr: *const c_char,
 ) {
-    write_slice(out, kafka_elt_load_records_json_impl(records_json_ptr, schema_json_ptr));
+    write_slice(
+        out,
+        kafka_elt_load_records_json_impl(records_json_ptr, schema_json_ptr),
+    );
 }
 
 #[cfg(all(feature = "link-main", feature = "kafka"))]

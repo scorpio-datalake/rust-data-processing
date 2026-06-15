@@ -45,7 +45,9 @@ fn transform_sql(table_spec: &Value) -> Result<String, String> {
         .ok_or("table spec missing columns")?;
     let mut parts = Vec::new();
     for col in columns {
-        let src = col["source_field"].as_str().ok_or("column missing source_field")?;
+        let src = col["source_field"]
+            .as_str()
+            .ok_or("column missing source_field")?;
         let name = col["name"].as_str().ok_or("column missing name")?;
         if src.contains(' ') || src.contains('/') {
             parts.push(format!("\"{src}\" AS {name}"));
@@ -63,8 +65,11 @@ fn run_pipeline(payload: Value) -> Result<Value, String> {
     }
     unsafe {
         let lib = Library::new(&lib_path).map_err(|e| e.to_string())?;
-        let run: Symbol<RunPipelineFn> = lib.get(b"rdp_run_pipeline_json").map_err(|e| e.to_string())?;
-        let free: Symbol<JsonSliceFreeFn> = lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
+        let run: Symbol<RunPipelineFn> = lib
+            .get(b"rdp_run_pipeline_json")
+            .map_err(|e| e.to_string())?;
+        let free: Symbol<JsonSliceFreeFn> =
+            lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
         let text = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
         let c_text = std::ffi::CString::new(text).map_err(|e| e.to_string())?;
         let mut out = RdpJsonSlice {
@@ -116,7 +121,9 @@ pub fn import_csv_spark(csv: &Path, max_rows: usize) -> Result<(usize, usize), S
         "orchestration": { "max_ingested_rows": max_rows },
     });
     let inter = run_pipeline(payload)?;
-    let ingested = inter["ingested_row_count"].as_u64().ok_or("missing ingested_row_count")? as usize;
+    let ingested = inter["ingested_row_count"]
+        .as_u64()
+        .ok_or("missing ingested_row_count")? as usize;
     let sink = inter["sink_results"]
         .as_array()
         .and_then(|a| a.iter().find(|s| s["kind"] == "spark"))
@@ -130,9 +137,9 @@ pub fn import_csv_spark(csv: &Path, max_rows: usize) -> Result<(usize, usize), S
 
 pub fn verify_spark_sql(expected: usize) -> Result<usize, String> {
     let script = integration_root().join("scripts/platform_sql.py");
-    let python = std::env::var("RDP_PLATFORM_PYTHON").map(PathBuf::from).unwrap_or_else(|_| {
-        integration_root().join("python-wrapper/.venv/bin/python")
-    });
+    let python = std::env::var("RDP_PLATFORM_PYTHON")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| integration_root().join("python-wrapper/.venv/bin/python"));
     let out = std::process::Command::new(&python)
         .arg(&script)
         .arg("spark")

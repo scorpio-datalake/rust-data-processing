@@ -1,8 +1,11 @@
-use rdp_cloud_integration_test::rdp_pipeline::{verify_file_transfer_import, verify_object_store_roundtrip};
+use rdp_cloud_integration_test::rdp_pipeline::{
+    verify_file_transfer_import, verify_object_store_roundtrip,
+};
 use std::path::PathBuf;
 
 fn csv_path() -> PathBuf {
-    let root = std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
+    let root =
+        std::env::var("RDP_INTEGRATION_ROOT").unwrap_or_else(|_| "integration_testing".into());
     let sample = PathBuf::from(&root).join("data/uber_nyc_pickups_sample.csv");
     if sample.is_file() {
         sample
@@ -32,7 +35,6 @@ fn cloud_import_uber_csv() {
             .unwrap_or_else(|e| panic!("{protocol} roundtrip: {e}"));
     }
     for protocol in ["sftp", "ftp"] {
-        verify_file_transfer_import(protocol)
-            .unwrap_or_else(|e| panic!("{protocol} import: {e}"));
+        verify_file_transfer_import(protocol).unwrap_or_else(|e| panic!("{protocol} import: {e}"));
     }
 }

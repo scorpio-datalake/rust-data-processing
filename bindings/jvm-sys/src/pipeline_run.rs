@@ -273,11 +273,13 @@ enum RunPipelineEnvelope {
     Legacy(LegacyStudentEtlSpec),
 }
 
-fn legacy_student_etl_to_v1(spec: LegacyStudentEtlSpec) -> Result<(RunPipelineRequest, serde_json::Value), String> {
+fn legacy_student_etl_to_v1(
+    spec: LegacyStudentEtlSpec,
+) -> Result<(RunPipelineRequest, serde_json::Value), String> {
     let lake: LegacyLakeSink =
         serde_json::from_value(spec.lake_sink.clone()).map_err(|e| format!("lake_sink: {e}"))?;
-    let rel: LegacyRelationalSink =
-        serde_json::from_value(spec.relational_sink.clone()).map_err(|e| format!("relational_sink: {e}"))?;
+    let rel: LegacyRelationalSink = serde_json::from_value(spec.relational_sink.clone())
+        .map_err(|e| format!("relational_sink: {e}"))?;
 
     let declared = serde_json::json!({
         "engine": spec.engine,
@@ -407,7 +409,10 @@ fn db_read_url_error(url: &str) -> Option<String> {
 }
 
 #[cfg(feature = "link-main")]
-fn export_dataset_to_handoff_uri(uri: &str, ds: &rust_data_processing::types::DataSet) -> Result<usize, PipelineErr> {
+fn export_dataset_to_handoff_uri(
+    uri: &str,
+    ds: &rust_data_processing::types::DataSet,
+) -> Result<usize, PipelineErr> {
     use rust_data_processing::ingestion::{
         export_dataset_to_object_store_uri, export_dataset_to_parquet,
     };
@@ -446,7 +451,13 @@ fn ingest_db_reads(
     db_reads: &[DbReadSpec],
     schema: &rust_data_processing::types::Schema,
     opts: &rust_data_processing::ingestion::IngestionOptions,
-) -> Result<(Vec<serde_json::Value>, Vec<Vec<rust_data_processing::types::Value>>), PipelineErr> {
+) -> Result<
+    (
+        Vec<serde_json::Value>,
+        Vec<Vec<rust_data_processing::types::Value>>,
+    ),
+    PipelineErr,
+> {
     if db_reads.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
@@ -523,7 +534,11 @@ fn ingest_pipeline_sources(
 
     if !local_paths.is_empty() {
         let (ds, meta) = ingest_from_ordered_paths(&local_paths, schema, opts).map_err(|e| {
-            PipelineErr::structured("INGEST_FAILED", format!("ingest_from_ordered_paths: {e}"), "ingest")
+            PipelineErr::structured(
+                "INGEST_FAILED",
+                format!("ingest_from_ordered_paths: {e}"),
+                "ingest",
+            )
         })?;
         all_rows.extend(ds.rows);
         batch_meta = meta;
@@ -613,7 +628,11 @@ pub(crate) enum PipelineErr {
 
 #[cfg(feature = "link-main")]
 impl PipelineErr {
-    pub(crate) fn structured(code: &'static str, message: impl Into<String>, stage: &'static str) -> Self {
+    pub(crate) fn structured(
+        code: &'static str,
+        message: impl Into<String>,
+        stage: &'static str,
+    ) -> Self {
         Self::Structured {
             code,
             message: message.into(),
@@ -622,7 +641,11 @@ impl PipelineErr {
     }
 
     pub(crate) fn into_slice(self) -> RdpJsonSlice {
-        let Self::Structured { code, message, stage } = self;
+        let Self::Structured {
+            code,
+            message,
+            stage,
+        } = self;
         json_err_structured(code, message, Some(stage))
     }
 }
@@ -637,7 +660,10 @@ fn pipeline_deadline(orch: &Option<OrchestrationSpec>) -> Option<std::time::Inst
 }
 
 #[cfg(feature = "link-main")]
-fn check_deadline(deadline: &Option<std::time::Instant>, stage: &'static str) -> Result<(), PipelineErr> {
+fn check_deadline(
+    deadline: &Option<std::time::Instant>,
+    stage: &'static str,
+) -> Result<(), PipelineErr> {
     if let Some(t) = deadline {
         if std::time::Instant::now() >= *t {
             return Err(PipelineErr::structured(
@@ -677,9 +703,8 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
         }
         Ok(RunPipelineEnvelope::V1(r)) => (r, None),
         Ok(RunPipelineEnvelope::Legacy(l)) => {
-            let (r, d) = legacy_student_etl_to_v1(l).map_err(|e| {
-                PipelineErr::structured("ORCHESTRATION_VALIDATION", e, "parse")
-            })?;
+            let (r, d) = legacy_student_etl_to_v1(l)
+                .map_err(|e| PipelineErr::structured("ORCHESTRATION_VALIDATION", e, "parse"))?;
             (r, Some(d))
         }
     };
@@ -780,9 +805,8 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
         sources.options.to_string()
     };
     let schema = sources.schema;
-    let opts = parse_ingestion_options(&opts_json, None).map_err(|e| {
-        PipelineErr::structured("ORCHESTRATION_VALIDATION", e, "parse")
-    })?;
+    let opts = parse_ingestion_options(&opts_json, None)
+        .map_err(|e| PipelineErr::structured("ORCHESTRATION_VALIDATION", e, "parse"))?;
 
     let db_reads = sources.db_reads;
     let (
@@ -819,7 +843,11 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
     }
 
     let mut base = DataFrame::from_dataset(&ingested_ds).map_err(|e| {
-        PipelineErr::structured("DATAFRAME_MATERIALIZATION_FAILED", e.to_string(), "transform")
+        PipelineErr::structured(
+            "DATAFRAME_MATERIALIZATION_FAILED",
+            e.to_string(),
+            "transform",
+        )
     })?;
     check_deadline(&deadline, "transform")?;
     if let Some(t) = transform {
@@ -945,7 +973,13 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                 }
                 #[cfg(not(feature = "sink_postgres"))]
                 {
-                    let _ = (url, table, create_table_if_missing, truncate_before_load, ds);
+                    let _ = (
+                        url,
+                        table,
+                        create_table_if_missing,
+                        truncate_before_load,
+                        ds,
+                    );
                     sink_results.push(serde_json::json!({
                         "kind": "postgresql",
                         "status": "skipped",
@@ -994,7 +1028,13 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                 }
                 #[cfg(not(feature = "sink_oracle"))]
                 {
-                    let _ = (url, table, create_table_if_missing, truncate_before_load, ds);
+                    let _ = (
+                        url,
+                        table,
+                        create_table_if_missing,
+                        truncate_before_load,
+                        ds,
+                    );
                     sink_results.push(serde_json::json!({
                         "kind": "oracle",
                         "status": "skipped",
@@ -1043,7 +1083,13 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                 }
                 #[cfg(not(feature = "sink_mssql"))]
                 {
-                    let _ = (url, table, create_table_if_missing, truncate_before_load, ds);
+                    let _ = (
+                        url,
+                        table,
+                        create_table_if_missing,
+                        truncate_before_load,
+                        ds,
+                    );
                     sink_results.push(serde_json::json!({
                         "kind": "mssql",
                         "status": "skipped",
@@ -1088,7 +1134,8 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                     namespace.as_deref(),
                     &table,
                 );
-                match rust_data_processing::ingestion::write_dataset_to_delta_table(&table_uri, &ds) {
+                match rust_data_processing::ingestion::write_dataset_to_delta_table(&table_uri, &ds)
+                {
                     Ok(row_count) => {
                         sink_results.push(serde_json::json!({
                             "kind": "delta_lake",
@@ -1223,7 +1270,8 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                     namespace.as_deref(),
                     &table,
                 );
-                match rust_data_processing::ingestion::write_dataset_to_delta_table(&table_uri, &ds) {
+                match rust_data_processing::ingestion::write_dataset_to_delta_table(&table_uri, &ds)
+                {
                     Ok(row_count) => {
                         sink_results.push(serde_json::json!({
                             "kind": "databricks",
@@ -1286,8 +1334,9 @@ fn run_pipeline_impl(payload_json: &str) -> Result<serde_json::Value, PipelineEr
                 } else {
                     uri.clone()
                 };
-                match rust_data_processing::ingestion::export_dataset_to_object_store_uri(&target, &ds)
-                {
+                match rust_data_processing::ingestion::export_dataset_to_object_store_uri(
+                    &target, &ds,
+                ) {
                     Ok(()) => {
                         sink_results.push(serde_json::json!({
                             "kind": "object_store",
@@ -1379,12 +1428,7 @@ fn postgres_copy_sink(
             .map_err(|e| format!("postgres truncate: {e}"))?;
     }
 
-    let col_names: Vec<String> = ds
-        .schema
-        .fields
-        .iter()
-        .map(|f| f.name.clone())
-        .collect();
+    let col_names: Vec<String> = ds.schema.fields.iter().map(|f| f.name.clone()).collect();
     let col_list: String = col_names
         .iter()
         .map(|c| quote_pg_ident(c))
@@ -1455,7 +1499,11 @@ fn oracle_create_table_ddl(
         let ty = oracle_type_sql(&f.data_type)?;
         cols.push(format!("{} {}", f.name, ty));
     }
-    Ok(format!("CREATE TABLE {} (\n    {}\n)", table, cols.join(",\n    ")))
+    Ok(format!(
+        "CREATE TABLE {} (\n    {}\n)",
+        table,
+        cols.join(",\n    ")
+    ))
 }
 
 #[cfg(all(feature = "link-main", feature = "sink_oracle"))]
@@ -1481,8 +1529,14 @@ fn oracle_execute_insert(
     vals: &[Option<String>],
 ) -> Result<(), String> {
     match vals {
-        [a] => conn.execute(sql, &[a]).map(|_| ()).map_err(|e| e.to_string()),
-        [a, b] => conn.execute(sql, &[a, b]).map(|_| ()).map_err(|e| e.to_string()),
+        [a] => conn
+            .execute(sql, &[a])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        [a, b] => conn
+            .execute(sql, &[a, b])
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
         [a, b, c] => conn
             .execute(sql, &[a, b, c])
             .map(|_| ())
@@ -1535,12 +1589,7 @@ fn oracle_row_sink(
             .map_err(|e| format!("oracle create table: {e}"))?;
     }
 
-    let col_names: Vec<String> = ds
-        .schema
-        .fields
-        .iter()
-        .map(|f| f.name.clone())
-        .collect();
+    let col_names: Vec<String> = ds.schema.fields.iter().map(|f| f.name.clone()).collect();
     let placeholders = (1..=col_names.len())
         .map(|i| format!(":{i}"))
         .collect::<Vec<_>>()
@@ -1595,11 +1644,9 @@ fn mssql_connect_config(url: &str) -> Result<tiberius::Config, String> {
         .find(|(k, _)| k.eq_ignore_ascii_case("encrypt"))
         .map(|(_, v)| v != "false" && v != "0")
         .unwrap_or(true);
-    let trust = parsed
-        .query_pairs()
-        .any(|(k, v)| {
-            k.eq_ignore_ascii_case("trustservercertificate") && (v == "true" || v == "1")
-        });
+    let trust = parsed.query_pairs().any(|(k, v)| {
+        k.eq_ignore_ascii_case("trustservercertificate") && (v == "true" || v == "1")
+    });
     if !encrypt || trust {
         config.trust_cert();
     }
@@ -1770,7 +1817,10 @@ fn pg_type_sql(dt: &rust_data_processing::types::DataType) -> Result<&'static st
 }
 
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]
-fn pg_create_table_ddl(fq: &str, schema: &rust_data_processing::types::Schema) -> Result<String, String> {
+fn pg_create_table_ddl(
+    fq: &str,
+    schema: &rust_data_processing::types::Schema,
+) -> Result<String, String> {
     let mut cols = Vec::new();
     for f in &schema.fields {
         let ty = pg_type_sql(&f.data_type)?;
@@ -1783,7 +1833,10 @@ fn pg_create_table_ddl(fq: &str, schema: &rust_data_processing::types::Schema) -
 }
 
 #[cfg(all(feature = "link-main", feature = "sink_postgres"))]
-fn append_copy_text_field<W: std::io::Write>(w: &mut W, v: &rust_data_processing::types::Value) -> Result<(), String> {
+fn append_copy_text_field<W: std::io::Write>(
+    w: &mut W,
+    v: &rust_data_processing::types::Value,
+) -> Result<(), String> {
     use rust_data_processing::types::Value;
     match v {
         Value::Null => w.write_all(br"\N").map_err(|e| e.to_string()),
@@ -1803,8 +1856,15 @@ fn append_copy_text_field<W: std::io::Write>(w: &mut W, v: &rust_data_processing
                     '\n' => w.write_all(br"\n").map_err(|e| e.to_string())?,
                     '\r' => w.write_all(br"\r").map_err(|e| e.to_string())?,
                     '\t' => w.write_all(br"\t").map_err(|e| e.to_string())?,
-                    c if ('\x01'..='\x08').contains(&c) || c == '\x0B' || c == '\x0C' || ('\x0E'..='\x1F').contains(&c) => {
-                        return Err(format!("unsupported control character in Utf8 cell (U+{:04X})", c as u32));
+                    c if ('\x01'..='\x08').contains(&c)
+                        || c == '\x0B'
+                        || c == '\x0C'
+                        || ('\x0E'..='\x1F').contains(&c) =>
+                    {
+                        return Err(format!(
+                            "unsupported control character in Utf8 cell (U+{:04X})",
+                            c as u32
+                        ));
                     }
                     c => {
                         let mut buf = [0u8; 4];
@@ -1923,9 +1983,15 @@ mod tests {
         let sinks = v["sink_results"].as_array().unwrap();
         assert_eq!(sinks.len(), 3);
         assert_eq!(sinks[0]["kind"].as_str(), Some("delta_lake"));
-        assert_eq!(sinks[0]["error_code"].as_str(), Some("DELTA_LAKE_CONNECTOR_PENDING"));
+        assert_eq!(
+            sinks[0]["error_code"].as_str(),
+            Some("DELTA_LAKE_CONNECTOR_PENDING")
+        );
         assert_eq!(sinks[1]["kind"].as_str(), Some("iceberg"));
-        assert_eq!(sinks[1]["error_code"].as_str(), Some("ICEBERG_CONNECTOR_PENDING"));
+        assert_eq!(
+            sinks[1]["error_code"].as_str(),
+            Some("ICEBERG_CONNECTOR_PENDING")
+        );
         assert_eq!(sinks[2]["kind"].as_str(), Some("postgresql"));
         #[cfg(not(feature = "sink_postgres"))]
         {
@@ -1986,7 +2052,10 @@ mod tests {
         let sinks = v["sink_results"].as_array().unwrap();
         assert_eq!(sinks.len(), 3);
         assert_eq!(sinks[0]["kind"].as_str(), Some("delta_lake"));
-        assert_eq!(sinks[0]["error_code"].as_str(), Some("DELTA_LAKE_CONNECTOR_PENDING"));
+        assert_eq!(
+            sinks[0]["error_code"].as_str(),
+            Some("DELTA_LAKE_CONNECTOR_PENDING")
+        );
     }
 
     /// Same pipeline as `docs/java/examples/PlatformConnectorsPipelineExample.java`.
@@ -2061,7 +2130,10 @@ mod tests {
 
         let v = run_pipeline_impl(&payload).unwrap();
         assert_eq!(v["ingested_row_count"].as_i64(), Some(6));
-        assert_eq!(v["object_store_source_results"].as_array().unwrap().len(), 3);
+        assert_eq!(
+            v["object_store_source_results"].as_array().unwrap().len(),
+            3
+        );
         assert!(sink.exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -2085,14 +2157,8 @@ mod tests {
             .resolve_pipeline_json(
                 "pipelines/csv_to_parquet.pipeline.json",
                 &HashMap::from([
-                    (
-                        "SOURCE_PATH".into(),
-                        csv.to_string_lossy().into_owned(),
-                    ),
-                    (
-                        "SINK_PATH".into(),
-                        out.to_string_lossy().into_owned(),
-                    ),
+                    ("SOURCE_PATH".into(), csv.to_string_lossy().into_owned()),
+                    ("SINK_PATH".into(), out.to_string_lossy().into_owned()),
                 ]),
             )
             .unwrap();
@@ -2130,10 +2196,7 @@ mod tests {
                         "SOURCE_PATH".into(),
                         json_input.to_string_lossy().into_owned(),
                     ),
-                    (
-                        "SINK_PATH".into(),
-                        out.to_string_lossy().into_owned(),
-                    ),
+                    ("SINK_PATH".into(), out.to_string_lossy().into_owned()),
                 ]),
             )
             .unwrap();
@@ -2175,10 +2238,7 @@ mod tests {
                         "SOURCE_PATH".into(),
                         json_input.to_string_lossy().into_owned(),
                     ),
-                    (
-                        "SINK_PATH".into(),
-                        xml_out.to_string_lossy().into_owned(),
-                    ),
+                    ("SINK_PATH".into(), xml_out.to_string_lossy().into_owned()),
                 ]),
             )
             .unwrap();
@@ -2193,10 +2253,7 @@ mod tests {
             .resolve_pipeline_json(
                 "pipelines/xml_to_parquet.pipeline.json",
                 &HashMap::from([
-                    (
-                        "SOURCE_PATH".into(),
-                        xml_out.to_string_lossy().into_owned(),
-                    ),
+                    ("SOURCE_PATH".into(), xml_out.to_string_lossy().into_owned()),
                     (
                         "SINK_PATH".into(),
                         parquet_out.to_string_lossy().into_owned(),

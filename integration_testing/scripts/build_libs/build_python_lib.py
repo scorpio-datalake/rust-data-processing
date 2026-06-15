@@ -23,13 +23,13 @@ from common import (  # noqa: E402
     REPO_ROOT,
     die,
     ensure_linux_native_deps,
+    ensure_uv,
     find_python_extension,
     integration_cargo_build_lock,
     log,
     mark_built,
     needs_rebuild,
     prepare_integration_disk,
-    require_tool,
     run,
     setup_integration_build_env,
     write_python_env,
@@ -54,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     prepare_integration_disk(force=args.force)
     log(f"Using CARGO_TARGET_DIR={os.environ['CARGO_TARGET_DIR']}")
     ensure_linux_native_deps()
-    require_tool("uv")
+    ensure_uv()
 
     dest_so: Path | None = None
 
@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"Building Python wrapper (maturin develop --release --features {PYTHON_INTEGRATION_FEATURES})..."
             )
             run(
-                ["uv", "sync", "--group", "dev", "--quiet"],
+                ["uv", "sync", "--group", "dev", "--no-install-project", "--quiet"],
                 cwd=REPO_ROOT / "python-wrapper",
             )
             run(

@@ -9,7 +9,7 @@ plugins {
 
 spotless {
     java {
-        googleJavaFormat("1.23.0")
+        googleJavaFormat("1.28.0")
         target(
             "src/main/java/**/*.java",
             "src/test/java/**/*.java",

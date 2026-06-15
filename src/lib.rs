@@ -308,3 +308,7 @@ pub mod types;
 pub mod validation;
 
 pub use error::{IngestionError, IngestionResult};
+
+// Keep pinned postgres crates in the `db_connectorx` dependency graph (RUSTSEC-2026-0178/0179/0180).
+#[cfg(feature = "db_connectorx")]
+use {postgres_protocol as _, tokio_postgres as _};

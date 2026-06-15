@@ -91,9 +91,49 @@ def require_integration_libs(*, require_data: bool = True) -> None:
         die(INTEGRATION_BUILD_HELP)
 
 
+def _prepend_path(directory: Path) -> None:
+    s = str(directory)
+    path = os.environ.get("PATH", "")
+    if s not in path.split(os.pathsep):
+        os.environ["PATH"] = f"{s}{os.pathsep}{path}" if path else s
+
+
+def ensure_uv() -> None:
+    """Python wrapper build uses uv; install via astral.sh when missing."""
+    _prepend_path(_integration_home() / ".local" / "bin")
+    if shutil.which("uv"):
+        return
+    if os.environ.get("INTEG_NO_AUTO_UV"):
+        die(
+            "uv not found. Install from https://docs.astral.sh/uv/:\n"
+            "  curl -LsSf https://astral.sh/uv/install.sh | sh\n"
+            "Or unset INTEG_NO_AUTO_UV to allow auto-install."
+        )
+    log("Python: installing uv (https://astral.sh/uv/install.sh)")
+    if shutil.which("curl"):
+        installer = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    elif shutil.which("wget"):
+        installer = "wget -qO- https://astral.sh/uv/install.sh | sh"
+    else:
+        die("uv not found and neither curl nor wget is available to install it.")
+    subprocess.run(["bash", "-c", installer], check=True)
+    _prepend_path(_integration_home() / ".local" / "bin")
+    if shutil.which("uv") is None:
+        die("uv still not on PATH after install (expected ~/.local/bin/uv).")
+
+
 def require_tool(name: str) -> None:
-    if shutil.which(name) is None:
-        die(f"{name} not found")
+    if shutil.which(name) is not None:
+        return
+    if name == "cargo":
+        die(
+            "cargo not found. Install Rust, then re-run:\n"
+            "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh\n"
+            "  source \"$HOME/.cargo/env\"\n"
+            "Or on Ubuntu: sudo apt install rustup && rustup default stable\n"
+            "See https://rustup.rs/ and repo rust-toolchain.toml (stable + rustfmt + clippy)."
+        )
+    die(f"{name} not found")
 
 
 def run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
@@ -105,10 +145,25 @@ def run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None =
     subprocess.run(cmd, cwd=cwd, env=merged, check=True)
 
 
+def _integration_home() -> Path:
+    """User home for rustup paths (non-login shells may leave HOME unset)."""
+    home = os.environ.get("HOME")
+    if home:
+        return Path(home)
+    try:
+        import pwd
+
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except (ImportError, KeyError):
+        return Path.home()
+
+
 def load_cargo_env() -> None:
     """Ensure ``cargo`` is on PATH (``~/.cargo/bin`` from rustup)."""
-    cargo_bin = Path.home() / ".cargo" / "bin"
-    if cargo_bin.is_dir():
+    home = _integration_home()
+    cargo_bin = home / ".cargo" / "bin"
+    cargo_exe = cargo_bin / "cargo"
+    if cargo_exe.is_file():
         path = os.environ.get("PATH", "")
         prefix = str(cargo_bin)
         if prefix not in path.split(":"):
@@ -124,6 +179,8 @@ def setup_integration_build_env() -> None:
     if "CARGO_BUILD_JOBS" not in os.environ:
         jobs = os.environ.get("INTEG_CARGO_JOBS", "2")
         os.environ["CARGO_BUILD_JOBS"] = jobs
+    if platform.system() == "Linux":
+        _setup_bindgen_env()
 
 
 def _integration_lock_holder_pid(lock_path: Path) -> int | None:
@@ -674,16 +731,159 @@ def stage_integration_python_ext() -> Path:
     return dest
 
 
+def _is_debian_like_linux() -> bool:
+    if platform.system() != "Linux":
+        return False
+    try:
+        data: dict[str, str] = {}
+        with Path("/etc/os-release").open(encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    key, val = line.strip().split("=", 1)
+                    data[key] = val.strip().strip('"')
+        if data.get("ID") in {"debian", "ubuntu"}:
+            return True
+        return "debian" in data.get("ID_LIKE", "")
+    except OSError:
+        return False
+
+
+def _gssapi_header_present() -> bool:
+    return any(
+        path.is_file()
+        for path in (
+            Path("/usr/include/gssapi/gssapi.h"),
+            Path("/usr/include/gssapi.h"),
+        )
+    )
+
+
+def _libclang_shared_library() -> Path | None:
+    """Return a usable libclang.so if already on the system (bindgen / libgssapi-sys)."""
+    env_path = os.environ.get("LIBCLANG_PATH", "").strip()
+    if env_path:
+        path = Path(env_path)
+        if path.is_file():
+            return path
+
+    search_roots = [
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/lib64"),
+        Path("/usr/lib"),
+    ]
+    for root in search_roots:
+        if not root.is_dir():
+            continue
+        for candidate in sorted(root.glob("libclang.so*")):
+            if candidate.is_file() and not candidate.name.endswith(".a"):
+                return candidate
+
+    for llvm_lib in sorted(Path("/usr/lib").glob("llvm-*/lib"), reverse=True):
+        for candidate in sorted(llvm_lib.glob("libclang.so*")):
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def _setup_bindgen_env() -> None:
+    """Help bindgen (libgssapi-sys) locate libclang and GCC system headers."""
+    found = _libclang_shared_library()
+    if found is not None:
+        os.environ.setdefault("LIBCLANG_PATH", str(found.parent))
+    if os.environ.get("BINDGEN_EXTRA_CLANG_ARGS"):
+        return
+    gcc_include = sorted(Path("/usr/lib/gcc").glob("*/*/include"))
+    if gcc_include:
+        extra = " ".join(f"-I{p}" for p in gcc_include)
+        os.environ.setdefault("BINDGEN_EXTRA_CLANG_ARGS", extra)
+
+
+def _apt_install(packages: list[str], *, what: str) -> None:
+    log(f"Linux: installing {what} ({', '.join(packages)})")
+    subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "DEBIAN_FRONTEND=noninteractive",
+            "apt-get",
+            "install",
+            "-y",
+            *packages,
+        ],
+        check=True,
+    )
+
+
 def ensure_linux_native_deps() -> None:
+    """Rust ``integration_full`` needs ``cc``, pkg-config, libclang, and Kerberos headers."""
     if platform.system() != "Linux":
         return
-    if shutil.which("pkg-config") is None:
-        log("WARN: pkg-config not found; db_connectorx build may fail on Linux.")
+
+    need_cc = not (shutil.which("cc") or shutil.which("gcc"))
+    need_pkg_config = shutil.which("pkg-config") is None
+    need_gssapi = not _gssapi_header_present()
+    need_libclang = _libclang_shared_library() is None
+    if not (need_cc or need_pkg_config or need_gssapi or need_libclang):
+        _setup_bindgen_env()
         return
-    if not Path("/usr/include/gssapi.h").is_file() and not Path(
-        "/usr/include/gssapi/gssapi.h"
-    ).is_file():
-        log("WARN: gssapi.h missing — install libkrb5-dev for ConnectorX (Oracle) builds.")
+
+    if os.environ.get("INTEG_NO_AUTO_APT"):
+        missing: list[str] = []
+        if need_cc:
+            missing.append("build-essential (provides `cc`)")
+        if need_pkg_config:
+            missing.append("pkg-config")
+        if need_gssapi:
+            missing.append("libkrb5-dev (gssapi.h)")
+        if need_libclang:
+            missing.append("libclang-dev (bindgen for libgssapi-sys)")
+        die(
+            "missing Linux native build deps: "
+            + ", ".join(missing)
+            + ".\nInstall on Debian/Ubuntu:\n"
+            "  sudo apt install build-essential pkg-config libkrb5-dev libclang-dev\n"
+            "Or unset INTEG_NO_AUTO_APT to allow auto-install on Debian/Ubuntu."
+        )
+
+    if not _is_debian_like_linux():
+        missing = []
+        if need_cc:
+            missing.append("C linker (`cc` / gcc)")
+        if need_pkg_config:
+            missing.append("pkg-config")
+        if need_gssapi:
+            missing.append("Kerberos dev headers (gssapi.h)")
+        if need_libclang:
+            missing.append("libclang-dev (bindgen)")
+        die(
+            "missing Linux native build deps: "
+            + ", ".join(missing)
+            + ". Install a C toolchain, pkg-config, and libclang-dev for your OS, then re-run."
+        )
+
+    packages: list[str] = []
+    if need_cc:
+        packages.append("build-essential")
+    if need_pkg_config:
+        packages.append("pkg-config")
+    if need_gssapi:
+        packages.append("libkrb5-dev")
+    if need_libclang:
+        packages.append("libclang-dev")
+    _apt_install(packages, what="native build deps")
+
+    if need_cc and not (shutil.which("cc") or shutil.which("gcc")):
+        die("`cc` still not on PATH after installing build-essential.")
+    if need_pkg_config and shutil.which("pkg-config") is None:
+        die("pkg-config still not on PATH after apt install.")
+    if need_gssapi and not _gssapi_header_present():
+        die("gssapi.h still not found after installing libkrb5-dev.")
+    if need_libclang and _libclang_shared_library() is None:
+        die(
+            "libclang still not found after installing libclang-dev. "
+            "Set LIBCLANG_PATH to your libclang.so and re-run."
+        )
+    _setup_bindgen_env()
 
 
 def count_lines(path: Path) -> int:

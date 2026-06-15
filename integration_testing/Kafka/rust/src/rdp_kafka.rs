@@ -63,7 +63,8 @@ fn invoke_two_arg(symbol: &[u8], arg1: &str, arg2: &str) -> Result<Value, String
     unsafe {
         let lib = Library::new(&lib_path).map_err(|e| e.to_string())?;
         let func: Symbol<KafkaTwoArgFn> = lib.get(symbol).map_err(|e| e.to_string())?;
-        let free: Symbol<JsonSliceFreeFn> = lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
+        let free: Symbol<JsonSliceFreeFn> =
+            lib.get(b"rdp_json_slice_free").map_err(|e| e.to_string())?;
         let c1 = std::ffi::CString::new(arg1).map_err(|e| e.to_string())?;
         let c2 = std::ffi::CString::new(arg2).map_err(|e| e.to_string())?;
         let mut out = RdpJsonSlice {
