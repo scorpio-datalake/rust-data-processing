@@ -8,8 +8,8 @@
 # without larger dependency/MSRV shifts. Polars / parquet also pull informational advisories
 # (e.g. unmaintained `bincode`, `paste`) until upstream bumps land. Track removals in CHANGELOG.
 #
-# Postgres stack pins (root `Cargo.toml` + lockfile): `postgres-protocol` >=0.6.12,
-# `tokio-postgres` >=0.7.18 for RUSTSEC-2026-0178/0179/0180 (2026-06-12 advisories).
+# Postgres stack minimums (root `Cargo.toml` direct deps + lockfile): `postgres-protocol` >=0.6.12,
+# `tokio-postgres` >=0.7.18 (each capped below next minor) for RUSTSEC-2026-0178/0179/0180.
 
 [advisories]
 ignore = [

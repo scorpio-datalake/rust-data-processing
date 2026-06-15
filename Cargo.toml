@@ -49,16 +49,16 @@ polars-sql = { version = "0.53.0", optional = true }
 rust_xlsxwriter = { version = "0.93", optional = true }
 arrow = { version = "54", optional = true }
 connectorx = { version = "0.4.5", default-features = false, features = ["dst_arrow", "fptr"], optional = true }
-# Pin transitive postgres stack (RUSTSEC-2026-0178/0179/0180 via ConnectorX).
-postgres-protocol = { version = "0.6.12", optional = true }
-tokio-postgres = { version = "0.7.18", optional = true, default-features = false, features = ["runtime"] }
+# Minimum postgres stack for RUSTSEC-2026-0178/0179/0180 (ConnectorX transitive); lockfile pins exact patch.
+postgres-protocol = { version = ">=0.6.12, <0.7", optional = true }
+tokio-postgres = { version = ">=0.7.18, <0.8", optional = true, default-features = false, features = ["runtime"] }
 object_store = { version = "0.13.1", optional = true, default-features = false, features = ["aws", "gcp", "azure", "fs"] }
 tokio = { version = "1", optional = true, features = ["rt"] }
 url = { version = "2", optional = true }
 ureq = { version = "2.12", optional = true, default-features = false }
 libssh2-sys = { version = "0.3.1", features = ["vendored-openssl"], optional = true }
 ssh2 = { version = "0.9.4", optional = true }
-suppaftp = { version = "6.0.3", default-features = false, features = ["rustls"], optional = true }
+suppaftp = { version = "6.3.0", default-features = false, features = ["rustls"], optional = true }
 webpki-roots = { version = "0.26", optional = true }
 rdkafka = { version = "0.36.2", optional = true, default-features = false, features = [
   "cmake-build",

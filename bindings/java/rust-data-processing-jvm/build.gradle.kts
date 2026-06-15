@@ -1,4 +1,5 @@
 import me.champeau.jmh.JmhBytecodeGeneratorTask
+import org.gradle.api.tasks.JavaExec
 
 plugins {
     java
@@ -92,6 +93,13 @@ jmh {
 tasks.named<JmhBytecodeGeneratorTask>("jmhRunBytecodeGenerator") {
     jvmArgs.add("--enable-preview")
     jvmArgs.add("--enable-native-access=ALL-UNNAMED")
+}
+
+// Gradle ``jmh`` JavaExec (runs org.openjdk.jmh.Main) — in addition to ``jmh { jvmArgs }`` fork args.
+afterEvaluate {
+    tasks.named<JavaExec>("jmh") {
+        jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+    }
 }
 
 publishing {
