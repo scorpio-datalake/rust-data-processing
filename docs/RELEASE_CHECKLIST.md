@@ -4,15 +4,18 @@ Use this when shipping **both** the Rust crate and the **Python** package (`pyth
 
 ## 1) Version alignment (do this first)
 
-Bump **all** of these to the **same** SemVer (e.g. `0.2.0`):
+Bump **all** of these to the **same** SemVer (e.g. `0.3.3`):
 
 | File | Field |
 |------|--------|
 | **`Cargo.toml`** (repo root) | `[package] version` |
 | **`python-wrapper/pyproject.toml`** | `[project] version` |
 | **`python-wrapper/Cargo.toml`** | `[package] version` |
+| **`bindings/java/VERSION`** | single line (no `-SNAPSHOT` at release) |
+| **`bindings/java/rust-data-processing-jvm/pom.xml`** | `<version>` (main artifact) |
+| **`bindings/java/rust-data-processing-jvm/gradle.properties`** | `version=` |
 
-The release script **`scripts/release.py`** (or **`./scripts/release_tag.sh`** / **`./scripts/release_tag.ps1`**) updates these plus **`Cargo.lock`** (root + **`python-wrapper/`**), **`python-wrapper/uv.lock`**, and inserts a **`CHANGELOG.md`** stub. Edit the changelog body after the script runs.
+The release script **`scripts/release.py`** (or **`./scripts/release_tag.sh`** / **`./scripts/release_tag.ps1`**) updates all of the above plus **`Cargo.lock`** (root + **`python-wrapper/`**), **`python-wrapper/uv.lock`**, and inserts a **`CHANGELOG.md`** stub. Edit the changelog body after the script runs (before confirming), or edit on `main` before the next release.
 
 PyPI uses **`pyproject.toml`** as the distribution version; the extension crate version should match for maintainability.
 
@@ -120,6 +123,7 @@ Use **one** flow: complete steps **1–2** (changelog + merge to **`main`**), th
 4. **Actions** runs:
    - **`rust_release.yml`** — verifies the tag is on **`origin/main`**, then **`cargo publish --locked`**.
    - **`python_release.yml`** — same guard, then builds wheels and uploads to **PyPI**.
+   - **`jvm_maven_central_release.yml`** — when the script publishes a **GitHub Release** for **`v{VERSION}`** (requires **`gh`** CLI locally: `gh auth login`). Deploys **`rust-data-processing-jvm`** to **Maven Central** when **`bindings/java/VERSION`** matches the tag (no `-SNAPSHOT`). Use **`--skip-github-release`** to tag only and publish the GitHub Release manually later.
 
 Tags pointing at commits **not** on **`main`** are rejected (no publish).
 

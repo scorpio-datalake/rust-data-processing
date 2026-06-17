@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Interactive release: show last tag and versions, bump Cargo/pyproject/locks/CHANGELOG,
-# commit, push main, tag v*, push tag.
+# Interactive release: show last tag and versions, bump Rust/Python/JVM + lockfiles/CHANGELOG,
+# commit, push main, tag v*, push tag, and publish a GitHub Release (Maven Central).
 #
 # Delegates to scripts/release.py (Python 3.10+). Run from repo root, or this script
 # will cd to the repository root.

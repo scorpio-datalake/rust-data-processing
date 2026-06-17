@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 Interactive release: show last git tag and current versions, prompt for new SemVer,
-bump Cargo.toml / pyproject / lockfiles / CHANGELOG, commit, push main, annotated tag, push tag.
+bump Rust / Python / JVM versions + lockfiles / CHANGELOG, commit, push main, tag v*,
+push tag, and publish a GitHub Release (triggers Maven Central for JVM).
 
 Run from repo root:
   python scripts/release.py
   ./scripts/release_tag.sh
   ./scripts/release_tag.ps1
 
-Requires: Python 3.10+, git on PATH.
+Requires: Python 3.10+, git on PATH. For Maven Central: gh CLI (gh auth login).
 """
 from __future__ import annotations
 
@@ -30,7 +31,15 @@ BUMP_PATHS = [
     "python-wrapper/pyproject.toml",
     "python-wrapper/Cargo.lock",
     "python-wrapper/uv.lock",
+    "bindings/java/VERSION",
+    "bindings/java/rust-data-processing-jvm/gradle.properties",
+    "bindings/java/rust-data-processing-jvm/pom.xml",
 ]
+
+JVM_POM_RE = re.compile(
+    r"(<artifactId>rust-data-processing-jvm</artifactId>\s*<version>)[^<]+(</version>)",
+    re.DOTALL,
+)
 
 
 def git(*args: str, cwd: Path | None = None) -> str:
@@ -103,11 +112,16 @@ def get_version_pyproject(content: str) -> str:
     raise ValueError("pyproject.toml: no version in [project]")
 
 
-def read_aligned_versions(repo: Path) -> tuple[str, str, str]:
+def read_jvm_version(repo: Path) -> str:
+    return read_text(repo / "bindings/java/VERSION").strip()
+
+
+def read_aligned_versions(repo: Path) -> tuple[str, str, str, str]:
     root = get_version_cargo_package(read_text(repo / "Cargo.toml"))
     py_cargo = get_version_cargo_package(read_text(repo / "python-wrapper" / "Cargo.toml"))
     pyproj = get_version_pyproject(read_text(repo / "python-wrapper" / "pyproject.toml"))
-    return root, py_cargo, pyproj
+    jvm = read_jvm_version(repo)
+    return root, py_cargo, pyproj, jvm
 
 
 def set_version_in_cargo_package(content: str, new_ver: str) -> str:
@@ -155,6 +169,33 @@ def set_version_in_pyproject_project(content: str, new_ver: str) -> str:
     if not replaced:
         raise ValueError("pyproject.toml: no version in [project]")
     return "".join(out)
+
+
+def set_jvm_version_files(repo: Path, new_ver: str) -> None:
+    if "-SNAPSHOT" in new_ver:
+        raise ValueError("JVM release version must not contain -SNAPSHOT (Maven Central gate).")
+
+    write_text(repo / "bindings/java/VERSION", f"{new_ver}\n")
+
+    gradle_props = repo / "bindings/java/rust-data-processing-jvm/gradle.properties"
+    lines = gradle_props.read_text(encoding="utf-8").splitlines(keepends=True)
+    replaced = False
+    out: list[str] = []
+    for line in lines:
+        if line.startswith("version="):
+            out.append(f"version={new_ver}\n")
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        raise ValueError("gradle.properties: no version= line")
+    write_text(gradle_props, "".join(out))
+
+    pom = repo / "bindings/java/rust-data-processing-jvm/pom.xml"
+    pom_text = read_text(pom)
+    if not JVM_POM_RE.search(pom_text):
+        raise ValueError("pom.xml: no <version> for rust-data-processing-jvm")
+    write_text(pom, JVM_POM_RE.sub(rf"\g<1>{new_ver}\g<2>", pom_text, count=1))
 
 
 def bump_cargo_lock_named_packages(content: str, names: set[str], new_ver: str) -> str:
@@ -258,6 +299,8 @@ def run_bump(repo: Path, new_ver: str, today: str) -> None:
     p = repo / "python-wrapper" / "pyproject.toml"
     write_text(p, set_version_in_pyproject_project(read_text(p), new_ver))
 
+    set_jvm_version_files(repo, new_ver)
+
     p = repo / "Cargo.lock"
     write_text(
         p,
@@ -290,6 +333,21 @@ def run_bump(repo: Path, new_ver: str, today: str) -> None:
     write_text(p, text)
 
     sync_workspace_cargo_lock(repo)
+    verify_cargo_publish_lockfile(repo)
+
+
+def verify_cargo_publish_lockfile(repo: Path) -> None:
+    """Fail before commit/tag if workspace Cargo.lock is out of sync (crates.io --locked)."""
+    p = subprocess.run(
+        ["cargo", "publish", "--locked", "--dry-run", "--allow-dirty"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        msg = (p.stderr or p.stdout or "").strip()
+        raise RuntimeError(f"cargo publish --locked --dry-run failed:\n{msg}")
 
 
 def sync_workspace_cargo_lock(repo: Path) -> None:
@@ -375,9 +433,54 @@ def do_tag_push(repo: Path, remote: str, tag_name: str, message: str) -> None:
     git("push", remote, tag_name, cwd=repo)
 
 
+def changelog_release_notes(repo: Path, ver: str) -> str:
+    text = read_text(repo / "CHANGELOG.md")
+    pattern = rf"^## \[{re.escape(ver)}\][^\n]*\n(.*?)(?=^## \[|\Z)"
+    m = re.search(pattern, text, re.M | re.S)
+    if m and m.group(1).strip():
+        return f"Release v{ver}\n\n{m.group(1).strip()}"
+    return f"Release v{ver}"
+
+
+def create_github_release(repo: Path, tag_name: str, ver: str) -> None:
+    """Publish GitHub Release for an existing tag (triggers jvm_maven_central_release.yml)."""
+    if subprocess.run(["gh", "--version"], capture_output=True).returncode != 0:
+        raise RuntimeError(
+            "GitHub CLI (gh) not found. Install gh and run `gh auth login`, "
+            "or pass --skip-github-release and create the release manually."
+        )
+    notes = changelog_release_notes(repo, ver)
+    p = subprocess.run(
+        [
+            "gh",
+            "release",
+            "create",
+            tag_name,
+            "--verify-tag",
+            "--title",
+            f"Release {tag_name}",
+            "--notes",
+            notes,
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        msg = (p.stderr or p.stdout or "").strip()
+        if "already exists" in msg.lower():
+            print(f"GitHub Release {tag_name} already exists; skipping create.")
+            return
+        raise RuntimeError(f"gh release create failed ({p.returncode}):\n{msg}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Bump monorepo version, CHANGELOG, commit, push main, tag vX.Y.Z, push tag."
+        description=(
+            "Bump Rust/Python/JVM versions, CHANGELOG, commit, push main, tag vX.Y.Z, "
+            "push tag, and publish GitHub Release (Maven Central)."
+        )
     )
     ap.add_argument("version", nargs="?", help="New SemVer (e.g. 0.1.3). Omit to be prompted.")
     ap.add_argument("--remote", default="origin")
@@ -395,6 +498,11 @@ def main() -> int:
         help="Only bump files; no commit, push, or tag.",
     )
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--skip-github-release",
+        action="store_true",
+        help="Do not run `gh release create` (Maven Central will not deploy until you publish a GitHub Release).",
+    )
     ap.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts.")
     args = ap.parse_args()
 
@@ -421,7 +529,7 @@ def main() -> int:
 
     last_tag = get_last_tag(repo)
     try:
-        rv, pv, qv = read_aligned_versions(repo)
+        rv, pv, qv, jv = read_aligned_versions(repo)
     except (ValueError, OSError) as e:
         print(e, file=sys.stderr)
         return 1
@@ -436,10 +544,13 @@ def main() -> int:
 
     print("== Last release tag (v*, after fetch) ==")
     print(f"    {last_tag or '(none)'}")
-    print("== Current package versions (must match) ==")
+    print("== Current package versions ==")
     print(f"    Cargo.toml (root):              {rv}")
     print(f"    python-wrapper/Cargo.toml:      {pv}")
     print(f"    python-wrapper/pyproject.toml:  {qv}")
+    print(f"    bindings/java/VERSION (JVM):    {jv}")
+    if jv.removesuffix("-SNAPSHOT") != rv:
+        print(f"    (JVM will be aligned to the new release version on bump.)")
     print()
 
     if args.version:
@@ -480,18 +591,37 @@ def main() -> int:
             return 0
 
     if args.dry_run:
-        print(f"[dry-run] would bump to {new_ver}, commit, tag {tag_name}")
+        gh = "skip GitHub Release" if args.skip_github_release else f"gh release create {tag_name}"
+        print(
+            f"[dry-run] would bump to {new_ver}, commit, push, tag {tag_name}, "
+            f"then {gh} (Maven Central via jvm_maven_central_release.yml)"
+        )
         return 0
 
     try:
         run_bump(repo, new_ver, today)
-    except (ValueError, OSError) as e:
+    except (ValueError, OSError, RuntimeError) as e:
         print(e, file=sys.stderr)
         return 1
 
-    rv2, _, _ = read_aligned_versions(repo)
-    if rv2 != new_ver:
-        print(f"Internal error: expected {new_ver}, got {rv2}", file=sys.stderr)
+    rv2, pv2, qv2, jv2 = read_aligned_versions(repo)
+    if rv2 != new_ver or pv2 != new_ver or qv2 != new_ver or jv2 != new_ver:
+        print(
+            f"Internal error: expected all surfaces at {new_ver}, "
+            f"got rust={rv2!r} py-cargo={pv2!r} pyproject={qv2!r} jvm={jv2!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    check = subprocess.run(
+        [sys.executable, "scripts/check_java_version_consistency.py"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check.returncode != 0:
+        print(check.stderr or check.stdout, file=sys.stderr)
         return 1
 
     if args.skip_git:
@@ -541,7 +671,30 @@ def main() -> int:
         print(e, file=sys.stderr)
         return 1
 
-    print(f"\nDone. Pushed tag {tag_name}. CI: rust_release.yml and python_release.yml.")
+    if not args.skip_github_release:
+        try:
+            create_github_release(repo, tag_name, new_ver)
+        except RuntimeError as e:
+            print(e, file=sys.stderr)
+            print(
+                f"\nTag {tag_name} was pushed. Rust/PyPI CI should still run. "
+                "Publish a GitHub Release manually to deploy Maven Central.",
+                file=sys.stderr,
+            )
+            return 1
+    else:
+        print(
+            f"\nSkipped GitHub Release. Publish manually to deploy Maven Central:\n"
+            f"  gh release create {tag_name} --verify-tag --title 'Release {tag_name}'"
+        )
+
+    print(f"\nDone. Pushed tag {tag_name}.")
+    print("  crates.io  → rust_release.yml (tag push)")
+    print("  PyPI       → python_release.yml (tag push)")
+    if args.skip_github_release:
+        print("  Maven Central → publish GitHub Release when ready (jvm_maven_central_release.yml)")
+    else:
+        print("  Maven Central → jvm_maven_central_release.yml (GitHub Release published)")
     return 0
 
 
