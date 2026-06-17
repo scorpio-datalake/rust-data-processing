@@ -15,9 +15,12 @@ on:
 permissions:
   contents: read
 
+# On PRs, keep in-flight runs (Windows/Polars compiles are slow; rapid fix commits
+# should not surface as spurious "operation was canceled"). On direct pushes to
+# main, still cancel superseded runs to save minutes.
 concurrency:
   group: rust-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   dependency-review:
@@ -73,6 +76,7 @@ jobs:
   fmt-clippy-test:
     name: ${{ matrix.os }} — fmt, clippy, tests
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:

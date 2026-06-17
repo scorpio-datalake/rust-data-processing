@@ -322,26 +322,32 @@ version = "0.3.2"
 source = { editable = "." }
 
 [package.dev-dependencies]
+deep = [
+    { name = "pyarrow" },
+    { name = "pytest-benchmark" },
+]
 dev = [
     { name = "maturin" },
-    { name = "pdoc" },
-    { name = "pyarrow" },
     { name = "pytest" },
-    { name = "pytest-benchmark" },
     { name = "ruff" },
+]
+docs = [
+    { name = "pdoc" },
 ]
 
 [package.metadata]
 
 [package.metadata.requires-dev]
+deep = [
+    { name = "pyarrow", specifier = ">=15" },
+    { name = "pytest-benchmark", specifier = ">=4" },
+]
 dev = [
     { name = "maturin", specifier = ">=1.7,<2" },
-    { name = "pdoc", specifier = ">=14,<16" },
-    { name = "pyarrow", specifier = ">=15" },
     { name = "pytest", specifier = ">=8" },
-    { name = "pytest-benchmark", specifier = ">=4" },
     { name = "ruff", specifier = ">=0.9,<1" },
 ]
+docs = [{ name = "pdoc", specifier = ">=14,<16" }]
 
 [[package]]
 name = "tomli"

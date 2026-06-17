@@ -304,6 +304,9 @@ def sync_workspace_cargo_lock(repo: Path) -> None:
     if p.returncode != 0:
         msg = (p.stderr or p.stdout or "").strip()
         raise RuntimeError(f"cargo generate-lockfile failed ({p.returncode}): {msg}")
+
+
+def assert_clean_tree(repo: Path, allow_dirty: bool) -> None:
     st = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repo,

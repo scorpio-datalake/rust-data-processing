@@ -24,10 +24,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: python-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 jobs:
   test:
     name: ${{ matrix.os }} · Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -43,15 +48,26 @@ jobs:
 
       - name: setup uv
         uses: astral-sh/setup-uv@v8.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "python-wrapper/uv.lock"
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Cache Cargo (maturin)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            python-wrapper
+
       - name: Sync deps, build extension, pytest (unit)
         working-directory: python-wrapper
         run: |
+          set -euo pipefail
           uv sync --group dev
           uv run maturin develop --release
           uv run pytest -m "not deep and not benchmark" -q

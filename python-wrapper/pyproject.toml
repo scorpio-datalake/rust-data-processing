@@ -26,13 +26,20 @@ Repository = "https://github.com/scorpio-datalake/rust-data-processing"
 Documentation = "https://scorpio-datalake.github.io/rust-data-processing/python/examples.html"
 
 [dependency-groups]
+# Core dev/CI (unit tests, maturin, ruff) — no pyarrow (~45 MiB wheel) unless you need deep parity.
 dev = [
     "maturin>=1.7,<2",
     "pytest>=8",
+    "ruff>=0.9,<1",
+]
+# Deep parity + benchmark markers (`pytest -m deep`, `pytest -m benchmark`).
+deep = [
     "pytest-benchmark>=4",
     "pyarrow>=15",
+]
+# HTML API docs (`pdoc` in docs.yml / build_docs).
+docs = [
     "pdoc>=14,<16",
-    "ruff>=0.9,<1",
 ]
 
 [tool.ruff]

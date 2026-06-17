@@ -19,6 +19,12 @@ cd python-wrapper
 uv sync --group dev
 ```
 
+Deep parity / benchmark tests also need **`pyarrow`**:
+
+```bash
+uv sync --group dev --group deep
+```
+
 ## Build / install editable
 
 ```bash
