@@ -1,0 +1,15 @@
+[package]
+name = "rdp-postgresql-integration-test"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Opt-in PostgreSQL integration tests (self-contained under integration_testing/PostgreSQL/)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libloading = "0.8"
+serde_json = "1"
+url = "2"
+rust-data-processing = { path = "../../../", features = ["integration_full"] }

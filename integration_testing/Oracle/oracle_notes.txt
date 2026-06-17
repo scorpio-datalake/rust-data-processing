@@ -1,0 +1,63 @@
+# Integration testing notes — Oracle
+
+## Done
+
+### 1. Rancher Desktop (on-demand)
+
+Scripts: `integration_testing/scripts/rancher/check_rancher_desktop.py`, `start_rancher_desktop.py`, `stop_rancher_desktop.py`
+
+### 2. Oracle Docker Compose
+
+`docker-compose.yml`, `.env.example`, `README.md` — Oracle XE via `gvenzl/oracle-xe:21-slim`.
+
+### 3. Build scripts (libs → `integration_testing/libs/`)
+
+Requires **`build_all_libs.py`** (or each leg) with CONNECTORS.md batch connector features — see `scripts/connector_features.py`.
+
+| Script | Cargo / maturin features | Output |
+| --- | --- | --- |
+| `scripts/build_libs/build_rust_lib.py` | `integration_full` | `libs/rust/env.sh` |
+| `scripts/build_libs/build_java_lib.py` | `rdp_jvm_sys --features full` | `libs/java/librdp_jvm_sys.so`, JAR, `env.sh` |
+| `scripts/build_libs/build_python_lib.py` | `integration_full` (`db` + `cloud`) | `libs/python/_rust_data_processing*.so`, `env.sh` |
+| `scripts/build_libs/build_all_libs.py` | All of the above | Full `libs/` tree |
+
+Incremental: skips rebuild unless sources changed, `--force`, or `libs/.last_test_failed` exists.
+
+Build artifacts compile into `integration_testing/.target/` (not repo `target/`) so integration builds can run alongside `build_all` without corrupting each other.
+
+### 4. Uber NYC pickups data
+
+`scripts/data_download/download_uber_data.py` → `integration_testing/data/uber_nyc_pickups_apr2014.csv`  
+Optional: `--sample` for 50k-row subset.
+
+### 5. Shared schemas (`integration_testing/schema/`)
+
+| File | Role |
+| --- | --- |
+| `uber_pickups.schema.json` | RDP CSV ingest schema (all connectors) |
+| `uber_pickups.table.json` | Warehouse table names + CSV→column map + transform SQL |
+
+### 6. Tri-language import tests (`run_oracle_tests.py`)
+
+All three legs use **RDP only** — no JDBC, python-oracledb, or psycopg in test code. Aligns with `docs/CONNECTORS.md`.
+
+| Step | Mechanism |
+| --- | --- |
+| CSV ingest | RDP pipeline source (`paths` + schema) |
+| Column rename | Polars SQL from `uber_pickups.table.json` (`transform.sql`) |
+| Reset + load | `rdp_run_pipeline_json` → `kind: oracle` sink (requires Java `full` build) |
+| Verify count | RDP `ingest_from_db` (ConnectorX; Python/Rust `integration_full` / `db`) |
+
+| Path | Role |
+| --- | --- |
+| `Oracle/java/` | JUnit → `RdpNativeJson.invokeRunPipelineJson` |
+| `Oracle/tests/` | pytest → `scripts/rdp_pipeline.py` (ctypes → `librdp_jvm_sys`) + `ingest_from_db` verify |
+| `Oracle/rust/` | `cargo test` → `librdp_jvm_sys` pipeline + `ingest_from_db` verify |
+
+Load paths call the same **`rdp_run_pipeline_json`** entry point (Java native; Python/Rust via ctypes). Oracle OCI (`libclntsh.so`) is required at runtime for the sink — auto-extracted from `gvenzl/oracle-xe:21-slim` into `integration_testing/.oracle/oci-home/` when Instant Client is not installed.
+
+```bash
+python3 integration_testing/scripts/build_libs/build_all_libs.py
+python3 integration_testing/scripts/data_download/download_uber_data.py --sample
+python3 integration_testing/Oracle/run_oracle_tests.py
+```

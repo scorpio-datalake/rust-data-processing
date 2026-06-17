@@ -56,7 +56,7 @@ final class FfiExportedSymbolsContractTest {
           "Bundled ffi_manifest.json missing from classpath (expected under"
               + " src/main/resources/io/github/scorpio_datalake/rust_data_processing/ in rust-data-processing-jvm).");
       JSONObject o = new JSONObject(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-      assertEquals(405, o.getInt("abi_version_constant"));
+      assertEquals(406, o.getInt("abi_version_constant"));
       JSONArray syms = o.getJSONArray("exported_symbols");
       boolean hasAbi = false;
       for (int i = 0; i < syms.length(); i++) {
@@ -242,6 +242,45 @@ final class FfiExportedSymbolsContractTest {
       case "rdp_run_pipeline_json":
         JvmNativeContractScenarios.runPipelineJsonContract(linker, lookup, arena);
         return;
+      case "rdp_kafka_elt_load_records_json":
+        JvmNativeContractScenarios.runKafkaEltLoadRecordsJsonContract(linker, lookup, arena);
+        return;
+      case "rdp_kafka_poll_window_json":
+        {
+          JSONObject root =
+              RdpNativeJson.invokeKafkaPollWindowJson(
+                  linker,
+                  lookup,
+                  arena,
+                  "{\"brokers\":\"\",\"group_id\":\"g\",\"topic\":\"t\",\"max_records\":1}");
+          assertFalse(root.getBoolean("ok"), "empty brokers should fail validation");
+          return;
+        }
+      case "rdp_kafka_poll_window_loaded_json":
+        {
+          String schema = "{\"fields\":[{\"name\":\"id\",\"data_type\":\"Int64\"}]}";
+          JSONObject root =
+              RdpNativeJson.invokeKafkaPollWindowLoadedJson(
+                  linker,
+                  lookup,
+                  arena,
+                  "{\"brokers\":\"\",\"group_id\":\"g\",\"topic\":\"t\",\"max_records\":1}",
+                  schema);
+          assertFalse(root.getBoolean("ok"), "empty brokers should fail validation");
+          return;
+        }
+      case "rdp_kafka_export_dataset_json":
+        {
+          JSONObject root =
+              RdpNativeJson.invokeKafkaExportDatasetJson(
+                  linker,
+                  lookup,
+                  arena,
+                  "{\"brokers\":\"\",\"topic\":\"t\"}",
+                  "{\"schema\":{\"fields\":[]},\"rows\":[]}");
+          assertFalse(root.getBoolean("ok"), "empty brokers should fail validation");
+          return;
+        }
       default:
         if (name.startsWith("rdp_parity_")) {
           JSONObject root = RdpNativeJson.invokeParityExport(linker, lookup, arena, name);

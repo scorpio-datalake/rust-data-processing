@@ -30,6 +30,14 @@ public final class PipelineJsonFixtures {
     return DEFAULT_PATH_INGEST_OPTIONS_JSON;
   }
 
+  /**
+   * Absolute path with forward slashes — stable in pipeline JSON on Windows and Unix ({@code
+   * JSONObject#toString()} escapes backslashes).
+   */
+  public static String pipelinePathBinding(Path path) {
+    return path.toAbsolutePath().normalize().toString().replace('\\', '/');
+  }
+
   /** Repo {@code tests/fixtures} when {@code people.csv} exists on an ancestor of the cwd. */
   public static Optional<Path> resolveTestsFixturesDir() {
     Path cwd = Path.of("").toAbsolutePath();

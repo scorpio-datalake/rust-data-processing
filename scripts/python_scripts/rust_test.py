@@ -9,6 +9,8 @@ import sys
 from common import (
     REPO_ROOT,
     banner,
+    cargo_jobs_args,
+    ensure_min_disk_space,
     generate_people_xlsx_fixture,
     require_tool,
     run,
@@ -18,7 +20,7 @@ from common import (
 
 def test(*, expanded: bool) -> None:
     require_tool("cargo")
-    args = ["cargo", "test", "--locked"]
+    args = ["cargo", "test", "--locked", *cargo_jobs_args()]
     if expanded:
         args.extend(["--features", "ci_expanded"])
         banner("Rust test (--features ci_expanded)")
@@ -30,7 +32,7 @@ def test(*, expanded: bool) -> None:
 def test_doctests() -> None:
     require_tool("cargo")
     banner("Rust test (doctests)")
-    run(["cargo", "test", "--locked", "--doc"], cwd=REPO_ROOT)
+    run(["cargo", "test", "--locked", *cargo_jobs_args(), "--doc"], cwd=REPO_ROOT)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     setup_rust_toolchain_env(offline=args.offline)
+    ensure_min_disk_space(context="Rust tests")
     if not args.expanded_only:
         test(expanded=False)
         test_doctests()

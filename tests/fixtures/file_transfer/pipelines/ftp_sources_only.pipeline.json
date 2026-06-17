@@ -1,0 +1,15 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": [],
+    "schema_ref": "schemas/id_name.schema.json",
+    "options": { "format": "json" },
+    "file_transfer_uris": ["{{FTP_URI}}"]
+  },
+  "sinks": [
+    {
+      "kind": "parquet_file",
+      "path": "{{SINK_PATH}}"
+    }
+  ]
+}

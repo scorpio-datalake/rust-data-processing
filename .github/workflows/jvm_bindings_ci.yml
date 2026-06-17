@@ -1,4 +1,5 @@
-# Phase 3 P3-E1: build rdp_jvm_sys → manifest + version checks → Maven verify + Gradle check (+ publishToMavenLocal smoke).
+# Phase 3 P3-E1: build rdp_jvm_sys (`--features full` = all batch connectors per CONNECTORS.md)
+# → check_jvm_ffi_manifest + check_jvm_full_features → Maven verify + Gradle check (+ publishToMavenLocal smoke).
 # Java tests: Surefire runs src/test/java/**/*Test.java on `mvn verify`; Gradle runs the same JUnit 5 suite on `./gradlew check`.
 # FfiExportedSymbolsContractTest + ParityMatrixDeferredExportTest run when RDP_JVM_SYS points at the built rdp_jvm_sys artifact.
 # JMH: `mvn verify` runs exec-maven-plugin at integration-test; `./gradlew jmh` runs the same hotspot benchmarks (JVM flags via exec jvmArgs / Gradle jvmArgs).
@@ -8,22 +9,27 @@ name: JVM bindings CI
 
 on:
   push:
-    branches:
-      - main
-      - phase*
+    branches: [main]
     paths:
       - bindings/**
       - docs/java/**
       - docs/adr/00{4,5}*.md
       - scripts/check_jvm_ffi_manifest.py
+      - scripts/check_jvm_full_features.py
+      - scripts/connector_features.py
       - scripts/check_java_version_consistency.py
+      - docs/CONNECTORS.md
       - .github/workflows/jvm_bindings_ci.yml
   pull_request:
+    branches: [main]
     paths:
       - bindings/**
       - docs/java/**
       - docs/adr/00{4,5}*.md
+      - docs/CONNECTORS.md
       - scripts/check_jvm_ffi_manifest.py
+      - scripts/check_jvm_full_features.py
+      - scripts/connector_features.py
       - scripts/check_java_version_consistency.py
       - .github/workflows/jvm_bindings_ci.yml
 
@@ -68,14 +74,32 @@ jobs:
           restore-keys: |
             jvm-${{ runner.os }}-
 
-      - name: FFI manifest + Java version consistency
+      - name: FFI manifest + connector features (JVM / Rust / Python) + Java version consistency
         run: |
           python scripts/check_jvm_ffi_manifest.py
+          python scripts/check_jvm_full_features.py
           python scripts/check_java_version_consistency.py
 
-      # Link Phase 1 / Phase 2 rust-data-processing (SQL default stack) into the cdylib — matches release-shaped JVM parity builds.
-      - name: Build native rdp_jvm_sys (full Rust core linkage)
+      # libgssapi-sys (ConnectorX) needs gssapi.h; bindgen needs libclang. GitHub ubuntu runners
+      # ship libgssapi_krb5.so but not -dev headers — build_all installs these on Debian/Ubuntu.
+      - name: Install native build deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            libkrb5-dev pkg-config libclang-dev \
+            cmake libssl-dev zlib1g-dev libcurl4-openssl-dev
+
+      # `full` = every batch connector in docs/CONNECTORS.md (see scripts/check_jvm_full_features.py):
+      #   db_connectorx + sink_postgres + sink_oracle + cloud_connectors (S3/GCS/Azure, SFTP/FTP,
+      #   Snowflake stage, Databricks warehouse, Spark handoff) + sql + excel.
+      # Kafka streaming ELT is a separate feature — Linux job below also builds full,kafka.
+      - name: Build native rdp_jvm_sys (full — all batch connectors)
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
+
+      - name: Build native rdp_jvm_sys with kafka (Linux only — streaming ELT)
+        if: runner.os == 'Linux'
+        run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full,kafka
 
       - name: Generate tests/fixtures/people.xlsx (JVM Excel FFI + docs)
         run: cargo run --features excel_test_writer --bin generate_people_xlsx_fixture

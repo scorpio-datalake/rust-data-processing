@@ -143,13 +143,11 @@ fn excel_ingest_path_sheet(path_ptr: *const c_char, sheet_ptr: *const c_char) ->
             ..IngestionOptions::default()
         };
 
-        let schema: Schema = match rust_data_processing::ingestion::infer_schema_from_path(
-            path,
-            &opts_infer,
-        ) {
-            Ok(s) => s,
-            Err(e) => return json_err(format!("infer Excel schema failed: {e}")),
-        };
+        let schema: Schema =
+            match rust_data_processing::ingestion::infer_schema_from_path(path, &opts_infer) {
+                Ok(s) => s,
+                Err(e) => return json_err(format!("infer Excel schema failed: {e}")),
+            };
 
         let opts = IngestionOptions {
             format: Some(IngestionFormat::Excel),
@@ -158,17 +156,13 @@ fn excel_ingest_path_sheet(path_ptr: *const c_char, sheet_ptr: *const c_char) ->
         };
 
         match ingest_from_path(path, &schema, &opts) {
-            Ok(ds) => {
-                match serde_json::to_value(&ds) {
-                    Ok(dataset) => {
-                        json_ok(serde_json::json!({
-                            "kind": "excel_ingest_sheet",
-                            "dataset": dataset,
-                        }))
-                    }
-                    Err(e) => json_err(format!("serialize Excel DataSet failed: {e}")),
-                }
-            }
+            Ok(ds) => match serde_json::to_value(&ds) {
+                Ok(dataset) => json_ok(serde_json::json!({
+                    "kind": "excel_ingest_sheet",
+                    "dataset": dataset,
+                })),
+                Err(e) => json_err(format!("serialize Excel DataSet failed: {e}")),
+            },
             Err(e) => json_err(format!("Excel ingest failed: {e}")),
         }
     }
@@ -406,7 +400,10 @@ fn processing_impl() -> Result<serde_json::Value, String> {
             vec![Value::Int64(2), Value::Float64(20.0)],
         ],
     );
-    let filtered = filter(&ds, |row| matches!(row.first(), Some(Value::Int64(i)) if *i > 1));
+    let filtered = filter(
+        &ds,
+        |row| matches!(row.first(), Some(Value::Int64(i)) if *i > 1),
+    );
     let mapped = map(&filtered, |row| {
         let mut r = row.to_vec();
         if let Some(Value::Float64(x)) = r.get_mut(1) {
@@ -493,7 +490,9 @@ fn parity_profiling() -> RdpJsonSlice {
 
 #[cfg(feature = "link-main")]
 fn profiling_impl() -> Result<serde_json::Value, String> {
-    use rust_data_processing::profiling::{profile_dataset, render_profile_report_json, ProfileOptions};
+    use rust_data_processing::profiling::{
+        profile_dataset, render_profile_report_json, ProfileOptions,
+    };
     use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
 
     let ds = DataSet::new(
@@ -537,8 +536,8 @@ fn parity_validation() -> RdpJsonSlice {
 
 #[cfg(feature = "link-main")]
 fn validation_impl() -> Result<serde_json::Value, String> {
-    use rust_data_processing::validation::{validate_dataset, Check, Severity, ValidationSpec};
     use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
+    use rust_data_processing::validation::{validate_dataset, Check, Severity, ValidationSpec};
 
     let ds = DataSet::new(
         Schema::new(vec![
@@ -750,7 +749,9 @@ fn parity_export_privacy_reports() -> RdpJsonSlice {
 #[cfg(feature = "link-main")]
 fn export_privacy_reports_impl() -> Result<serde_json::Value, String> {
     use rust_data_processing::export::{dataset_to_jsonl, train_test_row_indices};
-    use rust_data_processing::privacy::{render_privacy_report_json, summarize_utf8_column_changes};
+    use rust_data_processing::privacy::{
+        render_privacy_report_json, summarize_utf8_column_changes,
+    };
     use rust_data_processing::reports::truncate_utf8_by_bytes;
     use rust_data_processing::types::{DataSet, DataType, Field, Schema, Value};
 
@@ -786,8 +787,12 @@ pub unsafe extern "C" fn rdp_parity_kafka(out: *mut RdpJsonSlice) {
 fn parity_kafka() -> RdpJsonSlice {
     json_ok(serde_json::json!({
         "kind": "kafka",
-        "status": "planned",
+        "status": "in_progress",
+        "model": "streaming_elt",
+        "extract": "poll_kafka_window (rdp_kafka_poll_window_json FFI)",
+        "load": "elt_load_kafka_records_json",
+        "transform": "separate Polars SQL / rdp_run_pipeline_json",
+        "docs": "docs/KAFKA_ELT.md",
         "tracker": "P3-E2",
-        "note": "rdkafka + BYO connector ABI — Planning/PHASE3_EPICS.md P3-E2",
     }))
 }

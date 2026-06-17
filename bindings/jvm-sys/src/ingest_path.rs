@@ -66,11 +66,17 @@ pub(crate) fn parse_ingestion_options(
         opts.watermark_exclusive_above = Some(json_scalar_to_value(w)?);
     }
 
+    if let Some(n) = obj.get("max_rows").and_then(|x| x.as_u64()) {
+        opts.max_rows = Some(n as usize);
+    }
+
     Ok(opts)
 }
 
 #[cfg(feature = "link-main")]
-fn json_scalar_to_value(v: &serde_json::Value) -> Result<rust_data_processing::types::Value, String> {
+fn json_scalar_to_value(
+    v: &serde_json::Value,
+) -> Result<rust_data_processing::types::Value, String> {
     use rust_data_processing::types::Value;
     match v {
         serde_json::Value::Null => Ok(Value::Null),
@@ -323,10 +329,7 @@ fn ordered_paths_impl(payload_json: &str) -> Result<serde_json::Value, String> {
 
     match mode {
         "dataset" => {
-            let cap = response
-                .max_rows
-                .unwrap_or(DEFAULT_MAX_DATASET_ROWS)
-                .max(1);
+            let cap = response.max_rows.unwrap_or(DEFAULT_MAX_DATASET_ROWS).max(1);
             let truncated = total_row_count > cap;
             if truncated {
                 let mut rows = std::mem::take(&mut ds.rows);
@@ -468,10 +471,7 @@ mod people_payload_tests {
             .resolve_payload_json(
                 "payloads/excel_sheet_dataset.payload.json",
                 &HashMap::from([
-                    (
-                        "SOURCE_PATH".into(),
-                        xlsx.to_string_lossy().into_owned(),
-                    ),
+                    ("SOURCE_PATH".into(), xlsx.to_string_lossy().into_owned()),
                     ("SHEET_NAME".into(), "Sheet1".into()),
                 ]),
             )
@@ -513,8 +513,9 @@ mod people_payload_tests {
         std::fs::write(dir.join("a.csv"), "id,ts\n1,50\n2,99\n").unwrap();
         std::fs::write(nested.join("b.csv"), "id,ts\n3,150\n4,200\n").unwrap();
 
-        let paths = rust_data_processing::ingestion::paths_from_directory_scan(&dir, Some("**/*.csv"))
-            .unwrap();
+        let paths =
+            rust_data_processing::ingestion::paths_from_directory_scan(&dir, Some("**/*.csv"))
+                .unwrap();
         let bundle = PipelineBundle::from_repo_fixture("watermark");
         let mut body: serde_json::Value = serde_json::from_str(
             &bundle

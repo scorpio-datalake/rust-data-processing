@@ -6,34 +6,54 @@ from __future__ import annotations
 import argparse
 import sys
 
-from common import PYTHON_WRAPPER, banner, require_uv, run
+from common import (
+    PYTHON_WRAPPER,
+    banner,
+    cleanup_disk_for_python,
+    python_maturin_use_release,
+    python_venv_executable,
+    python_wrapper_cargo_env,
+    require_uv,
+    run,
+)
 
 from python_clean import clean as python_clean_wrapper
 
 
 def lint(*, check_only: bool) -> None:
-    require_uv()
+    """Ruff from .venv only — does not install the editable Rust extension."""
+    ruff = str(python_venv_executable("ruff"))
     banner("Python: Ruff format" + (" --check" if check_only else ""))
-    fmt_cmd = ["uv", "run", "ruff", "format"]
+    fmt_cmd = [ruff, "format"]
     if check_only:
         fmt_cmd.append("--check")
     fmt_cmd.extend(["rust_data_processing", "tests"])
     run(fmt_cmd, cwd=PYTHON_WRAPPER)
     banner("Python: Ruff check")
-    run(["uv", "run", "ruff", "check", "rust_data_processing", "tests"], cwd=PYTHON_WRAPPER)
+    run([ruff, "check", "rust_data_processing", "tests"], cwd=PYTHON_WRAPPER)
 
 
-def build(*, release: bool = True, skip_fmt: bool = False) -> None:
+def build(*, release: bool | None = None, skip_fmt: bool = False) -> None:
     require_uv()
-    banner("Python: uv sync (dev group)")
-    run(["uv", "sync", "--group", "dev"], cwd=PYTHON_WRAPPER)
+    if release is None:
+        release = python_maturin_use_release()
+    env = python_wrapper_cargo_env()
+    banner("Python: uv sync (dev group, defer project build to maturin)")
+    run(
+        ["uv", "sync", "--group", "dev", "--no-install-project"],
+        cwd=PYTHON_WRAPPER,
+        env=env,
+    )
     if not skip_fmt:
         lint(check_only=True)
-    maturin_args = ["uv", "run", "maturin", "develop"]
+    maturin_cmd = [str(python_venv_executable("maturin")), "develop"]
     if release:
-        maturin_args.append("--release")
-    banner("Python: maturin develop")
-    run(maturin_args, cwd=PYTHON_WRAPPER)
+        maturin_cmd.append("--release")
+    banner(
+        "Python: maturin develop"
+        + (" (--release)" if release else " (debug, shares repo target/)")
+    )
+    run(maturin_cmd, cwd=PYTHON_WRAPPER, env=env)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,12 +76,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    cleanup_disk_for_python()
     if args.clean:
         python_clean_wrapper()
     require_uv()
     if args.fmt_only:
         banner("Python: uv sync (dev group) — fmt-only mode")
-        run(["uv", "sync", "--group", "dev"], cwd=PYTHON_WRAPPER)
+        run(
+            ["uv", "sync", "--group", "dev", "--no-install-project"],
+            cwd=PYTHON_WRAPPER,
+            env=python_wrapper_cargo_env(),
+        )
         if not args.skip_fmt:
             lint(check_only=True)
         return 0

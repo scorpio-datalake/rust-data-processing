@@ -20,19 +20,24 @@ use rust_data_processing::export::{
 use rust_data_processing::ingestion::{
     IngestionOptions, discover_hive_partitioned_files as discover_hive_partitioned_files_rs,
     infer_schema_from_path, ingest_from_db, ingest_from_db_infer, ingest_from_ordered_paths,
-    ingest_from_path, ingest_from_path_infer, parse_partition_segment as parse_partition_segment_rs,
+    ingest_from_path, ingest_from_path_infer,
+    parse_partition_segment as parse_partition_segment_rs,
     paths_from_directory_scan as paths_from_directory_scan_rs,
     paths_from_explicit_list as paths_from_explicit_list_rs, paths_from_glob as paths_from_glob_rs,
+};
+#[cfg(feature = "cloud")]
+use rust_data_processing::ingestion::{
+    export_dataset_to_object_store_uri, ingest_from_file_transfer_uri, ingest_from_object_store_uri,
 };
 use rust_data_processing::outliers::{
     detect_outliers_dataset, render_outlier_report_json, render_outlier_report_markdown,
 };
 use rust_data_processing::pipeline::{Agg, CastMode, DataFrame, JoinKind, Predicate};
-use rust_data_processing::processing::{
-    VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce, top_k_by_frequency,
-};
 use rust_data_processing::privacy::{
     render_privacy_report_json, render_privacy_report_markdown, summarize_utf8_column_changes,
+};
+use rust_data_processing::processing::{
+    VarianceKind, arg_max_row, arg_min_row, feature_wise_mean_std, reduce, top_k_by_frequency,
 };
 use rust_data_processing::profiling::{
     profile_dataset, render_profile_report_json, render_profile_report_markdown,
@@ -149,7 +154,7 @@ fn merge_ingestion_options(
 ) -> PyResult<IngestionOptions> {
     let mut opts = ingestion_options_from_py(options)?;
     if let Some(o) = options {
-        if let Ok(d) = o.downcast::<PyDict>() {
+        if let Ok(d) = o.cast::<PyDict>() {
             observer_bridge::apply_ingestion_observer_options(py, d, &mut opts)?;
         }
     }
@@ -366,7 +371,7 @@ impl PyDataFrame {
         let key_refs: Vec<&str> = keys.iter().map(|s| s.as_str()).collect();
         let mut out_aggs = Vec::with_capacity(aggs.len());
         for item in aggs.iter() {
-            let d = item.downcast::<PyDict>()?;
+            let d = item.cast::<PyDict>()?;
             out_aggs.push(agg_from_py(&d)?);
         }
         self.inner
@@ -594,7 +599,7 @@ impl PyExecutionEngine {
                         }
                     }
                     match mapper.bind(py).call1((list,)) {
-                        Ok(new_row) => match new_row.downcast::<PyList>() {
+                        Ok(new_row) => match new_row.cast::<PyList>() {
                             Ok(py_row) => {
                                 if py_row.len() != ncols {
                                     *err_ref.lock().unwrap() =
@@ -764,6 +769,136 @@ fn ingest_from_db_infer_py(
         .map_err(ingestion_err_to_py)
 }
 
+/// **Load** step: map a JSON poll window into a landing `DataSet` (ELT).
+#[cfg(feature = "kafka")]
+use rust_data_processing::kafka::{
+    KafkaConsumerBuilder, KafkaProducerBuilder, elt_load_kafka_records_json,
+    export_dataset_to_kafka, poll_kafka_window, poll_kafka_window_loaded,
+};
+
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "elt_load_kafka_records_json")]
+fn elt_load_kafka_records_json_py(
+    records_json: &str,
+    landing_schema: &Bound<'_, PyAny>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(landing_schema)?;
+    elt_load_kafka_records_json(records_json, &schema)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+/// **Extract:** poll up to `max_records` from a topic; returns JSON `{ "records": [ … ] }`.
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "poll_kafka_window")]
+#[pyo3(signature = (brokers, group_id, topic, max_records=500, auto_offset_reset="earliest", session_timeout_ms=None))]
+fn poll_kafka_window_py(
+    brokers: &str,
+    group_id: &str,
+    topic: &str,
+    max_records: usize,
+    auto_offset_reset: &str,
+    session_timeout_ms: Option<u32>,
+) -> PyResult<String> {
+    let mut builder =
+        KafkaConsumerBuilder::new(brokers, group_id, topic).auto_offset_reset(auto_offset_reset);
+    if let Some(ms) = session_timeout_ms {
+        builder = builder.session_timeout_ms(ms);
+    }
+    let records = poll_kafka_window(&builder, max_records).map_err(ingestion_err_to_py)?;
+    serde_json::to_string(&serde_json::json!({ "records": records }))
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))
+}
+
+/// **Extract + Load:** poll a window and map to a landing `DataSet`.
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "poll_kafka_window_loaded")]
+#[pyo3(signature = (brokers, group_id, topic, landing_schema, max_records=500, auto_offset_reset="earliest", session_timeout_ms=None))]
+fn poll_kafka_window_loaded_py(
+    brokers: &str,
+    group_id: &str,
+    topic: &str,
+    landing_schema: &Bound<'_, PyAny>,
+    max_records: usize,
+    auto_offset_reset: &str,
+    session_timeout_ms: Option<u32>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(landing_schema)?;
+    let mut builder =
+        KafkaConsumerBuilder::new(brokers, group_id, topic).auto_offset_reset(auto_offset_reset);
+    if let Some(ms) = session_timeout_ms {
+        builder = builder.session_timeout_ms(ms);
+    }
+    poll_kafka_window_loaded(&builder, &schema, max_records)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+/// **Sink:** publish each row of `dataset` to Kafka; returns rows sent.
+#[cfg(feature = "kafka")]
+#[pyfunction(name = "export_dataset_to_kafka")]
+#[pyo3(signature = (brokers, topic, dataset, key_column=None, value_column=None, message_timeout_ms=5000))]
+fn export_dataset_to_kafka_py(
+    brokers: &str,
+    topic: &str,
+    dataset: &PyDataSet,
+    key_column: Option<&str>,
+    value_column: Option<&str>,
+    message_timeout_ms: u64,
+) -> PyResult<usize> {
+    let mut builder =
+        KafkaProducerBuilder::new(brokers, topic).message_timeout_ms(message_timeout_ms);
+    if let Some(col) = key_column {
+        builder = builder.key_column(col);
+    }
+    if let Some(col) = value_column {
+        builder = builder.value_column(col);
+    }
+    export_dataset_to_kafka(&builder, &dataset.inner).map_err(ingestion_err_to_py)
+}
+
+/// Read one object from `s3://`, `gs://`, `abfss://`, `file://`, … into a `DataSet` (feature `cloud`).
+#[cfg(feature = "cloud")]
+#[pyfunction(name = "ingest_from_object_store_uri")]
+#[pyo3(signature = (uri, schema, options=None))]
+fn ingest_from_object_store_uri_py(
+    _py: Python<'_>,
+    uri: &str,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(schema)?;
+    let opts = merge_ingestion_options(_py, options)?;
+    ingest_from_object_store_uri(uri, &schema, &opts)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
+/// Write a `DataSet` as one Parquet object at `uri` (feature `cloud`).
+#[cfg(feature = "cloud")]
+#[pyfunction(name = "export_dataset_to_object_store_uri")]
+#[pyo3(signature = (uri, ds))]
+fn export_dataset_to_object_store_uri_py(uri: &str, ds: &PyDataSet) -> PyResult<()> {
+    export_dataset_to_object_store_uri(uri, &ds.inner).map_err(ingestion_err_to_py)
+}
+
+/// Read one file over `sftp://`, `ftp://`, or `ftps://` into a `DataSet` (feature `cloud`).
+#[cfg(feature = "cloud")]
+#[pyfunction(name = "ingest_from_file_transfer_uri")]
+#[pyo3(signature = (uri, schema, options=None))]
+fn ingest_from_file_transfer_uri_py(
+    _py: Python<'_>,
+    uri: &str,
+    schema: &Bound<'_, PyAny>,
+    options: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyDataSet> {
+    let schema = schema_from_py(schema)?;
+    let opts = merge_ingestion_options(_py, options)?;
+    ingest_from_file_transfer_uri(uri, &schema, &opts)
+        .map(PyDataSet::from_inner)
+        .map_err(ingestion_err_to_py)
+}
+
 #[pyfunction]
 fn sql_query_dataset(ds: &PyDataSet, sql: &str) -> PyResult<PyDataSet> {
     let df = DataFrame::from_dataset(&ds.inner).map_err(ingestion_err_to_py)?;
@@ -805,7 +940,10 @@ fn reports_truncate_utf8_bytes_py(text: &str, max_bytes: usize) -> String {
 
 /// Deterministic train/test row index split: `(train_indices, test_indices)` as two lists of `int`.
 #[pyfunction(name = "export_train_test_row_indices")]
-fn export_train_test_row_indices_py(row_count: usize, test_fraction: f64) -> (Vec<usize>, Vec<usize>) {
+fn export_train_test_row_indices_py(
+    row_count: usize,
+    test_fraction: f64,
+) -> (Vec<usize>, Vec<usize>) {
     train_test_row_indices(row_count, test_fraction)
 }
 
@@ -940,7 +1078,7 @@ fn processing_map(
         }
         let new_list = mapper.call1((list,))?;
         let py_row = new_list
-            .downcast::<PyList>()
+            .cast::<PyList>()
             .map_err(|_| PyValueError::new_err("mapper must return a list of cell values"))?;
         let n = py_row.len();
         if n != ds.inner.schema.fields.len() {
@@ -1052,7 +1190,8 @@ fn discover_hive_partitioned_files(
     root: &str,
     file_pattern: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
-    let files = discover_hive_partitioned_files_rs(root, file_pattern).map_err(ingestion_err_to_py)?;
+    let files =
+        discover_hive_partitioned_files_rs(root, file_pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for pf in files {
         let d = PyDict::new(py);
@@ -1089,7 +1228,8 @@ fn paths_from_directory_scan_py(
     root: &str,
     relative_pattern: Option<&str>,
 ) -> PyResult<Py<PyAny>> {
-    let paths = paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
+    let paths =
+        paths_from_directory_scan_rs(root, relative_pattern).map_err(ingestion_err_to_py)?;
     let list = PyList::empty(py);
     for p in paths {
         list.append(p.to_string_lossy().to_string())?;
@@ -1136,13 +1276,29 @@ fn _rust_data_processing(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ingest_from_path_infer_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_py, m)?)?;
     m.add_function(wrap_pyfunction!(ingest_from_db_infer_py, m)?)?;
+    #[cfg(feature = "kafka")]
+    {
+        m.add_function(wrap_pyfunction!(elt_load_kafka_records_json_py, m)?)?;
+        m.add_function(wrap_pyfunction!(poll_kafka_window_py, m)?)?;
+        m.add_function(wrap_pyfunction!(poll_kafka_window_loaded_py, m)?)?;
+        m.add_function(wrap_pyfunction!(export_dataset_to_kafka_py, m)?)?;
+    }
+    #[cfg(feature = "cloud")]
+    {
+        m.add_function(wrap_pyfunction!(ingest_from_object_store_uri_py, m)?)?;
+        m.add_function(wrap_pyfunction!(export_dataset_to_object_store_uri_py, m)?)?;
+        m.add_function(wrap_pyfunction!(ingest_from_file_transfer_uri_py, m)?)?;
+    }
     m.add_function(wrap_pyfunction!(sql_query_dataset, m)?)?;
     m.add_function(wrap_pyfunction!(transform_apply_json, m)?)?;
     m.add_function(wrap_pyfunction!(export_dataset_jsonl_py, m)?)?;
     m.add_function(wrap_pyfunction!(export_train_test_row_indices_py, m)?)?;
     m.add_function(wrap_pyfunction!(export_filter_rows_max_utf8_chars_py, m)?)?;
     m.add_function(wrap_pyfunction!(privacy_summarize_utf8_changes_json_py, m)?)?;
-    m.add_function(wrap_pyfunction!(privacy_summarize_utf8_changes_markdown_py, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        privacy_summarize_utf8_changes_markdown_py,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(reports_truncate_utf8_bytes_py, m)?)?;
     m.add_function(wrap_pyfunction!(profile_dataset_json, m)?)?;
     m.add_function(wrap_pyfunction!(profile_dataset_markdown, m)?)?;

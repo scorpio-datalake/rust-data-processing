@@ -88,6 +88,9 @@ pub struct IngestionOptions {
     /// Keep only rows where `watermark_column` is **strictly greater than** this value (same
     /// [`crate::types::DataType`] as the column). Applied after ingest for file and DB sources.
     pub watermark_exclusive_above: Option<Value>,
+    /// After ingest (and watermark filter), keep at most this many rows from the start of the
+    /// dataset. **`None`** = no limit. Pipeline `sources.options.max_rows` maps here.
+    pub max_rows: Option<usize>,
 }
 
 impl fmt::Debug for IngestionOptions {
@@ -99,6 +102,7 @@ impl fmt::Debug for IngestionOptions {
             .field("alert_at_or_above", &self.alert_at_or_above)
             .field("watermark_column", &self.watermark_column)
             .field("watermark_exclusive_above", &self.watermark_exclusive_above)
+            .field("max_rows", &self.max_rows)
             .finish()
     }
 }
@@ -112,7 +116,26 @@ impl Default for IngestionOptions {
             alert_at_or_above: IngestionSeverity::Critical,
             watermark_column: None,
             watermark_exclusive_above: None,
+            max_rows: None,
         }
+    }
+}
+
+/// Truncate a dataset to at most `max` rows (no-op when `max` is zero).
+fn truncate_dataset_rows(mut ds: DataSet, max: usize) -> DataSet {
+    if max == 0 {
+        return ds;
+    }
+    if ds.row_count() > max {
+        ds.rows.truncate(max);
+    }
+    ds
+}
+
+fn apply_max_rows(ds: DataSet, max_rows: Option<usize>) -> DataSet {
+    match max_rows {
+        Some(max) if max > 0 => truncate_dataset_rows(ds, max),
+        _ => ds,
     }
 }
 
@@ -315,7 +338,9 @@ pub fn ingest_from_path(
         IngestionFormat::Xml => xml::ingest_xml_from_path(path, schema),
     };
 
-    let result = result.and_then(|ds| apply_watermark_after_ingest(ds, schema, options));
+    let result = result
+        .and_then(|ds| apply_watermark_after_ingest(ds, schema, options))
+        .map(|ds| apply_max_rows(ds, options.max_rows));
 
     if let Some(obs) = options.observer.as_ref() {
         match &result {
@@ -390,6 +415,7 @@ pub fn ingest_from_ordered_paths<P: AsRef<Path>>(
 
     let mut ds = DataSet::new(schema.clone(), all_rows);
     ds = apply_watermark_after_ingest(ds, schema, options)?;
+    ds = apply_max_rows(ds, options.max_rows);
 
     let max_watermark_value = match &options.watermark_column {
         Some(col) => max_value_in_column(&ds, schema, col),

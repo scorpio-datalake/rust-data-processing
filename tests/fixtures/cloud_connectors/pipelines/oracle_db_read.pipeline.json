@@ -1,0 +1,23 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": [],
+    "db_reads": [
+      {
+        "url": "oracle://etl_user:FAKE_ORA_PASS@db01.example.com:1521/ORCLPDB1",
+        "query": "SELECT id, name, amount FROM demo.fact_scores WHERE ROWNUM <= 100000"
+      }
+    ],
+    "schema_ref": "schemas/id_name.schema.json",
+    "options": {}
+  },
+  "transform": {
+    "sql": "SELECT id, name FROM df WHERE id IS NOT NULL"
+  },
+  "sinks": [
+    {
+      "kind": "parquet_file",
+      "path": "{{CURATED_PARQUET}}"
+    }
+  ]
+}

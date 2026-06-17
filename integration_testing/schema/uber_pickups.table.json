@@ -1,0 +1,38 @@
+{
+  "connectors": {
+    "oracle": { "table": "UBER_PICKUPS" },
+    "postgresql": { "table": "uber_pickups" },
+    "mssql": { "table": "dbo.uber_pickups" },
+    "snowflake": {
+      "table": "UBER_PICKUPS",
+      "database": "TEST_DB",
+      "schema": "PUBLIC",
+      "account_url": "https://local.snowflake.example.snowflakecomputing.com"
+    },
+    "databricks": {
+      "table": "uber_pickups",
+      "namespace": "main.curated",
+      "workspace_url": "https://local.databricks.example"
+    },
+    "spark": {
+      "table": "uber_pickups",
+      "handoff_file": "out.parquet",
+      "master": "spark://localhost:7077",
+      "app_name": "rdp-integration"
+    },
+    "s3": { "export_uri": "s3://rdp-cloud-s3/out.parquet" },
+    "gcs": { "export_uri": "gs://rdp-cloud-gcs/out.parquet" },
+    "azure": {
+      "export_uri": "azure://rdp-cloud-azure/out.parquet"
+    },
+    "sftp": { "source_uri": "sftp://rdp:rdp_sftp_secret@127.0.0.1:2222/upload/incoming.csv" },
+    "ftp": { "source_uri": "ftp://rdp:rdp_ftp_secret@127.0.0.1:21/incoming.csv" },
+    "kafka": { "topic": "rdp-uber-pickups", "brokers": "127.0.0.1:19092" }
+  },
+  "columns": [
+    { "source_field": "Date/Time", "name": "pickup_time" },
+    { "source_field": "Lat", "name": "lat" },
+    { "source_field": "Lon", "name": "lon" },
+    { "source_field": "Base", "name": "base_code" }
+  ]
+}

@@ -1,12 +1,13 @@
-# Build + test the Rust library on every PR and on pushes to main / phase branches.
+# Build + test the Rust library on pushes to main and PRs targeting main.
 # (Python wrapper is covered by python_ci.yml.)
 
 name: Rust CI
 
 on:
   push:
-    branches: ["main", "phase*"]
+    branches: [main]
   pull_request:
+    branches: [main]
   # Optional: keep dependency advisories fresh even without PR activity.
   schedule:
     - cron: "0 3 * * *"
@@ -103,6 +104,30 @@ jobs:
 
       - name: cargo test (doctests)
         run: cargo test --locked --doc
+
+  kafka-ubuntu:
+    name: ubuntu — kafka feature
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install kafka build deps
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            cmake libssl-dev zlib1g-dev libcurl4-openssl-dev pkg-config
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "true"
+
+      - name: cargo test (--features kafka)
+        run: cargo test --locked --features kafka
 
   # `db_connectorx` omitted: ConnectorX pulls OpenSSL (Perl / vendored build pain on Windows).
   # Local parity: `cargo test --locked --features ci_expanded`

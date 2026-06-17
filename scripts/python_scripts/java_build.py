@@ -9,7 +9,6 @@ etc.) runs in ``java_test.py``.
 from __future__ import annotations
 
 import argparse
-import platform
 import sys
 from pathlib import Path
 
@@ -18,8 +17,11 @@ from common import (
     JVM_SYS_DIR,
     REPO_ROOT,
     banner,
+    cleanup_disk_for_jvm,
+    ensure_libclang_linux,
     generate_people_xlsx_fixture,
     gradlew_argv,
+    native_lib_debug,
     native_lib_release,
     require_tool,
     run,
@@ -35,6 +37,7 @@ def gradle_clean() -> None:
 
 def build_native(*, release: bool = True) -> Path:
     require_tool("cargo")
+    ensure_libclang_linux()
     banner("JVM: build rdp_jvm_sys (--features full)")
     cmd = [
         "cargo",
@@ -47,19 +50,10 @@ def build_native(*, release: bool = True) -> Path:
     if release:
         cmd.append("--release")
     run(cmd, cwd=REPO_ROOT)
-    lib = native_lib_release() if release else _native_lib_debug()
+    lib = native_lib_release() if release else native_lib_debug()
     if not lib.is_file():
         raise SystemExit(f"Native library missing after build: {lib}")
     return lib
-
-
-def _native_lib_debug() -> Path:
-    root = JVM_SYS_DIR / "target" / "debug"
-    if platform.system() == "Windows":
-        return root / "rdp_jvm_sys.dll"
-    if platform.system() == "Darwin":
-        return root / "librdp_jvm_sys.dylib"
-    return root / "librdp_jvm_sys.so"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    cleanup_disk_for_jvm()
     if args.clean:
         gradle_clean()
 

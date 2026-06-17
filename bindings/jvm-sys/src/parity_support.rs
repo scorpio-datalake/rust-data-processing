@@ -50,7 +50,11 @@ pub fn json_err(msg: impl Into<String>) -> RdpJsonSlice {
 }
 
 /// Structured failure for **`rdp_run_pipeline_json`** (stable `error.code` / `error.stage`; see ADR 006).
-pub fn json_err_structured(code: &str, message: impl Into<String>, stage: Option<&str>) -> RdpJsonSlice {
+pub fn json_err_structured(
+    code: &str,
+    message: impl Into<String>,
+    stage: Option<&str>,
+) -> RdpJsonSlice {
     let v = serde_json::json!({
         "ok": false,
         "error": {

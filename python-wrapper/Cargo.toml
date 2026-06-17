@@ -16,9 +16,15 @@ crate-type = ["cdylib"]
 default = []
 # Enables ConnectorX DB ingestion in the parent crate (heavier build).
 db = ["rust-data-processing/db_connectorx"]
+# S3 / GCS / Azure / file:// object-store read/write (same as JVM cloud_connectors).
+cloud = ["rust-data-processing/cloud_connectors"]
+# Kafka streaming ELT (Load from BYO poll windows; native poll when parent kafka feature on).
+kafka = ["rust-data-processing/kafka"]
+# Every batch connector in docs/CONNECTORS.md for integration builds (``db`` + ``cloud``).
+integration_full = ["db", "cloud"]
 
 [dependencies]
-pyo3 = { version = "0.26", features = ["extension-module"] }
+pyo3 = { version = "0.29", features = ["extension-module"] }
 rust-data-processing = { path = "..", default-features = true, features = ["excel"] }
 serde_json = "1"
 

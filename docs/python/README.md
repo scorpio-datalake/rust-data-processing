@@ -41,6 +41,8 @@ Use this as a **tour of the Python API** (the same page is rendered on [GitHub P
 | **SFT / fine-tuning prep** (Alpaca JSONL, HF optional, chat column) | [SFT Python examples](SFT_PYTHON_EXAMPLES.md), [`SFT_DATA_FORMATS.md`](../SFT_DATA_FORMATS.md) |
 | **Row-wise & parallel processing** | [Processing pipelines](#processing-pipelines-epic-1--story-12), [Execution engine](#execution-engine-parallel-pipelines-story-13) |
 | **Ingestion observability** | [Observability](#observability-failurealert-hooks) |
+| **Cloud connectors** (S3, GCS, Azure, SFTP, FTP) | [Cloud storage & file transfer](#cloud-storage-and-file-transfer-connectors) |
+| **Kafka streaming ELT** | [Kafka streaming](#kafka-streaming-elt) |
 | **CDC boundary types** | [CDC](#cdc-interface-boundary-phase-1-spike) |
 
 ## Quick start (library usage)
@@ -666,8 +668,112 @@ except ValueError:
     pass
 ```
 
+## Cloud storage and file transfer connectors
+
+Rust performs all cloud I/O (`object_store`, SFTP/FTP). Python is a thin wrapper — build with **`cloud`** / **`integration_full`** (`maturin develop --features cloud`). Cross-language URLs and auth: [`docs/CONNECTORS.md`](../CONNECTORS.md).
+
+**Validated end-to-end** (Docker): `python3 integration_testing/CloudConnectors/run_cloud_tests.py --no-rancher` — same patterns as [`integration_testing/scripts/cloud_pipeline.py`](../../integration_testing/scripts/cloud_pipeline.py).
+
+### Direct API (single object)
+
+```python
+import rust_data_processing as rdp
+
+schema = [
+    {"name": "pickup_time", "data_type": "utf8"},
+    {"name": "lat", "data_type": "float64"},
+    {"name": "lon", "data_type": "float64"},
+    {"name": "base_code", "data_type": "utf8"},
+]
+
+# Read Parquet from S3 / GCS / Azure (set AWS_*, GOOGLE_APPLICATION_CREDENTIALS, or AZURE_* on this process)
+ds = rdp.ingest_from_object_store_uri(
+    "s3://rdp-cloud-s3/out.parquet",
+    schema,
+    {"format": "parquet"},
+)
+
+# Write Parquet to cloud
+rdp.export_dataset_to_object_store_uri("gs://rdp-cloud-gcs/out.parquet", ds)
+
+# SFTP / FTP import (passwords via SFTP_PASSWORD / FTP_PASSWORD env — not in URI)
+ds = rdp.ingest_from_file_transfer_uri(
+    "sftp://rdp:rdp_sftp_secret@127.0.0.1:2222/upload/incoming.csv",
+    schema,
+    {"format": "csv", "max_rows": 500},
+)
+```
+
+### Pipeline JSON roundtrip (integration-tested)
+
+Integration tests export Uber CSV → transform → **`kind: object_store`** sink, then read back via **`object_store_uris`**. Use the shared helper (ctypes → `rdp_run_pipeline_json`):
+
+```python
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "integration_testing/scripts")
+from cloud_pipeline import verify_object_store_roundtrip, verify_file_transfer_import
+
+csv = Path("integration_testing/data/uber_nyc_pickups_sample.csv")
+for protocol in ("s3", "gcs", "azure"):
+    rows = verify_object_store_roundtrip(protocol=protocol, csv_path=csv, max_rows=500)
+    print(protocol, "roundtrip rows:", rows)
+
+for protocol in ("sftp", "ftp"):
+    rows = verify_file_transfer_import(protocol=protocol)
+    print(protocol, "import rows:", rows)
+```
+
+Set emulator env from `integration_testing/CloudConnectors/.env.example` before running (MinIO, fake-gcs, Azurite, SFTP, FTP).
+
+## Kafka streaming ELT
+
+Kafka is **streaming**, not batch file ETL: **Extract** (poll window) → **Load** (landing schema) → **Transform** separately. Build with **`kafka`**: `uv run maturin develop --release --features kafka`. Full guide: [`docs/KAFKA_ELT.md`](../KAFKA_ELT.md).
+
+**Validated:** `python3 integration_testing/Kafka/run_kafka_tests.py --no-rancher` (Redpanda on `127.0.0.1:19092`). Reference: [`integration_testing/scripts/kafka_stream.py`](../../integration_testing/scripts/kafka_stream.py).
+
+```python
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "integration_testing/scripts")
+from kafka_stream import verify_uber_kafka_stream
+
+# One CSV row → one Kafka message; poll and assert row count (FFI to rdp_kafka_* in librdp_jvm_sys)
+count = verify_uber_kafka_stream(
+    Path("integration_testing/data/uber_nyc_pickups_sample.csv"),
+    max_rows=500,
+)
+print("kafka rows landed:", count)
+```
+
+Native API (same Rust code as JVM FFI):
+
+```python
+import rust_data_processing as rdp
+
+landing = [
+    {"name": "user_id", "data_type": "int64"},
+    {"name": "event", "data_type": "utf8"},
+    {"name": "_kafka_offset", "data_type": "int64"},
+]
+
+records_json = rdp.poll_kafka_window("127.0.0.1:19092", "rdp-elt", "rdp-uber-pickups", max_records=500)
+landed = rdp.elt_load_kafka_records_json(records_json, landing)
+
+# Or Extract+Load in one call:
+landed = rdp.poll_kafka_window_loaded(
+    "127.0.0.1:19092", "rdp-elt", "rdp-uber-pickups", landing, max_records=500
+)
+```
+
+`poll_kafka_window*` blocks while holding the GIL — run from a dedicated thread for production loops.
+
 ## See also
 
+- [`docs/CONNECTORS.md`](../CONNECTORS.md) — same URLs in Rust, Python, and Java  
+- [`integration_testing/integration_testing_details.md`](../../integration_testing/integration_testing_details.md) — step-by-step integration flows  
 - [`python-wrapper/README.md`](../../python-wrapper/README.md) — install and dev workflow  
 - [`python-wrapper/API.md`](../../python-wrapper/API.md) — full Python API  
 - [`docs/rust/README.md`](../rust/README.md) — Rust mirror of this page  

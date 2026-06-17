@@ -1,0 +1,4 @@
+# Reuse the repo-root target/ (Rust + python-wrapper share artifacts). Avoids a second
+# full Polars graph under python-wrapper/target/ during build_all (~tens of GB on small VMs).
+[build]
+target-dir = "../target"

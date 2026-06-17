@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # Full CI-style pipeline: see scripts/build_all.md
+
+# Re-exec under bash when invoked as `sh build_all.sh` (dash lacks pipefail).
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 readme="${script_dir}/build_all.md"
+
+# Fresh capture logs each invocation (see scripts/build_all.md). Set BUILD_ALL_KEEP_LOGS=1 to retain.
+if [[ -z "${BUILD_ALL_KEEP_LOGS:-}" ]]; then
+  rm -f "${repo_root}/build_all.log"
+fi
 
 usage() {
   cat <<'EOF'
@@ -105,11 +116,38 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Non-login shells often omit rustup's PATH; load it when present.
-if [[ -f "${HOME}/.cargo/env" ]]; then
-  # shellcheck source=/dev/null
-  source "${HOME}/.cargo/env"
-fi
+# Non-login shells often omit /etc/profile.d and rustup's PATH.
+ensure_java_env() {
+  if [[ -f /etc/profile.d/java21.sh ]]; then
+    # shellcheck source=/dev/null
+    source /etc/profile.d/java21.sh
+  fi
+}
+
+ensure_cargo_on_path() {
+  if [[ -z "${HOME:-}" ]]; then
+    HOME="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6 || true)"
+    export HOME
+  fi
+  if [[ -z "${HOME:-}" ]]; then
+    HOME="/home/$(id -un)"
+    export HOME
+  fi
+  if [[ -f "${HOME}/.cargo/env" ]]; then
+    # shellcheck source=/dev/null
+    source "${HOME}/.cargo/env"
+  fi
+  local cargo_bin="${HOME}/.cargo/bin"
+  if [[ -x "${cargo_bin}/cargo" ]]; then
+    case ":${PATH}:" in
+      *":${cargo_bin}:"*) ;;
+      *) export PATH="${cargo_bin}:${PATH}" ;;
+    esac
+  fi
+}
+
+ensure_java_env
+ensure_cargo_on_path
 
 cd "${repo_root}"
 
@@ -238,6 +276,18 @@ ensure_java_for_build() {
 
 ensure_java_for_build
 ensure_maven_for_build
+
+# Fail fast before a long compile when the root disk is nearly full.
+min_gib="${BUILD_ALL_MIN_DISK_GIB:-8}"
+avail_kib="$(df -Pk "${repo_root}" | awk 'NR==2 {print $4}')"
+if [[ -n "${avail_kib}" && "${avail_kib}" =~ ^[0-9]+$ ]]; then
+  avail_gib=$((avail_kib / 1024 / 1024))
+  if (( avail_gib < min_gib )); then
+    echo "error: only ${avail_gib} GiB free on ${repo_root} (need ~${min_gib} GiB)." >&2
+    echo "  Free space: cargo clean; remove old target/ or .build_all_runs/run-*" >&2
+    exit 1
+  fi
+fi
 
 if [[ "${skip_upstream_clean}" != true ]]; then
   echo "== Rust: cargo clean =="

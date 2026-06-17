@@ -37,8 +37,9 @@ public final class RdpNativeJson {
 
   /**
    * Resolves an existing native library path from {@code RDP_JVM_SYS} or system property {@code
-   * rdp.jvm.sys.library} (first match wins). Returns {@code null} if unset, blank, or the path is
-   * not a regular file (symlinks to files count as present).
+   * rdp.jvm.sys.library} (first match wins), then {@code bindings/jvm-sys/target/{release,debug}/}
+   * under {@code GITHUB_WORKSPACE} or by walking up from the working directory. Returns {@code
+   * null} if nothing is found.
    */
   public static Path resolveNativeLibraryFromEnvOrProperty() {
     String env = System.getenv("RDP_JVM_SYS");
@@ -55,7 +56,51 @@ public final class RdpNativeJson {
         return p;
       }
     }
+    return discoverBuiltNativeLibrary();
+  }
+
+  private static Path discoverBuiltNativeLibrary() {
+    String gw = System.getenv("GITHUB_WORKSPACE");
+    if (gw != null && !gw.isBlank()) {
+      Path fromWorkspace =
+          tryJvmSysTargetProfiles(Path.of(gw.strip()).resolve("bindings").resolve("jvm-sys"));
+      if (fromWorkspace != null) {
+        return fromWorkspace;
+      }
+    }
+    Path cwd = Path.of("").toAbsolutePath();
+    for (Path cur = cwd; cur != null; cur = cur.getParent()) {
+      Path jvmSys = cur.resolve("bindings").resolve("jvm-sys");
+      if (!Files.isDirectory(jvmSys)) {
+        continue;
+      }
+      Path found = tryJvmSysTargetProfiles(jvmSys);
+      if (found != null) {
+        return found;
+      }
+    }
     return null;
+  }
+
+  private static Path tryJvmSysTargetProfiles(Path jvmSysRoot) {
+    for (String profile : new String[] {"release", "debug"}) {
+      Path lib = jvmSysRoot.resolve("target").resolve(profile).resolve(nativeLibraryBasename());
+      if (Files.isRegularFile(lib)) {
+        return lib.toAbsolutePath().normalize();
+      }
+    }
+    return null;
+  }
+
+  private static String nativeLibraryBasename() {
+    String os = System.getProperty("os.name", "").toLowerCase();
+    if (os.contains("mac") || os.contains("darwin")) {
+      return "librdp_jvm_sys.dylib";
+    }
+    if (os.contains("win")) {
+      return "rdp_jvm_sys.dll";
+    }
+    return "librdp_jvm_sys.so";
   }
 
   /**
@@ -309,6 +354,84 @@ public final class RdpNativeJson {
             FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
     free.invokeExact(out);
 
+    return new JSONObject(json);
+  }
+
+  /** Kafka **Load**: {@code rdp_kafka_elt_load_records_json}. */
+  public static JSONObject invokeKafkaEltLoadRecordsJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String recordsJson, String schemaJson)
+      throws Throwable {
+    return invokeKafkaThreeStringArgs(
+        linker, lookup, arena, "rdp_kafka_elt_load_records_json", recordsJson, schemaJson);
+  }
+
+  /** Kafka **Extract**: {@code rdp_kafka_poll_window_json} (config JSON object). */
+  public static JSONObject invokeKafkaPollWindowJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String configJson) throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment configUtf8 = allocateUtf8CString(arena, configJson);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find("rdp_kafka_poll_window_json").orElseThrow(),
+            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, configUtf8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_kafka_poll_window_json");
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+    return new JSONObject(json);
+  }
+
+  /** Kafka **Extract+Load**: {@code rdp_kafka_poll_window_loaded_json}. */
+  public static JSONObject invokeKafkaPollWindowLoadedJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String configJson, String schemaJson)
+      throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment configUtf8 = allocateUtf8CString(arena, configJson);
+    MemorySegment schemaUtf8 = allocateUtf8CString(arena, schemaJson);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find("rdp_kafka_poll_window_loaded_json").orElseThrow(),
+            FunctionDescriptor.ofVoid(
+                ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, configUtf8, schemaUtf8);
+    String json = readJsonSliceUtf8(out, arena, "rdp_kafka_poll_window_loaded_json");
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
+    return new JSONObject(json);
+  }
+
+  /** Kafka **sink**: {@code rdp_kafka_export_dataset_json}. */
+  public static JSONObject invokeKafkaExportDatasetJson(
+      Linker linker, SymbolLookup lookup, Arena arena, String configJson, String datasetJson)
+      throws Throwable {
+    return invokeKafkaThreeStringArgs(
+        linker, lookup, arena, "rdp_kafka_export_dataset_json", configJson, datasetJson);
+  }
+
+  private static JSONObject invokeKafkaThreeStringArgs(
+      Linker linker, SymbolLookup lookup, Arena arena, String symbol, String arg1, String arg2)
+      throws Throwable {
+    MemorySegment out = arena.allocate(RDP_JSON_SLICE_LAYOUT);
+    MemorySegment arg1Utf8 = allocateUtf8CString(arena, arg1);
+    MemorySegment arg2Utf8 = allocateUtf8CString(arena, arg2);
+    MethodHandle fn =
+        linker.downcallHandle(
+            lookup.find(symbol).orElseThrow(),
+            FunctionDescriptor.ofVoid(
+                ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    fn.invokeExact(out, arg1Utf8, arg2Utf8);
+    String json = readJsonSliceUtf8(out, arena, symbol);
+    MethodHandle free =
+        linker.downcallHandle(
+            lookup.find("rdp_json_slice_free").orElseThrow(),
+            FunctionDescriptor.ofVoid(RDP_JSON_SLICE_LAYOUT));
+    free.invokeExact(out);
     return new JSONObject(json);
   }
 

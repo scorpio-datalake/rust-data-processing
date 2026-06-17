@@ -58,6 +58,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--skip-fmt", action="store_true", help="Skip Rust/Python/Java format checks.")
     parser.add_argument(
+        "--skip-audit",
+        action="store_true",
+        help="Skip RustSec cargo audit (Rust build step).",
+    )
+    parser.add_argument(
         "--fix-fmt",
         action="store_true",
         help="Java only: Spotless apply then check (all Maven modules + Gradle).",
@@ -137,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         rust_flags.append("--skip-fmt")
         python_args.append("--skip-fmt")
         java_args.append("--skip-fmt")
+    if args.skip_audit:
+        rust_flags.append("--skip-audit")
     if args.fix_fmt:
         java_args.append("--fix-fmt")
 
@@ -152,7 +159,8 @@ def main(argv: list[str] | None = None) -> int:
         pause(wait, "before Python build")
         _run_module(python_build_main, python_args)
         pause(wait, "before Python tests")
-        _run_module(python_test_main, [])
+        # Skip a second release wheel compile in the same run (saves disk; CI uses python_ci.yml).
+        _run_module(python_test_main, ["--skip-wheel-smoke"])
 
     if not args.skip_java:
         pause(wait, "before JVM build")

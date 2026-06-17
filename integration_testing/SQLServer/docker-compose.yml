@@ -1,0 +1,37 @@
+# Local Microsoft SQL Server for RDP integration testing (development / CI opt-in only).
+#
+# Image: mcr.microsoft.com/mssql/server:2022-latest — not for production.
+#
+# Usage:
+#   cd integration_testing/SQLServer
+#   cp .env.example .env
+#   docker compose up -d
+#   docker compose logs -f mssql
+
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: rdp-mssql-test
+    restart: "no"
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Rdp_test_sa1!}
+      MSSQL_PID: "Developer"
+    volumes:
+      - mssql-data:/var/opt/mssql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 45s
+
+volumes:
+  mssql-data:

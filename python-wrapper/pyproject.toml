@@ -47,6 +47,7 @@ select = ["E4", "E7", "E9", "F", "I"]
 markers = [
     "deep: uses repo tests/fixtures/deep (slower)",
     "benchmark: pytest-benchmark timing (adds iterations; use -m 'not benchmark' to skip)",
+    "integration: Oracle / external-service integration tests (opt-in via env)",
 ]
 testpaths = ["tests"]
 pythonpath = ["."]

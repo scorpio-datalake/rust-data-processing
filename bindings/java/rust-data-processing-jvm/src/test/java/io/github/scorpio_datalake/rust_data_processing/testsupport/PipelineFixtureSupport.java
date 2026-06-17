@@ -40,6 +40,11 @@ public final class PipelineFixtureSupport {
     return PipelineJsonFixtures.defaultPathIngestOptionsJson();
   }
 
+  /** {@link PipelineJsonFixtures#pipelinePathBinding(Path)}. */
+  public static String pipelinePathBinding(java.nio.file.Path path) {
+    return PipelineJsonFixtures.pipelinePathBinding(path);
+  }
+
   public static String loadPeopleSchemaJson(String schemaRel) throws IOException {
     Path people =
         RdpJvmSysTestSupport.resolveTestsFixturesDir()

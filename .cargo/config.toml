@@ -2,3 +2,17 @@
 # `rust-lld` is typically much more memory-efficient than `link.exe` for large Rust graphs.
 linker = "rust-lld.exe"
 
+[target.x86_64-unknown-linux-gnu]
+# Disable rust-lld; use GNU bfd. Parallel Polars test links on 8–16 GB VMs can SIGBUS (lld)
+# or SIGKILL signal 9 (OOM). `build_all` also caps `cargo test -j` on Linux (see common.py).
+rustflags = [
+  "-C", "linker-features=-lld",
+  "-C", "link-arg=-fuse-ld=bfd",
+]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = [
+  "-C", "linker-features=-lld",
+  "-C", "link-arg=-fuse-ld=bfd",
+]
+

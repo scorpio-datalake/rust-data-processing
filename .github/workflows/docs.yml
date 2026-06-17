@@ -11,8 +11,9 @@ name: Documentation
 
 on:
   push:
-    branches: ["main", "phase*"]
+    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 # Opt JavaScript actions into Node 24 (avoids Node 20 deprecation warnings on the runner).

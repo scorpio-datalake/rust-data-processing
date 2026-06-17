@@ -1,3 +1,5 @@
+import me.champeau.jmh.JmhBytecodeGeneratorTask
+
 plugins {
     java
     `maven-publish`
@@ -7,7 +9,7 @@ plugins {
 
 spotless {
     java {
-        googleJavaFormat("1.23.0")
+        googleJavaFormat("1.28.0")
         target(
             "src/main/java/**/*.java",
             "src/test/java/**/*.java",
@@ -80,14 +82,16 @@ jmh {
     warmupIterations.set(1)
     iterations.set(1)
     fork.set(1)
+    // Panama FFM on JDK 21; also required by jmhRunBytecodeGenerator (not a JavaExec task).
+    jvmArgs.add("--enable-preview")
+    jvmArgs.add("--enable-native-access=ALL-UNNAMED")
+    val lib = providers.environmentVariable("RDP_JVM_SYS")
+    environment.put("RDP_JVM_SYS", lib.orElse("").get())
 }
 
-afterEvaluate {
-    tasks.findByName("jmh")?.let { task ->
-        if (task is JavaExec) {
-            task.jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
-        }
-    }
+tasks.named<JmhBytecodeGeneratorTask>("jmhRunBytecodeGenerator") {
+    jvmArgs.add("--enable-preview")
+    jvmArgs.add("--enable-native-access=ALL-UNNAMED")
 }
 
 publishing {

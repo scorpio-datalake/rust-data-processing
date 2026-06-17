@@ -1,5 +1,5 @@
 {
-  "abi_version_constant": 405,
+  "abi_version_constant": 406,
   "exported_symbols": [
     "rdp_ffi_abi_version",
     "rdp_json_slice_free",
@@ -13,6 +13,10 @@
     "rdp_run_pipeline_json",
     "rdp_ingest_parquet_path",
     "rdp_ingest_xml_path",
+    "rdp_kafka_elt_load_records_json",
+    "rdp_kafka_export_dataset_json",
+    "rdp_kafka_poll_window_json",
+    "rdp_kafka_poll_window_loaded_json",
     "rdp_parity_benchmark_smoke_mirror",
     "rdp_parity_bindings_mirror",
     "rdp_parity_cdc",

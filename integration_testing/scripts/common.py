@@ -1,0 +1,1009 @@
+"""Shared helpers for integration_testing/scripts (library module — not a CLI entrypoint)."""
+
+from __future__ import annotations
+
+import fcntl
+import gc
+import os
+import platform
+from contextlib import contextmanager
+import shlex
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+INTEG_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = INTEG_ROOT.parent
+LIBS_DIR = INTEG_ROOT / "libs"
+DATA_DIR = INTEG_ROOT / "data"
+SCRIPTS_DIR = INTEG_ROOT / "scripts"
+# Isolated from repo ``target/`` so integration builds do not race with ``build_all`` / clippy.
+INTEG_TARGET_DIR = INTEG_ROOT / ".target"
+
+RUST_STAMP = LIBS_DIR / "rust" / ".built_at"
+JAVA_STAMP = LIBS_DIR / "java" / ".built_at"
+PYTHON_STAMP = LIBS_DIR / "python" / ".built_at"
+FAILURE_FLAG = LIBS_DIR / ".last_test_failed"
+# One integration cargo/maturin build at a time (shared ``integration_testing/.target/``).
+INTEG_CARGO_BUILD_LOCK = LIBS_DIR / ".integration_cargo_build.lock"
+_integration_cargo_lock_depth = 0
+
+for sub in ("rust", "java", "python"):
+    (LIBS_DIR / sub).mkdir(parents=True, exist_ok=True)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Feature flags for CONNECTORS.md batch connectors (see scripts/connector_features.py).
+INTEGRATION_RUST_FEATURES = "integration_full"
+INTEGRATION_JVM_FEATURES = "full"
+INTEGRATION_PYTHON_FEATURES = "integration_full"
+
+INTEGRATION_BUILD_HELP = f"""Build libraries and data first:
+  python3 integration_testing/scripts/build_libs/build_all_libs.py
+    Rust  → --features {INTEGRATION_RUST_FEATURES} (db_connectorx + cloud_connectors + excel)
+    Java  → rdp_jvm_sys --features {INTEGRATION_JVM_FEATURES} (all batch connectors + PG/Oracle sinks)
+    Python → maturin --features {INTEGRATION_PYTHON_FEATURES} (db + cloud; load uses librdp_jvm_sys)
+  python3 integration_testing/scripts/data_download/download_uber_data.py --sample"""
+
+
+def log(msg: str) -> None:
+    print(f"[integration] {msg}", flush=True)
+
+
+def log_test_passed(leg: str) -> None:
+    log(f"PASSED: {leg} integration test")
+
+
+def log_test_failed(leg: str) -> None:
+    log(f"FAILED: {leg} integration test")
+
+
+def log_test_summary(results: list[tuple[str, bool]]) -> None:
+    log("--- Test summary ---")
+    for leg, ok in results:
+        log(f"  {leg}: {'PASSED' if ok else 'FAILED'}")
+
+
+def die(msg: str, code: int = 1) -> None:
+    print(f"[integration] ERROR: {msg}", file=sys.stderr, flush=True)
+    raise SystemExit(code)
+
+
+def require_integration_libs(*, require_data: bool = True) -> None:
+    """Fail fast when integration_testing/libs/ or Uber CSV is missing."""
+    missing = False
+    for leg, rel in (
+        ("rust", "rust/env.sh"),
+        ("java", "java/env.sh"),
+        ("python", "python/env.sh"),
+    ):
+        if not (LIBS_DIR / rel).is_file():
+            log(f"missing libs/{leg} — run build_libs/build_{leg}_lib.py or build_all_libs.py")
+            missing = True
+    if require_data:
+        sample = DATA_DIR / "uber_nyc_pickups_sample.csv"
+        full = DATA_DIR / "uber_nyc_pickups_apr2014.csv"
+        if not sample.is_file() and not full.is_file():
+            log("missing Uber CSV — run data_download/download_uber_data.py")
+            missing = True
+    if missing:
+        die(INTEGRATION_BUILD_HELP)
+
+
+def _prepend_path(directory: Path) -> None:
+    s = str(directory)
+    path = os.environ.get("PATH", "")
+    if s not in path.split(os.pathsep):
+        os.environ["PATH"] = f"{s}{os.pathsep}{path}" if path else s
+
+
+def ensure_uv() -> None:
+    """Python wrapper build uses uv; install via astral.sh when missing."""
+    _prepend_path(_integration_home() / ".local" / "bin")
+    if shutil.which("uv"):
+        return
+    if os.environ.get("INTEG_NO_AUTO_UV"):
+        die(
+            "uv not found. Install from https://docs.astral.sh/uv/:\n"
+            "  curl -LsSf https://astral.sh/uv/install.sh | sh\n"
+            "Or unset INTEG_NO_AUTO_UV to allow auto-install."
+        )
+    log("Python: installing uv (https://astral.sh/uv/install.sh)")
+    if shutil.which("curl"):
+        installer = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+    elif shutil.which("wget"):
+        installer = "wget -qO- https://astral.sh/uv/install.sh | sh"
+    else:
+        die("uv not found and neither curl nor wget is available to install it.")
+    subprocess.run(["bash", "-c", installer], check=True)
+    _prepend_path(_integration_home() / ".local" / "bin")
+    if shutil.which("uv") is None:
+        die("uv still not on PATH after install (expected ~/.local/bin/uv).")
+
+
+def require_tool(name: str) -> None:
+    if shutil.which(name) is not None:
+        return
+    if name == "cargo":
+        die(
+            "cargo not found. Install Rust, then re-run:\n"
+            "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh\n"
+            "  source \"$HOME/.cargo/env\"\n"
+            "Or on Ubuntu: sudo apt install rustup && rustup default stable\n"
+            "See https://rustup.rs/ and repo rust-toolchain.toml (stable + rustfmt + clippy)."
+        )
+    die(f"{name} not found")
+
+
+def run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> None:
+    cwd = cwd or REPO_ROOT
+    log(f"+ {' '.join(cmd)}  (cwd={cwd})")
+    merged = os.environ.copy()
+    if env:
+        merged.update(env)
+    subprocess.run(cmd, cwd=cwd, env=merged, check=True)
+
+
+def _integration_home() -> Path:
+    """User home for rustup paths (non-login shells may leave HOME unset)."""
+    home = os.environ.get("HOME")
+    if home:
+        return Path(home)
+    try:
+        import pwd
+
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except (ImportError, KeyError):
+        return Path.home()
+
+
+def load_cargo_env() -> None:
+    """Ensure ``cargo`` is on PATH (``~/.cargo/bin`` from rustup)."""
+    home = _integration_home()
+    cargo_bin = home / ".cargo" / "bin"
+    cargo_exe = cargo_bin / "cargo"
+    if cargo_exe.is_file():
+        path = os.environ.get("PATH", "")
+        prefix = str(cargo_bin)
+        if prefix not in path.split(":"):
+            os.environ["PATH"] = f"{prefix}:{path}" if path else prefix
+
+
+def setup_integration_build_env() -> None:
+    """Cargo + isolated target dir (safe alongside ``build_all`` on the same machine)."""
+    load_cargo_env()
+    INTEG_TARGET_DIR.mkdir(parents=True, exist_ok=True)
+    os.environ["CARGO_TARGET_DIR"] = str(INTEG_TARGET_DIR)
+    # Limit parallel link/native compiles; override with INTEGR_CARGO_JOBS if needed.
+    if "CARGO_BUILD_JOBS" not in os.environ:
+        jobs = os.environ.get("INTEG_CARGO_JOBS", "2")
+        os.environ["CARGO_BUILD_JOBS"] = jobs
+    if platform.system() == "Linux":
+        _setup_bindgen_env()
+
+
+def _integration_lock_holder_pid(lock_path: Path) -> int | None:
+    if not lock_path.is_file():
+        return None
+    try:
+        return int(lock_path.read_text(encoding="utf-8").strip().split()[0])
+    except ValueError:
+        return None
+
+
+@contextmanager
+def integration_cargo_build_lock():
+    """Exclusive lock for scripts that write ``integration_testing/.target/``.
+
+    Prevents concurrent ``build_rust_lib.py`` / ``build_python_lib.py`` runs from blocking
+    indefinitely on Cargo's artifact-directory lock. Re-entrant within one process (e.g.
+    ``build_java_lib.py`` calling ``build_rust_lib.main()``).
+    """
+    global _integration_cargo_lock_depth
+    if _integration_cargo_lock_depth > 0:
+        _integration_cargo_lock_depth += 1
+        try:
+            yield
+        finally:
+            _integration_cargo_lock_depth -= 1
+        return
+
+    INTEG_CARGO_BUILD_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with open(INTEG_CARGO_BUILD_LOCK, "a+", encoding="utf-8") as lf:
+        try:
+            fcntl.flock(lf.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            holder = _integration_lock_holder_pid(INTEG_CARGO_BUILD_LOCK)
+            rel = INTEG_CARGO_BUILD_LOCK.relative_to(REPO_ROOT)
+            msg = (
+                f"Another integration cargo build is already running (lock: {rel}). "
+                "Wait for it to finish before starting build_rust_lib.py or build_all_libs.py."
+            )
+            if holder is not None:
+                msg += f" Lock holder PID: {holder}."
+                if not _pid_alive(holder):
+                    msg += " That process has exited; retry in a few seconds."
+            die(msg)
+        lf.seek(0)
+        lf.truncate()
+        lf.write(f"{os.getpid()}\n")
+        lf.flush()
+        _integration_cargo_lock_depth = 1
+        try:
+            yield
+        finally:
+            _integration_cargo_lock_depth = 0
+            fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+
+
+def disk_clean_enabled() -> bool:
+    """When false (``INTEG_NO_DISK_CLEAN=1``), skip pre-build disk cleanup."""
+    return os.environ.get("INTEG_NO_DISK_CLEAN", "").lower() not in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def available_disk_gib(path: Path | str = INTEG_ROOT) -> float:
+    """Free space on the filesystem containing ``path`` (GiB)."""
+    return shutil.disk_usage(path).free / (1024**3)
+
+
+def ensure_min_disk_space(
+    *,
+    min_gib: float | None = None,
+    path: Path | str = INTEG_ROOT,
+    context: str = "integration build",
+) -> None:
+    """Fail fast when the disk is too full to link release Polars artifacts."""
+    if min_gib is None:
+        raw = os.environ.get("INTEG_MIN_DISK_GIB", "6")
+        min_gib = float(raw)
+    free = available_disk_gib(path)
+    if free >= min_gib:
+        return
+    die(
+        f"Only {free:.1f} GiB free on {path} ({context} needs ~{min_gib:.0f} GiB). "
+        "Free space (e.g. remove repo target/, run build_all_libs after build_all finishes) "
+        "or set INTEGR_NO_DISK_CLEAN=1 only if you manage disk manually."
+    )
+
+
+def report_disk_usage(title: str, paths: list[Path]) -> None:
+    log(f"Disk: {title}")
+    subprocess.run(["df", "-h", str(INTEG_ROOT)], check=False)
+    existing = [p for p in paths if p.exists()]
+    if not existing:
+        log("  (nothing on disk yet for listed paths)")
+        return
+    subprocess.run(["du", "-sh", *[str(p) for p in existing]], check=False)
+
+
+def _remove_path(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        display = path.relative_to(REPO_ROOT)
+    except ValueError:
+        display = path
+    log(f"  removing {display}")
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def build_all_run_in_progress() -> bool:
+    """True when ``build_all_run.sh`` still has a live launcher or build shell."""
+    runs_dir = REPO_ROOT / ".build_all_runs"
+    if not runs_dir.is_dir():
+        return False
+    for run_dir in runs_dir.glob("run-*"):
+        if not run_dir.is_dir():
+            continue
+        for name in ("run.pid", "launcher.pid"):
+            pid_file = run_dir / name
+            if not pid_file.is_file():
+                continue
+            try:
+                pid = int(pid_file.read_text(encoding="utf-8").strip())
+            except ValueError:
+                continue
+            if _pid_alive(pid):
+                return True
+    return False
+
+
+def repo_cargo_build_in_progress() -> bool:
+    """True when ``cargo``/``rustc`` is compiling in this repo (any ``target/`` dir)."""
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-af", "cargo|rustc"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return False
+    root = str(REPO_ROOT)
+    for line in proc.stdout.splitlines():
+        if root in line and "integration_testing" not in line:
+            return True
+    return False
+
+
+def assert_safe_to_clean_repo_target() -> None:
+    """Refuse to delete repo ``target/`` while ``build_all`` or repo ``cargo`` is active."""
+    if build_all_run_in_progress():
+        die(
+            "build_all is still running (check ./build_all_run.sh status). "
+            "Wait for it to finish before integration lib builds — removing repo target/ "
+            "mid-build causes linker 'No such file or directory' errors."
+        )
+    if repo_cargo_build_in_progress():
+        die(
+            "cargo/rustc is still compiling under the repo. "
+            "Wait for it to finish before integration lib builds."
+        )
+
+
+def cleanup_disk_before_integration_build(
+    *,
+    force_integr_target: bool = False,
+    force_repo_target: bool = False,
+) -> None:
+    """Drop stale build artifacts before integration lib builds.
+
+    Removes ``integration_testing/.target/`` only when ``force_integr_target`` (``--force``).
+    Keeps repo ``target/`` when the integration Rust lib stamp exists unless ``force_repo_target``.
+    """
+    if not disk_clean_enabled():
+        return
+    assert_safe_to_clean_repo_target()
+    paths: list[Path] = []
+    if force_integr_target:
+        paths.append(INTEG_TARGET_DIR)
+    repo_target = REPO_ROOT / "target"
+    if force_repo_target:
+        paths.append(repo_target)
+    elif not (RUST_STAMP.is_file() and repo_target.exists()):
+        paths.append(repo_target)
+    else:
+        log("Disk: keeping repo target/ (integration lib built; use --force to remove)")
+    paths.extend(
+        [
+            REPO_ROOT / "bindings" / "jvm-sys" / "target",
+            REPO_ROOT / "python-wrapper" / "target",
+            REPO_ROOT / "bindings" / "java" / "rust-data-processing-jvm" / "target",
+        ]
+    )
+    report_disk_usage("before integration cleanup", paths)
+    log("Disk: integration phase cleanup")
+    for path in paths:
+        _remove_path(path)
+    gc.collect()
+
+
+def prepare_integration_disk(*, force: bool = False) -> None:
+    """Free conflicting artifacts, then verify minimum free space."""
+    if os.environ.get("INTEG_DISK_PREPARED") == "1":
+        return
+    cleanup_disk_before_integration_build(
+        force_integr_target=force,
+        force_repo_target=force,
+    )
+    ensure_min_disk_space(context="integration lib build")
+    os.environ["INTEG_DISK_PREPARED"] = "1"
+
+
+def cargo_target_dir() -> Path:
+    return Path(os.environ.get("CARGO_TARGET_DIR", REPO_ROOT / "target"))
+
+
+def load_env_sh(path: Path) -> dict[str, str]:
+    """Parse simple ``export KEY=value`` env files written by build scripts."""
+    out: dict[str, str] = {}
+    if not path.is_file():
+        return out
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:]
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        val = val.strip().strip('"').strip("'")
+        if "${" in val:
+            val = os.path.expandvars(val)
+        out[key] = val
+    return out
+
+
+def apply_env_sh(path: Path) -> None:
+    for key, val in load_env_sh(path).items():
+        if key == "PYTHONPATH" and key in os.environ:
+            os.environ[key] = f"{val}:{os.environ[key]}"
+        else:
+            os.environ[key] = val
+
+
+# Smoke-test binary name per connector folder (``integration_testing/<Name>/rust/``).
+# Pre-built by build_rust_lib.py; run_tests.py only executes (incremental link at most).
+INTEGRATION_RUST_TEST_FILTER: dict[str, str] = {
+    "Oracle": "oracle_import_uber_csv",
+    "PostgreSQL": "postgresql_import_uber_csv",
+    "SQLServer": "mssql_import_uber_csv",
+    "Snowflake": "snowflake_import_uber_csv",
+    "Databricks": "databricks_import_uber_csv",
+    "Spark": "spark_import_uber_csv",
+    "CloudConnectors": "cloud_import_uber_csv",
+    "Kafka": "kafka_stream_uber_csv",
+}
+
+INTEGRATION_RUST_PACKAGES: dict[str, str] = {
+    "Oracle": "rdp-oracle-integration-test",
+    "PostgreSQL": "rdp-postgresql-integration-test",
+    "SQLServer": "rdp-sqlserver-integration-test",
+    "Snowflake": "rdp-snowflake-integration-test",
+    "Databricks": "rdp-databricks-integration-test",
+    "Spark": "rdp-spark-integration-test",
+    "CloudConnectors": "rdp-cloud-integration-test",
+    "Kafka": "rdp-kafka-integration-test",
+}
+
+INTEGRATION_PREBUILD_PROFILE = "integration"
+INTEGRATION_RUN_PROFILE = "release"
+
+
+def integration_rust_manifests() -> list[Path]:
+    """``integration_testing/<Connector>/rust/Cargo.toml`` for each connector leg."""
+    return sorted(p for p in INTEG_ROOT.glob("*/rust/Cargo.toml") if p.is_file())
+
+
+def integration_rust_test_filter(connector_dir_name: str) -> str | None:
+    return INTEGRATION_RUST_TEST_FILTER.get(connector_dir_name)
+
+
+def skip_prebuild_enabled() -> bool:
+    return os.environ.get("INTEG_SKIP_PREBUILD", "").lower() in ("1", "true", "yes")
+
+
+def integration_prebuild_profile() -> str:
+    return os.environ.get("RDP_INTEGRATION_CARGO_PROFILE", INTEGRATION_PREBUILD_PROFILE)
+
+
+def integration_rust_package_name(connector_dir_name: str) -> str:
+    try:
+        return INTEGRATION_RUST_PACKAGES[connector_dir_name]
+    except KeyError:
+        die(f"unknown connector for Rust prebuild: {connector_dir_name}")
+
+
+def connector_prebuild_stamp(connector_dir_name: str) -> Path:
+    slug = connector_dir_name.lower()
+    return LIBS_DIR / "rust" / f".{slug}_test_built_at"
+
+
+def connector_prebuild_watch_paths(manifest: Path) -> list[str]:
+    rel = manifest.parent.relative_to(REPO_ROOT)
+    return [
+        "Cargo.toml",
+        "Cargo.lock",
+        str(rel / "Cargo.toml"),
+        str(rel / "src"),
+    ]
+
+
+def needs_connector_prebuild(connector_dir_name: str, manifest: Path) -> bool:
+    if skip_prebuild_enabled():
+        return False
+    return needs_rebuild(
+        connector_prebuild_stamp(connector_dir_name),
+        connector_prebuild_watch_paths(manifest),
+    )
+
+
+def integration_rust_prebuild_cmd(
+    connector_dir_name: str,
+    test_filter: str | None,
+    *,
+    profile: str | None = None,
+) -> list[str]:
+    """Argv for ``cargo test --no-run`` on a workspace connector crate (prebuild only)."""
+    prof = profile or integration_prebuild_profile()
+    cmd = [
+        "cargo",
+        "test",
+        f"--profile={prof}",
+        "--locked",
+        "--no-run",
+        "-p",
+        integration_rust_package_name(connector_dir_name),
+    ]
+    if test_filter:
+        cmd.append(test_filter)
+    return cmd
+
+
+def integration_rust_test_cmd(manifest: Path, test_filter: str) -> list[str]:
+    """Argv for ``cargo test`` when executing connector tests (release profile)."""
+    connector = manifest.parent.parent.name
+    return [
+        "cargo",
+        "test",
+        f"--profile={INTEGRATION_RUN_PROFILE}",
+        "--locked",
+        "-p",
+        integration_rust_package_name(connector),
+        test_filter,
+        "--",
+        "--nocapture",
+    ]
+
+
+def integration_rust_watch_paths() -> list[str]:
+    """Repo-relative paths that should invalidate the Rust integration stamp."""
+    paths: list[str] = ["Cargo.toml", "Cargo.lock", "src"]
+    for manifest in integration_rust_manifests():
+        rel = manifest.parent.relative_to(REPO_ROOT)
+        paths.extend([str(rel / "Cargo.toml"), str(rel / "src")])
+    return paths
+
+
+def prebuild_integration_rust_tests() -> None:
+    """Compile connector integration test binaries once (``cargo test --no-run``).
+
+    Uses ``integration_testing/.target/`` (same as run_tests.py) so Polars / rust-data-processing
+    artifacts are shared across Oracle, PostgreSQL, and future ``*/rust/`` connectors.
+    """
+    if skip_prebuild_enabled():
+        log("Skipping connector prebuild (INTEG_SKIP_PREBUILD=1).")
+        return
+    profile = integration_prebuild_profile()
+    for manifest in integration_rust_manifests():
+        connector = manifest.parent.parent.name
+        if not needs_connector_prebuild(connector, manifest):
+            log(f"Rust integration tests ({connector}) up to date (skip prebuild).")
+            continue
+        test_filter = integration_rust_test_filter(connector)
+        log(f"Pre-building Rust integration tests ({connector}, profile={profile})...")
+        run(integration_rust_prebuild_cmd(connector, test_filter, profile=profile))
+        mark_built(connector_prebuild_stamp(connector))
+
+
+def needs_rebuild(stamp_file: Path, watch_paths: list[str]) -> bool:
+    if os.environ.get("INTEG_FORCE_REBUILD") == "1":
+        return True
+    if FAILURE_FLAG.is_file():
+        return True
+    if not stamp_file.is_file():
+        return True
+    stamp_mtime = stamp_file.stat().st_mtime
+    for rel in watch_paths:
+        root = REPO_ROOT / rel
+        if not root.exists():
+            continue
+        if root.is_file():
+            if root.stat().st_mtime > stamp_mtime:
+                return True
+            continue
+        for path in root.rglob("*"):
+            if path.is_file() and path.stat().st_mtime > stamp_mtime:
+                return True
+    return False
+
+
+def mark_built(stamp_file: Path) -> None:
+    stamp_file.parent.mkdir(parents=True, exist_ok=True)
+    stamp_file.write_text(
+        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        encoding="utf-8",
+    )
+    if FAILURE_FLAG.is_file():
+        FAILURE_FLAG.unlink()
+    try:
+        rev = subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        rev = "unknown"
+    (stamp_file.parent / ".git_rev").write_text(rev, encoding="utf-8")
+
+
+def mark_test_failed() -> None:
+    FAILURE_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    FAILURE_FLAG.write_text(
+        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        encoding="utf-8",
+    )
+
+
+def _jvm_lib_basename() -> str:
+    system = platform.system()
+    if system == "Darwin":
+        return "librdp_jvm_sys.dylib"
+    if system.startswith("MINGW") or system.endswith("_NT"):
+        return "rdp_jvm_sys.dll"
+    return "librdp_jvm_sys.so"
+
+
+def native_jvm_src() -> Path:
+    return cargo_target_dir() / "release" / _jvm_lib_basename()
+
+
+def jvm_lib_dest() -> Path:
+    return LIBS_DIR / "java" / _jvm_lib_basename()
+
+
+def find_python_extension() -> Path | None:
+    for pattern in (
+        REPO_ROOT / "python-wrapper" / "rust_data_processing" / "_rust_data_processing*.so",
+        REPO_ROOT / "python-wrapper" / ".venv" / "lib" / "python*" / "site-packages" / "_rust_data_processing*.so",
+    ):
+        if "*" in str(pattern):
+            for match in pattern.parent.glob(pattern.name):
+                if match.is_file():
+                    return match
+        elif pattern.is_file():
+            return pattern
+    return None
+
+
+def write_java_env() -> None:
+    dest = jvm_lib_dest()
+    (LIBS_DIR / "java" / "env.sh").write_text(
+        f"""# Source before Java integration tests: source integration_testing/libs/java/env.sh
+export RDP_JVM_SYS="{dest}"
+export RDP_INTEGRATION_JVM_FEATURES={INTEGRATION_JVM_FEATURES}
+export RDP_INTEGRATION_JAVA_BUILT=1
+""",
+        encoding="utf-8",
+    )
+
+
+def write_rust_env() -> None:
+    (LIBS_DIR / "rust" / "env.sh").write_text(
+        f"""# Source before Rust integration tests: source integration_testing/libs/rust/env.sh
+# Connector test crates (integration_testing/*/rust/) are pre-built by build_rust_lib.py into:
+#   {INTEG_TARGET_DIR}
+export RDP_REPO_ROOT="{REPO_ROOT}"
+export CARGO_TARGET_DIR="{INTEG_TARGET_DIR}"
+export RDP_INTEGRATION_RUST_FEATURES={INTEGRATION_RUST_FEATURES}
+export RDP_INTEGRATION_JVM_FEATURES={INTEGRATION_JVM_FEATURES}
+export RDP_INTEGRATION_PYTHON_FEATURES={INTEGRATION_PYTHON_FEATURES}
+export RDP_INTEGRATION_CARGO_PROFILE={INTEGRATION_PREBUILD_PROFILE}
+export RDP_INTEGRATION_RUST_BUILT=1
+""",
+        encoding="utf-8",
+    )
+
+
+def write_python_env(ext_path: Path) -> None:
+    (LIBS_DIR / "python" / "env.sh").write_text(
+        f"""# Source before Python integration tests: source integration_testing/libs/python/env.sh
+export RDP_INTEGRATION_PYTHON_EXT="{ext_path}"
+export RDP_INTEGRATION_PYTHON_FEATURES={INTEGRATION_PYTHON_FEATURES}
+export RDP_INTEGRATION_PYTHON_BUILT=1
+export PYTHONPATH="{REPO_ROOT / 'python-wrapper'}:${{PYTHONPATH:-}}"
+""",
+        encoding="utf-8",
+    )
+
+
+def stage_integration_python_ext() -> Path:
+    """Copy prebuilt extension into python-wrapper so pytest does not trigger maturin."""
+    ext_var = os.environ.get("RDP_INTEGRATION_PYTHON_EXT")
+    if not ext_var:
+        die("RDP_INTEGRATION_PYTHON_EXT not set — run build_libs/build_python_lib.py")
+    src = Path(ext_var)
+    if not src.is_file():
+        die(f"Integration Python extension missing: {src}")
+    dest_dir = REPO_ROOT / "python-wrapper" / "rust_data_processing"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for old in dest_dir.glob("_rust_data_processing*.so"):
+        if old.name != src.name:
+            old.unlink()
+    dest = dest_dir / src.name
+    if not dest.exists() or src.stat().st_size != dest.stat().st_size:
+        shutil.copy2(src, dest)
+        log(f"Staged Python extension → {dest} ({dest.stat().st_size} bytes)")
+    # uv/maturin may install a non-db .so in site-packages that shadows the staged copy.
+    site_root = REPO_ROOT / "python-wrapper" / ".venv" / "lib"
+    for site in site_root.glob("python*/site-packages/_rust_data_processing*.so"):
+        if site.stat().st_size != src.stat().st_size:
+            site.unlink()
+            log(f"Removed non-integration extension {site}")
+    return dest
+
+
+def _is_debian_like_linux() -> bool:
+    if platform.system() != "Linux":
+        return False
+    try:
+        data: dict[str, str] = {}
+        with Path("/etc/os-release").open(encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    key, val = line.strip().split("=", 1)
+                    data[key] = val.strip().strip('"')
+        if data.get("ID") in {"debian", "ubuntu"}:
+            return True
+        return "debian" in data.get("ID_LIKE", "")
+    except OSError:
+        return False
+
+
+def _gssapi_header_present() -> bool:
+    return any(
+        path.is_file()
+        for path in (
+            Path("/usr/include/gssapi/gssapi.h"),
+            Path("/usr/include/gssapi.h"),
+        )
+    )
+
+
+def _libclang_shared_library() -> Path | None:
+    """Return a usable libclang.so if already on the system (bindgen / libgssapi-sys)."""
+    env_path = os.environ.get("LIBCLANG_PATH", "").strip()
+    if env_path:
+        path = Path(env_path)
+        if path.is_file():
+            return path
+
+    search_roots = [
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/lib64"),
+        Path("/usr/lib"),
+    ]
+    for root in search_roots:
+        if not root.is_dir():
+            continue
+        for candidate in sorted(root.glob("libclang.so*")):
+            if candidate.is_file() and not candidate.name.endswith(".a"):
+                return candidate
+
+    for llvm_lib in sorted(Path("/usr/lib").glob("llvm-*/lib"), reverse=True):
+        for candidate in sorted(llvm_lib.glob("libclang.so*")):
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def _setup_bindgen_env() -> None:
+    """Help bindgen (libgssapi-sys) locate libclang and GCC system headers."""
+    found = _libclang_shared_library()
+    if found is not None:
+        os.environ.setdefault("LIBCLANG_PATH", str(found.parent))
+    if os.environ.get("BINDGEN_EXTRA_CLANG_ARGS"):
+        return
+    gcc_include = sorted(Path("/usr/lib/gcc").glob("*/*/include"))
+    if gcc_include:
+        extra = " ".join(f"-I{p}" for p in gcc_include)
+        os.environ.setdefault("BINDGEN_EXTRA_CLANG_ARGS", extra)
+
+
+def _apt_install(packages: list[str], *, what: str) -> None:
+    log(f"Linux: installing {what} ({', '.join(packages)})")
+    subprocess.run(["sudo", "apt-get", "update", "-qq"], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "DEBIAN_FRONTEND=noninteractive",
+            "apt-get",
+            "install",
+            "-y",
+            *packages,
+        ],
+        check=True,
+    )
+
+
+def ensure_linux_native_deps() -> None:
+    """Rust ``integration_full`` needs ``cc``, pkg-config, libclang, and Kerberos headers."""
+    if platform.system() != "Linux":
+        return
+
+    need_cc = not (shutil.which("cc") or shutil.which("gcc"))
+    need_pkg_config = shutil.which("pkg-config") is None
+    need_gssapi = not _gssapi_header_present()
+    need_libclang = _libclang_shared_library() is None
+    if not (need_cc or need_pkg_config or need_gssapi or need_libclang):
+        _setup_bindgen_env()
+        return
+
+    if os.environ.get("INTEG_NO_AUTO_APT"):
+        missing: list[str] = []
+        if need_cc:
+            missing.append("build-essential (provides `cc`)")
+        if need_pkg_config:
+            missing.append("pkg-config")
+        if need_gssapi:
+            missing.append("libkrb5-dev (gssapi.h)")
+        if need_libclang:
+            missing.append("libclang-dev (bindgen for libgssapi-sys)")
+        die(
+            "missing Linux native build deps: "
+            + ", ".join(missing)
+            + ".\nInstall on Debian/Ubuntu:\n"
+            "  sudo apt install build-essential pkg-config libkrb5-dev libclang-dev\n"
+            "Or unset INTEG_NO_AUTO_APT to allow auto-install on Debian/Ubuntu."
+        )
+
+    if not _is_debian_like_linux():
+        missing = []
+        if need_cc:
+            missing.append("C linker (`cc` / gcc)")
+        if need_pkg_config:
+            missing.append("pkg-config")
+        if need_gssapi:
+            missing.append("Kerberos dev headers (gssapi.h)")
+        if need_libclang:
+            missing.append("libclang-dev (bindgen)")
+        die(
+            "missing Linux native build deps: "
+            + ", ".join(missing)
+            + ". Install a C toolchain, pkg-config, and libclang-dev for your OS, then re-run."
+        )
+
+    packages: list[str] = []
+    if need_cc:
+        packages.append("build-essential")
+    if need_pkg_config:
+        packages.append("pkg-config")
+    if need_gssapi:
+        packages.append("libkrb5-dev")
+    if need_libclang:
+        packages.append("libclang-dev")
+    _apt_install(packages, what="native build deps")
+
+    if need_cc and not (shutil.which("cc") or shutil.which("gcc")):
+        die("`cc` still not on PATH after installing build-essential.")
+    if need_pkg_config and shutil.which("pkg-config") is None:
+        die("pkg-config still not on PATH after apt install.")
+    if need_gssapi and not _gssapi_header_present():
+        die("gssapi.h still not found after installing libkrb5-dev.")
+    if need_libclang and _libclang_shared_library() is None:
+        die(
+            "libclang still not found after installing libclang-dev. "
+            "Set LIBCLANG_PATH to your libclang.so and re-run."
+        )
+    _setup_bindgen_env()
+
+
+def count_lines(path: Path) -> int:
+    with path.open(encoding="utf-8", errors="replace") as f:
+        return sum(1 for _ in f)
+
+
+def find_rdctl() -> Path | None:
+    if shutil.which("rdctl"):
+        return Path(shutil.which("rdctl"))  # type: ignore[arg-type]
+    for candidate in (
+        Path.home() / ".rd" / "bin" / "rdctl",
+        Path("/usr/local/bin/rdctl"),
+        Path("/opt/rancher-desktop/bin/rdctl"),
+    ):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def rdctl_json_setting(rdctl: Path, jq_key: str) -> str:
+    if shutil.which("jq") is None:
+        return "unknown (jq not installed)"
+    try:
+        proc = subprocess.run(
+            [str(rdctl), "list-settings"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        proc2 = subprocess.run(
+            ["jq", "-r", jq_key],
+            input=proc.stdout,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        val = proc2.stdout.strip()
+        return val if val else "unknown"
+    except subprocess.CalledProcessError:
+        return "unknown"
+
+
+def use_native_docker() -> bool:
+    """Headless Linux servers use Docker Engine when Rancher Desktop / rdctl is unavailable."""
+    if find_rdctl() is not None:
+        return False
+    return platform.system() == "Linux" and shutil.which("docker") is not None
+
+
+def _user_in_docker_group() -> bool:
+    try:
+        import grp
+        import pwd
+
+        docker = grp.getgrnam("docker")
+        user = pwd.getpwuid(os.getuid()).pw_name
+        if user in docker.gr_mem:
+            return True
+        return docker.gr_gid in os.getgroups()
+    except KeyError:
+        return False
+
+
+def _docker_via_sg_ok() -> bool:
+    if shutil.which("sg") is None:
+        return False
+    try:
+        subprocess.run(
+            ["sg", "docker", "-c", "docker info"],
+            capture_output=True,
+            check=True,
+        )
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+
+def docker_info_ok() -> bool:
+    try:
+        subprocess.run(["docker", "info"], capture_output=True, check=True)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    return _docker_via_sg_ok()
+
+
+def docker_command(args: list[str]) -> list[str]:
+    """Return argv prefix to run docker (handles fresh group membership via sg)."""
+    if shutil.which("docker") is None:
+        die("docker not found")
+    try:
+        subprocess.run(["docker", "info"], capture_output=True, check=True)
+        return ["docker", *args]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    if _docker_via_sg_ok():
+        inner = " ".join(shlex.quote(x) for x in ["docker", *args])
+        return ["sg", "docker", "-c", inner]
+    die(
+        "Docker installed but not usable. Log out and back in, or run: newgrp docker"
+    )
+
+
+def run_docker(args: list[str], *, cwd: Path | None = None) -> None:
+    run(docker_command(args), cwd=cwd)
+
+
+def ensure_docker_running() -> None:
+    """Start system Docker on Linux when not using Rancher Desktop."""
+    if docker_info_ok():
+        return
+    if platform.system() != "Linux":
+        die("Docker is not running and Rancher Desktop (rdctl) is not installed.")
+    log("Starting system Docker service...")
+    run(["sudo", "systemctl", "start", "docker"])
+    if not docker_info_ok():
+        die(
+            "Docker installed but not usable. Log out and back in after: "
+            "sudo usermod -aG docker $USER"
+        )
+
+

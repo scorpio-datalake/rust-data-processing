@@ -31,6 +31,8 @@ HighLevelDevelopmentPlan.txt
 epcis_and_stories.txt
 test_run.log
 test_run_*.log
+.build_all_runs/
+build_all.log
 benchmarks.log
 # Local planning / story tracking — not for version control
 Planning/
@@ -42,4 +44,11 @@ bindings/java/**/.gradle/
 bindings/java/**/target/
 bindings/java/**/build/
 scripts/git_scripts/
+build_all_libs.log
+to_do_notes.md
 
+integration_testing/logs/*
+integration_testing/.staging/
+integration_testing/.target/
+integration_testing/libs/
+scripts/setup_java21_os_env.sh

@@ -6,16 +6,17 @@
 #[cfg(feature = "link-main")]
 use rust_data_processing as _;
 
-mod parity_support;
+mod ingest_path;
+mod kafka;
 mod parity;
 mod parity_mirrors;
-mod ingest_path;
+mod parity_support;
 mod pipeline_run;
 
 /// Bump only when ABI / calling conventions for exported symbols break.
 #[no_mangle]
 pub extern "C" fn rdp_ffi_abi_version() -> u32 {
-    405
+    406
 }
 
 #[cfg(test)]
@@ -24,6 +25,6 @@ mod tests {
 
     #[test]
     fn abi_constant() {
-        assert_eq!(rdp_ffi_abi_version(), 405);
+        assert_eq!(rdp_ffi_abi_version(), 406);
     }
 }

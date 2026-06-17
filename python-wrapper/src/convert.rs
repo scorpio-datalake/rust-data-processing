@@ -47,10 +47,10 @@ pub(crate) fn parse_data_type(s: &str) -> PyResult<DataType> {
 }
 
 pub(crate) fn schema_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Schema> {
-    let list = obj.downcast::<PyList>()?;
+    let list = obj.cast::<PyList>()?;
     let mut fields = Vec::with_capacity(list.len());
     for item in list.iter() {
-        let d = item.downcast::<PyDict>()?;
+        let d = item.cast::<PyDict>()?;
         let name: String = d
             .get_item("name")?
             .ok_or_else(|| PyValueError::new_err("schema field missing 'name'"))?
@@ -95,7 +95,7 @@ pub(crate) fn parse_format(s: &str) -> PyResult<IngestionFormat> {
 }
 
 fn excel_selection_from_py(obj: &Bound<'_, PyAny>) -> PyResult<ExcelSheetSelection> {
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let mode: String = d
         .get_item("mode")?
         .ok_or_else(|| PyValueError::new_err("excel_sheet_selection missing 'mode'"))?
@@ -114,7 +114,7 @@ fn excel_selection_from_py(obj: &Bound<'_, PyAny>) -> PyResult<ExcelSheetSelecti
             let names_any = d
                 .get_item("names")?
                 .ok_or_else(|| PyValueError::new_err("mode 'sheets' requires 'names' (list)"))?;
-            let names_list = names_any.downcast::<PyList>()?;
+            let names_list = names_any.cast::<PyList>()?;
             let mut names = Vec::with_capacity(names_list.len());
             for x in names_list.iter() {
                 names.push(x.extract::<String>()?);
@@ -133,7 +133,7 @@ pub(crate) fn ingestion_options_from_py(
     let Some(obj) = obj else {
         return Ok(IngestionOptions::default());
     };
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let mut o = IngestionOptions::default();
     if let Some(v) = d.get_item("format")? {
         let s: String = v.extract()?;
@@ -203,11 +203,11 @@ pub(crate) fn dataset_from_rows_py(
 ) -> PyResult<rust_data_processing::types::DataSet> {
     use rust_data_processing::types::DataSet;
     let schema = schema_from_py(schema)?;
-    let list = rows.downcast::<PyList>()?;
+    let list = rows.cast::<PyList>()?;
     let ncols = schema.fields.len();
     let mut out_rows = Vec::with_capacity(list.len());
     for row_any in list.iter() {
-        let row_list = row_any.downcast::<PyList>()?;
+        let row_list = row_any.cast::<PyList>()?;
         if row_list.len() != ncols {
             return Err(PyValueError::new_err(format!(
                 "row length {} does not match schema length {}",
@@ -272,14 +272,14 @@ fn severity_from_py(s: &str) -> PyResult<Severity> {
 }
 
 pub(crate) fn validation_spec_from_py(obj: &Bound<'_, PyAny>) -> PyResult<ValidationSpec> {
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let checks_any = d
         .get_item("checks")?
         .ok_or_else(|| PyValueError::new_err("validation spec missing 'checks' list"))?;
-    let checks_list = checks_any.downcast::<PyList>()?;
+    let checks_list = checks_any.cast::<PyList>()?;
     let mut checks = Vec::with_capacity(checks_list.len());
     for item in checks_list.iter() {
-        let c = item.downcast::<PyDict>()?;
+        let c = item.cast::<PyDict>()?;
         let kind: String = c
             .get_item("kind")?
             .ok_or_else(|| PyValueError::new_err("check missing 'kind'"))?
@@ -356,7 +356,7 @@ pub(crate) fn validation_spec_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Valida
                 let vals_any = c
                     .get_item("values")?
                     .ok_or_else(|| PyValueError::new_err("in_set needs 'values' list"))?;
-                let vals_list = vals_any.downcast::<PyList>()?;
+                let vals_list = vals_any.cast::<PyList>()?;
                 let mut values = Vec::with_capacity(vals_list.len());
                 for v in vals_list.iter() {
                     values.push(value_from_py(&v)?);
@@ -392,15 +392,21 @@ pub(crate) fn validation_spec_from_py(obj: &Bound<'_, PyAny>) -> PyResult<Valida
                     .extract()?;
                 let min_chars: u32 = c
                     .get_item("min_chars")?
-                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'min_chars'"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("utf8_len_chars_between needs 'min_chars'")
+                    })?
                     .extract()?;
                 let max_chars: u32 = c
                     .get_item("max_chars")?
-                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'max_chars'"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("utf8_len_chars_between needs 'max_chars'")
+                    })?
                     .extract()?;
                 let sev: String = c
                     .get_item("severity")?
-                    .ok_or_else(|| PyValueError::new_err("utf8_len_chars_between needs 'severity'"))?
+                    .ok_or_else(|| {
+                        PyValueError::new_err("utf8_len_chars_between needs 'severity'")
+                    })?
                     .extract()?;
                 Check::Utf8LenCharsBetween {
                     column,
@@ -428,7 +434,7 @@ pub(crate) fn profile_options_from_py(obj: Option<&Bound<'_, PyAny>>) -> PyResul
     let Some(obj) = obj else {
         return Ok(ProfileOptions::default());
     };
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let mut o = ProfileOptions::default();
     if let Some(v) = d.get_item("sampling")? {
         if let Ok(s) = v.extract::<String>() {
@@ -440,7 +446,7 @@ pub(crate) fn profile_options_from_py(obj: Option<&Bound<'_, PyAny>>) -> PyResul
                     ));
                 }
             }
-        } else if let Ok(sub) = v.downcast::<PyDict>() {
+        } else if let Ok(sub) = v.cast::<PyDict>() {
             if let Some(n) = sub.get_item("head")? {
                 o.sampling = SamplingMode::Head(n.extract::<usize>()?);
             }
@@ -450,7 +456,7 @@ pub(crate) fn profile_options_from_py(obj: Option<&Bound<'_, PyAny>>) -> PyResul
         o.sampling = SamplingMode::Head(v.extract::<usize>()?);
     }
     if let Some(v) = d.get_item("quantiles")? {
-        let lst = v.downcast::<PyList>()?;
+        let lst = v.cast::<PyList>()?;
         let mut qs = Vec::with_capacity(lst.len());
         for x in lst.iter() {
             qs.push(x.extract::<f64>()?);
@@ -461,7 +467,7 @@ pub(crate) fn profile_options_from_py(obj: Option<&Bound<'_, PyAny>>) -> PyResul
 }
 
 pub(crate) fn outlier_method_from_py(obj: &Bound<'_, PyAny>) -> PyResult<OutlierMethod> {
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let kind: String = d
         .get_item("kind")?
         .ok_or_else(|| PyValueError::new_err("outlier method missing 'kind'"))?
@@ -498,14 +504,14 @@ pub(crate) fn outlier_options_from_py(obj: Option<&Bound<'_, PyAny>>) -> PyResul
     let Some(obj) = obj else {
         return Ok(OutlierOptions::default());
     };
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let mut o = OutlierOptions::default();
     if let Some(v) = d.get_item("sampling")? {
         if let Ok(s) = v.extract::<String>() {
             if s.to_ascii_lowercase() == "full" {
                 o.sampling = SamplingMode::Full;
             }
-        } else if let Ok(sub) = v.downcast::<PyDict>() {
+        } else if let Ok(sub) = v.cast::<PyDict>() {
             if let Some(n) = sub.get_item("head")? {
                 o.sampling = SamplingMode::Head(n.extract::<usize>()?);
             }
@@ -526,7 +532,7 @@ pub(crate) fn execution_options_from_py(
     let Some(obj) = obj else {
         return Ok(ExecutionOptions::default());
     };
-    let d = obj.downcast::<PyDict>()?;
+    let d = obj.cast::<PyDict>()?;
     let mut o = ExecutionOptions::default();
     if let Some(v) = d.get_item("num_threads")? {
         if v.is_none() {

@@ -1,0 +1,123 @@
+# Cloud storage integration — one Docker stack per CONNECTORS.md protocol.
+#
+# | Protocol | Service(s)                         | Host port | RDP URI (see .env.example)              |
+# | -------- | ------------------------------------ | --------- | --------------------------------------- |
+# | S3       | minio + minio-init (included below)  | 9000      | s3://rdp-cloud-s3/out.parquet           |
+# | GCS      | fake-gcs                             | 4443      | gs://rdp-cloud-gcs/out.parquet          |
+# | Azure    | azurite                              | 10000     | azure://rdp-cloud-azure/out.parquet     |
+# | SFTP     | sftp                                 | 2222      | sftp://…/upload/incoming.csv            |
+# | FTP      | ftp                                  | 21        | ftp://…/incoming.csv                    |
+#
+# S3 is not duplicated here — it comes from the MinIO include (same minio container as Snowflake/Spark).
+# GCS bucket + Azure container are created at test start by cloud_common.seed_gcs_and_azure().
+# cloud-seed also creates the S3 bucket (rdp-cloud-s3) and copies Uber CSV to SFTP/FTP.
+#
+# Usage:
+#   cd integration_testing/CloudConnectors
+#   cp .env.example .env
+#   docker compose up -d
+#   python3 run_cloud_tests.py --no-rancher
+
+include:
+  - path: ../MinIO/docker-compose.yml
+
+services:
+  fake-gcs:
+    # GCS emulator — gs:// URIs; Rust uses JSON API when gcs_base_url / STORAGE_EMULATOR_HOST is set.
+    image: tustvold/fake-gcs-server
+    container_name: rdp-fake-gcs
+    restart: "no"
+    ports:
+      - "${GCS_PORT:-4443}:4443"
+    command:
+      - -scheme
+      - http
+      - -backend
+      - memory
+      - -port
+      - "4443"
+      - -public-host
+      - "localhost:${GCS_PORT:-4443}"
+    networks:
+      - rdp-platform
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: rdp-azurite
+    restart: "no"
+    ports:
+      - "${AZURITE_BLOB_PORT:-10000}:10000"
+    command: azurite-blob --blobHost 0.0.0.0 --location /data --skipApiVersionCheck
+    networks:
+      - rdp-platform
+
+  sftp:
+    image: atmoz/sftp
+    container_name: rdp-sftp-test
+    restart: "no"
+    ports:
+      - "${SFTP_PORT:-2222}:22"
+    volumes:
+      - sftp-data:/home/rdp/upload
+    command: rdp:rdp_sftp_secret:1001
+    networks:
+      - rdp-platform
+
+  ftp:
+    image: fauria/vsftpd
+    container_name: rdp-ftp-test
+    restart: "no"
+    ports:
+      - "${FTP_PORT:-21}:21"
+      - "21100-21110:21100-21110"
+    environment:
+      FTP_USER: rdp
+      FTP_PASS: rdp_ftp_secret
+      PASV_ADDRESS: 127.0.0.1
+      PASV_MIN_PORT: 21100
+      PASV_MAX_PORT: 21110
+    volumes:
+      - ftp-data:/home/vsftpd/rdp
+    networks:
+      - rdp-platform
+
+  cloud-seed:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: rdp-cloud-seed
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+      fake-gcs:
+        condition: service_started
+      azurite:
+        condition: service_started
+      sftp:
+        condition: service_started
+      ftp:
+        condition: service_started
+    networks:
+      - rdp-platform
+    volumes:
+      - ../data:/data:ro
+      - sftp-data:/seed/sftp
+      - ftp-data:/seed/ftp
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-rdp_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-rdp_minio_secret}
+    entrypoint: >
+      /bin/sh -c "
+      set -e;
+      SAMPLE=/data/uber_nyc_pickups_sample.csv;
+      FULL=/data/uber_nyc_pickups_apr2014.csv;
+      if [ -f $$SAMPLE ]; then SRC=$$SAMPLE; elif [ -f $$FULL ]; then SRC=$$FULL; else echo 'Uber CSV missing in integration_testing/data' >&2; exit 1; fi;
+      head -n 501 $$SRC > /seed/sftp/incoming.csv;
+      cp /seed/sftp/incoming.csv /seed/ftp/incoming.csv;
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      mc mb --ignore-existing local/rdp-cloud-s3;
+      echo 'Cloud seed complete (S3 bucket rdp-cloud-s3 + SFTP/FTP CSV)';
+      "
+
+volumes:
+  sftp-data:
+  ftp-data:

@@ -159,3 +159,35 @@ __all__ = [
     "validate_dataset_json",
     "validate_dataset_markdown",
 ]
+
+try:
+    from ._rust_data_processing import (  # noqa: F401
+        elt_load_kafka_records_json,
+        export_dataset_to_kafka,
+        poll_kafka_window,
+        poll_kafka_window_loaded,
+    )
+except ImportError:
+    pass
+else:
+    __all__ += [
+        "elt_load_kafka_records_json",
+        "export_dataset_to_kafka",
+        "poll_kafka_window",
+        "poll_kafka_window_loaded",
+    ]
+
+try:
+    from ._rust_data_processing import (  # noqa: F401
+        export_dataset_to_object_store_uri,
+        ingest_from_file_transfer_uri,
+        ingest_from_object_store_uri,
+    )
+except ImportError:
+    pass
+else:
+    __all__ += [
+        "export_dataset_to_object_store_uri",
+        "ingest_from_file_transfer_uri",
+        "ingest_from_object_store_uri",
+    ]

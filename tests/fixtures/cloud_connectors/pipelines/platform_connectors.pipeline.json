@@ -1,0 +1,59 @@
+{
+  "pipeline_spec_version": 1,
+  "sources": {
+    "paths": [],
+    "schema_ref": "schemas/id_name.schema.json",
+    "options": { "format": "json" },
+    "object_store_uris": [
+      "file://{{FILE_BASE}}/data/two_rows.json",
+      "file://{{FILE_BASE}}/cloud/s3-style/incoming/two_rows.json",
+      "file://{{FILE_BASE}}/cloud/gcs-style/incoming/two_rows.json"
+    ]
+  },
+  "transform": {
+    "sql": "SELECT * FROM df ORDER BY id"
+  },
+  "sinks": [
+    {
+      "kind": "snowflake",
+      "account_url": "https://xy12345.us-east-1.snowflakecomputing.com",
+      "warehouse": "COMPUTE_WH",
+      "database": "ANALYTICS",
+      "schema": "CURATED",
+      "table": "FACT_SCORES",
+      "stage_uri": "file://{{STAGE_BASE}}/snowflake-stage/",
+      "role": "ETL_ROLE"
+    },
+    {
+      "kind": "databricks",
+      "workspace_url": "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com",
+      "catalog_uri": "https://dbc-a1b2c3d4-e5f6.cloud.databricks.com/api/2.1/unity-catalog/iceberg",
+      "warehouse": "file://{{DELTA_WH}}/unity/",
+      "namespace": "main.curated",
+      "table": "fact_scores"
+    },
+    {
+      "kind": "spark",
+      "master": "spark://spark-master.example:7077",
+      "app_name": "rdp-handoff",
+      "handoff_uri": "file://{{STAGE_BASE}}/spark-handoff/out.parquet"
+    },
+    {
+      "kind": "object_store",
+      "uri": "file://{{STAGE_BASE}}/out/s3-style/",
+      "format": "parquet"
+    },
+    {
+      "kind": "object_store",
+      "uri": "file://{{STAGE_BASE}}/out/gcs-style/",
+      "format": "parquet"
+    },
+    {
+      "kind": "delta_lake",
+      "warehouse": "file://{{DELTA_WH}}/lake/",
+      "catalog_uri": "thrift://iceberg-catalog.example:9083",
+      "namespace": "curated",
+      "table": "fact_scores_delta"
+    }
+  ]
+}
