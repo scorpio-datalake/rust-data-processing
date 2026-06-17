@@ -73,11 +73,13 @@ Generate the same HTML as CI locally: `./scripts/build_docs.ps1` (Rust only) or 
     - 1M rows: ~74.10 ms median (\approx 13.5 million rows/sec)
   - **Reproduce**: `cargo bench --bench pipelines -- --warm-up-time 2 --measurement-time 6 --sample-size 50`
 
-## Phase 2 scope (roadmap)
+## Phase 3 scope (roadmap)
 
-![Library scope overview — Phase 2](docs/images/phase-2-scope-overview.png)
+![Library scope overview — Phase 3](docs/images/phase-3-scope-overview.png)
 
-Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Planning/`** folder (gitignored—never committed). Nothing in the repo removes those files; this section is the public README summary only.
+*One Rust engine — Python (PyO3 / PyPI) and Java (Panama / Maven + Gradle) bindings; Phase 1–2 capabilities; agent-ready JSON in/out; shared connectors (Postgres, S3, Kafka, Snowflake).*
+
+Detailed Phase 1 / Phase 1a / Phase 2 / Phase 3 planning trackers stay in your local **`Planning/`** folder (gitignored—never committed). Nothing in the repo removes those files; this section is the public README summary only.
 
 - Polars-first delegation for ingestion + DataFrame-centric pipelines
 - Polars-backed SQL support (default-on)
@@ -111,7 +113,7 @@ Detailed Phase 1 / Phase 1a / Phase 2 planning trackers stay in your local **`Pl
 
 Bindings live under **`python-wrapper/`** (**PyO3** + **maturin** + **uv**). User-facing docs: **`python-wrapper/README.md`**, **`python-wrapper/API.md`**, **`python-wrapper/README_DEV.md`**. The native module calls this crate; Polars stays on the Rust side.
 
-**JVM / Java:** not shipped yet. **Phase 3** targets a **Maven Central–compatible** JVM layer (**Project Panama** / **FFM**) with **`jextract`**-style codegen from `C` headers, published for **Maven and Gradle** consumers (**dual build tooling and CI gates** — see **`Planning/PHASE3_EPICS.md`** and **`docs/adr/003-jvm-panama-ffi-spike.md`** for the phased plan and increment-1 spike).
+**JVM / Java:** **Phase 3** **`rust-data-processing-jvm`** bindings (**Project Panama** / **FFM** → **`rdp_jvm_sys`**) ship for **Maven** and **Gradle** (see [`docs/java/README.md`](docs/java/README.md), [`bindings/java/rust-data-processing-jvm/README.md`](bindings/java/rust-data-processing-jvm/README.md)).
 
 **Rust** examples (ingestion, DataFrame/SQL, transforms, profiling, execution, benchmarks): [`docs/rust/README.md`](docs/rust/README.md).
 

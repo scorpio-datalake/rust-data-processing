@@ -19,7 +19,7 @@ The release script **`scripts/release.py`** (or **`./scripts/release_tag.sh`** /
 
 PyPI uses **`pyproject.toml`** as the distribution version; the extension crate version should match for maintainability.
 
-**README assets:** Keep scope infographics under **`docs/images/`** (repository root). **`README_CRATE.md`** (crates.io / docs.rs) and **`python-wrapper/README_PYPI.md`** (PyPI) use the **Phase 2** hero **`phase-2-scope-overview.png`**; keep **`phase-1-scope-overview.png`** for historical posts or docs that still reference Phase 1. Both READMEs use **raw.githubusercontent.com** for the hero image so registries always resolve the current graphic (PyPI avoids bundling a duplicate PNG in sdist; crates.io/docs.rs avoid stale or missing relative-path renders). The `Planning/` tree is gitignored and is not a publish source for this asset.
+**README assets:** Keep scope infographics under **`docs/images/`** (repository root). **`README_CRATE.md`** (crates.io / docs.rs) and **`python-wrapper/README_PYPI.md`** (PyPI) use the **Phase 3** hero **`phase-3-scope-overview.png`**; keep **`phase-2-scope-overview.png`** and **`phase-1-scope-overview.png`** for historical posts or docs that still reference earlier phases. Language doc indexes (**`docs/rust/README.md`**, **`docs/python/README.md`**, **`docs/java/README.md`**) use the same Phase 3 graphic via relative paths. Registry READMEs use **raw.githubusercontent.com** for the hero image so PyPI/crates.io always resolve the current graphic (PyPI avoids bundling a duplicate PNG in sdist; crates.io/docs.rs avoid stale or missing relative-path renders). The `Planning/` tree is gitignored and is not a publish source for this asset.
 
 ## 2) Changelog + CI
 

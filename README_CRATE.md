@@ -1,10 +1,10 @@
 # rust-data-processing
 
-![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](https://raw.githubusercontent.com/scorpio-datalake/rust-data-processing/main/docs/images/phase-2-scope-overview.png)
+![Phase 3 scope: Rust core with Python (PyO3) and Java (Panama) bindings, agent-ready JSON FFI, and shared batch/streaming connectors](https://raw.githubusercontent.com/scorpio-datalake/rust-data-processing/main/docs/images/phase-3-scope-overview.png)
 
-**Rust** library: schema-first ingestion (CSV, JSON, Parquet, Excel with Cargo features) into an in-memory [`DataSet`](https://docs.rs/rust-data-processing/latest/rust_data_processing/types/struct.DataSet.html), plus Polars-backed pipelines, optional SQL, profiling, validation, map/reduce-style processing, **Phase 2** export (JSONL, train/test splits), UTF-8 privacy transforms and summaries, median aggregations, Arrow interop, and incremental ingest helpers.
+**Rust** library: schema-first ingestion (CSV, JSON, Parquet, Excel with Cargo features) into an in-memory [`DataSet`](https://docs.rs/rust-data-processing/latest/rust_data_processing/types/struct.DataSet.html), plus Polars-backed pipelines, optional SQL, profiling, validation, map/reduce-style processing, **Phase 2** export (JSONL, train/test splits), UTF-8 privacy transforms and summaries, median aggregations, Arrow interop, incremental ingest helpers, and **Phase 3** JVM bindings (Panama / `rdp_jvm_sys`, Maven + Gradle) with JSON parity FFI for agents and orchestration.
 
-*Infographic: Phase 2 — Phase 1 single-node flow (ingest → `DataSet`, pipelines, SQL, profile, validate, outliers, transforms, parallel execution) plus JSONL export, privacy tooling, median, Arrow batch paths, watermark / ordered-file / Hive-style discovery; JVM bindings planned Phase 3.*
+*Infographic: Phase 3 — one Rust engine; Python (PyO3 / PyPI) and Java (Panama / Maven + Gradle) bindings; Phase 1–2 ingest → `DataSet` → pipelines, SQL, profile, validate; agent-ready JSON in/out; shared connectors (Postgres, S3, Kafka, Snowflake).*
 
 **Limits (masking / “PII”):** UTF-8 transforms and validation checks are **mechanical** helpers only; callers supply policy and must not treat outputs as legal guarantees. See `Planning/P2_E6_PRIVACY_POLICY.md` in the repository.
 
@@ -19,6 +19,7 @@ This file is the **crate README** shown on [crates.io](https://crates.io/crates/
 | **Markdown API overview** | [`API.md`](./API.md) (shipped in this crate) |
 | **Rust examples & cookbook** | [`docs/rust/README.md`](./docs/rust/README.md) |
 | **Python package (PyPI)** | [pypi.org/project/rust-data-processing](https://pypi.org/project/rust-data-processing/) |
+| **JVM bindings (Maven Central)** | [docs/java/README.md](./docs/java/README.md) — Panama / `rdp_jvm_sys` |
 | **Python runnable examples (HTML)** | [GitHub Pages — examples](https://scorpio-datalake.github.io/rust-data-processing/python/examples.html) |
 | **HTML site (Rust + Python pages)** | [GitHub Pages — home](https://scorpio-datalake.github.io/rust-data-processing/) — **Rust (rustdoc):** [crate index on Pages](https://scorpio-datalake.github.io/rust-data-processing/rust/rust_data_processing/index.html) (or [docs.rs](https://docs.rs/rust-data-processing)); **Python (pdoc):** [module root](https://scorpio-datalake.github.io/rust-data-processing/python/rust_data_processing.html). [Setup](https://github.com/scorpio-datalake/rust-data-processing/blob/main/docs/DOCUMENTATION.md) if the site is empty. |
 

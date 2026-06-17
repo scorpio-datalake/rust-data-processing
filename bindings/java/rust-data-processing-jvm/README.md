@@ -1,5 +1,9 @@
 # rust-data-processing-jvm — Maven bindings (Phase 3)
 
+![Phase 3 scope: Rust core with Python (PyO3) and Java (Panama) bindings, agent-ready JSON FFI, and shared batch/streaming connectors](https://raw.githubusercontent.com/scorpio-datalake/rust-data-processing/main/docs/images/phase-3-scope-overview.png)
+
+*Infographic: Phase 3 — Java thin Panama wrapper (`rdp_jvm_sys`, Maven + Gradle) on the shared Rust engine; JSON parity FFI; same connectors as Rust/Python.*
+
 Build the native **`rdp_jvm_sys`** first:
 
 ```bash

@@ -1,8 +1,10 @@
 # JVM bindings (Phase 3)
 
-
+![Phase 3 scope: Rust core with Python (PyO3) and Java (Panama) bindings, agent-ready JSON FFI, and shared batch/streaming connectors](../images/phase-3-scope-overview.png)
 
 **Maven** and **Gradle** are **blocking** Phase 3 deliverables (see **`Planning/PHASE3_EPICS.md`**).
+
+*Infographic: Phase 3 — one Rust engine; Java thin Panama wrapper (`rdp_jvm_sys`, Maven + Gradle) alongside Python (PyO3); JSON parity FFI for agents; same connectors and fixtures as Rust/Python.*
 
 
 

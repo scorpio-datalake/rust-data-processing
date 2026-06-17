@@ -1,10 +1,10 @@
 # Rust quick start and examples
 
-![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](../images/phase-2-scope-overview.png)
+![Phase 3 scope: Rust core with Python (PyO3) and Java (Panama) bindings, agent-ready JSON FFI, and shared batch/streaming connectors](../images/phase-3-scope-overview.png)
 
-This page collects **Rust** snippets for the `rust-data-processing` crate. The [repository README](../../README.md) leads with Python; Python mirrors many of these examples in [`docs/python/README.md`](../python/README.md), including **Phase 2** copy-paste blocks in [`docs/python/PHASE2_EXAMPLES.md`](../python/PHASE2_EXAMPLES.md) (JSONL export, privacy transforms, median, Delta handoff). For the conceptual API surface see [`API.md`](../../API.md).
+This page collects **Rust** snippets for the `rust-data-processing` crate. The [repository README](../../README.md) leads with Python; Python mirrors many of these examples in [`docs/python/README.md`](../python/README.md), including **Phase 2** copy-paste blocks in [`docs/python/PHASE2_EXAMPLES.md`](../python/PHASE2_EXAMPLES.md) (JSONL export, privacy transforms, median, Delta handoff). JVM JSON parity examples live in [`docs/java/EXAMPLES.md`](../java/EXAMPLES.md). For the conceptual API surface see [`API.md`](../../API.md).
 
-*Phase 2 overview (infographic): Phase 1 sources and engine (pipelines, SQL, transforms, profile, validation, outliers, map/reduce, parallel execution, Python bindings) plus export, privacy tooling, median, Arrow batch paths, and incremental ETL helpers; JVM planned Phase 3.*
+*Phase 3 overview (infographic): one Rust engine; Python and JVM bindings; Phase 1–2 ingest → `DataSet` → pipelines, SQL, profile, validate; agent-ready JSON in/out; shared connectors (Postgres, S3, Kafka, Snowflake).*
 
 ## Quick start (library usage)
 

@@ -1,6 +1,6 @@
 # Python quick start and examples
 
-![Phase 2 scope: Phase 1 baseline plus export, privacy, Arrow, incremental ETL → Python; JVM planned](../images/phase-2-scope-overview.png)
+![Phase 3 scope: Rust core with Python (PyO3) and Java (Panama) bindings, agent-ready JSON FFI, and shared batch/streaming connectors](../images/phase-3-scope-overview.png)
 
 The same Markdown is **included in the HTML docs** (pdoc) as [`rust_data_processing.examples`](https://scorpio-datalake.github.io/rust-data-processing/python/examples.html) — see `python-wrapper/rust_data_processing/examples.py`.
 
