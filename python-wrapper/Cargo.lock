@@ -4695,7 +4695,7 @@ dependencies = [
 
 [[package]]
 name = "rust-data-processing"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "arrow",
  "calamine",
@@ -4724,7 +4724,7 @@ dependencies = [
 
 [[package]]
 name = "rust_data_processing_py"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "pyo3",
  "rust-data-processing",
