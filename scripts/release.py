@@ -261,7 +261,11 @@ def run_bump(repo: Path, new_ver: str, today: str) -> None:
     p = repo / "Cargo.lock"
     write_text(
         p,
-        bump_cargo_lock_named_packages(read_text(p), {"rust-data-processing"}, new_ver),
+        bump_cargo_lock_named_packages(
+            read_text(p),
+            {"rust-data-processing", "rust_data_processing_py"},
+            new_ver,
+        ),
     )
 
     p = repo / "python-wrapper" / "Cargo.lock"
@@ -285,8 +289,21 @@ def run_bump(repo: Path, new_ver: str, today: str) -> None:
     text = insert_changelog_link(text, new_ver)
     write_text(p, text)
 
+    sync_workspace_cargo_lock(repo)
 
-def assert_clean_tree(repo: Path, allow_dirty: bool) -> None:
+
+def sync_workspace_cargo_lock(repo: Path) -> None:
+    """Align workspace Cargo.lock with bumped path-package versions in Cargo.toml."""
+    p = subprocess.run(
+        ["cargo", "generate-lockfile"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if p.returncode != 0:
+        msg = (p.stderr or p.stdout or "").strip()
+        raise RuntimeError(f"cargo generate-lockfile failed ({p.returncode}): {msg}")
     st = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repo,
