@@ -9,7 +9,20 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 VERSION_FILE = REPO / "bindings/java/VERSION"
 GRADLE_PROPS = REPO / "bindings/java/rust-data-processing-jvm/gradle.properties"
-POM = REPO / "bindings/java/rust-data-processing-jvm/pom.xml"
+JVM_POM = REPO / "bindings/java/rust-data-processing-jvm/pom.xml"
+JVM_DEPENDENT_POMS = (
+    REPO / "bindings/java/rust-data-processing-jvm-examples/pom.xml",
+    REPO / "bindings/java/rust-data-processing-jvm-spark/pom.xml",
+)
+JVM_DEP_RE = re.compile(
+    r"<artifactId>rust-data-processing-jvm</artifactId>\s*<version>([^<]+)</version>",
+    re.DOTALL,
+)
+
+
+def jvm_dependency_version(pom_path: Path) -> str:
+    m = JVM_DEP_RE.search(pom_path.read_text(encoding="utf-8"))
+    return m.group(1).strip() if m else ""
 
 
 def main() -> int:
@@ -19,19 +32,17 @@ def main() -> int:
         "",
     )
     gradle_ver = gradle_line.split("=", 1)[1].strip() if gradle_line else ""
-    pom_text = POM.read_text(encoding="utf-8")
-    m = re.search(
-        r"<artifactId>rust-data-processing-jvm</artifactId>\s*<version>([^<]+)</version>",
-        pom_text,
-        re.DOTALL,
-    )
-    pom_ver = m.group(1).strip() if m else ""
+    pom_ver = jvm_dependency_version(JVM_POM)
 
     bad = []
     if gradle_ver != ver:
         bad.append(f"gradle.properties version ({gradle_ver!r}) != VERSION ({ver!r})")
     if pom_ver != ver:
-        bad.append(f"pom.xml <version> ({pom_ver!r}) != VERSION ({ver!r})")
+        bad.append(f"rust-data-processing-jvm/pom.xml <version> ({pom_ver!r}) != VERSION ({ver!r})")
+    for pom in JVM_DEPENDENT_POMS:
+        dep_ver = jvm_dependency_version(pom)
+        if dep_ver != ver:
+            bad.append(f"{pom.relative_to(REPO)} rust-data-processing-jvm dep ({dep_ver!r}) != VERSION ({ver!r})")
 
     if bad:
         for line in bad:

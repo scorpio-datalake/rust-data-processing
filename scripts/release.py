@@ -34,6 +34,8 @@ BUMP_PATHS = [
     "bindings/java/VERSION",
     "bindings/java/rust-data-processing-jvm/gradle.properties",
     "bindings/java/rust-data-processing-jvm/pom.xml",
+    "bindings/java/rust-data-processing-jvm-examples/pom.xml",
+    "bindings/java/rust-data-processing-jvm-spark/pom.xml",
 ]
 
 JVM_POM_RE = re.compile(
@@ -191,11 +193,16 @@ def set_jvm_version_files(repo: Path, new_ver: str) -> None:
         raise ValueError("gradle.properties: no version= line")
     write_text(gradle_props, "".join(out))
 
-    pom = repo / "bindings/java/rust-data-processing-jvm/pom.xml"
-    pom_text = read_text(pom)
-    if not JVM_POM_RE.search(pom_text):
-        raise ValueError("pom.xml: no <version> for rust-data-processing-jvm")
-    write_text(pom, JVM_POM_RE.sub(rf"\g<1>{new_ver}\g<2>", pom_text, count=1))
+    jvm_poms = [
+        repo / "bindings/java/rust-data-processing-jvm/pom.xml",
+        repo / "bindings/java/rust-data-processing-jvm-examples/pom.xml",
+        repo / "bindings/java/rust-data-processing-jvm-spark/pom.xml",
+    ]
+    for pom in jvm_poms:
+        pom_text = read_text(pom)
+        if not JVM_POM_RE.search(pom_text):
+            raise ValueError(f"{pom.relative_to(repo)}: no <version> for rust-data-processing-jvm")
+        write_text(pom, JVM_POM_RE.sub(rf"\g<1>{new_ver}\g<2>", pom_text, count=1))
 
 
 def bump_cargo_lock_named_packages(content: str, names: set[str], new_ver: str) -> str:
