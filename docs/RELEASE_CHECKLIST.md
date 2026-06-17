@@ -12,7 +12,7 @@ Bump **all** of these to the **same** SemVer (e.g. `0.2.0`):
 | **`python-wrapper/pyproject.toml`** | `[project] version` |
 | **`python-wrapper/Cargo.toml`** | `[package] version` |
 
-The release script **`scripts/release.py`** (or **`./scripts/release_tag.ps1`**) updates these plus **`Cargo.lock`** (root + **`python-wrapper/`**), **`python-wrapper/uv.lock`**, and inserts a **`CHANGELOG.md`** stub. Edit the changelog body after the script runs.
+The release script **`scripts/release.py`** (or **`./scripts/release_tag.sh`** / **`./scripts/release_tag.ps1`**) updates these plus **`Cargo.lock`** (root + **`python-wrapper/`**), **`python-wrapper/uv.lock`**, and inserts a **`CHANGELOG.md`** stub. Edit the changelog body after the script runs.
 
 PyPI uses **`pyproject.toml`** as the distribution version; the extension crate version should match for maintainability.
 
@@ -29,7 +29,7 @@ PyPI uses **`pyproject.toml`** as the distribution version; the extension crate 
 
 ## 3) Publish Rust crate (crates.io)
 
-**Preferred:** after merging to **`main`**, push tag **`v*`** (use **`scripts/release.py`** / **`./scripts/release_tag.ps1`** - see §4) — **`rust_release.yml`** publishes via **`CRATES_IO_TOKEN`**.
+**Preferred:** after merging to **`main`**, push tag **`v*`** (use **`scripts/release.py`** / **`./scripts/release_tag.sh`** / **`./scripts/release_tag.ps1`** - see §4) — **`rust_release.yml`** publishes via **`CRATES_IO_TOKEN`**.
 
 **Manual alternative** (from repo root, after merge):
 
@@ -95,6 +95,12 @@ Use **one** flow: complete steps **1–2** (changelog + merge to **`main`**), th
 1. Confirm **`python-wrapper/pyproject.toml`** version matches the Rust crate (step 1), or let the release script bump them.
 2. Merge your release PR into **`main`** and ensure CI is green. Push **`main`** to **`origin`** so `HEAD` matches **`origin/main`** (unless the script will push main and bump for you).
 3. From repo root, on **`main`**, run the release script (interactive: shows last `v*` tag, prompts for new SemVer, writes files, commits, pushes **`main`**, pushes **`v*`**):
+
+   ```bash
+   ./scripts/release_tag.sh
+   ```
+
+   Windows PowerShell:
 
    ```powershell
    ./scripts/release_tag.ps1

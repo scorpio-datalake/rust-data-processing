@@ -5,6 +5,7 @@ bump Cargo.toml / pyproject / lockfiles / CHANGELOG, commit, push main, annotate
 
 Run from repo root:
   python scripts/release.py
+  ./scripts/release_tag.sh
   ./scripts/release_tag.ps1
 
 Requires: Python 3.10+, git on PATH.
