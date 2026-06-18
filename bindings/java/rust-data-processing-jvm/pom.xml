@@ -245,6 +245,26 @@
       </properties>
     </profile>
     <profile>
+      <!-- Local smoke: mvn test -Drdp.native.classifier.jar=/path/to/rdp-jvm-sys-*-linux-x86_64.jar \
+           -Dtest=NativeClassifierClasspathTest env -u RDP_JVM_SYS -->
+      <id>native-classifier-smoke</id>
+      <activation>
+        <property>
+          <name>rdp.native.classifier.jar</name>
+        </property>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
+          <artifactId>rdp-jvm-sys</artifactId>
+          <version>${project.version}</version>
+          <classifier>linux-x86_64</classifier>
+          <scope>system</scope>
+          <systemPath>${rdp.native.classifier.jar}</systemPath>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
       <!-- Activate with -DcentralRelease=true alongside GPG tooling (Central Portal) -->
       <id>central-release</id>
       <activation>

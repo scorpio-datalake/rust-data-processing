@@ -53,6 +53,8 @@ Configure these **repository secrets**:
    - **`mvn -DcentralRelease=true deploy`** → Central Publisher Portal → **`autoPublish`** + **`waitUntil=published`**
 5. After success, artifacts appear as **`io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm:{VERSION}`** on [Maven Central](https://central.sonatype.com/).
 
+**Native classifiers:** the same **`v{VERSION}`** GitHub Release also triggers **`jvm_native_maven_release.yml`**, which publishes **`rdp-jvm-sys:{VERSION}:{classifier}`** JARs (one platform binary each under **`META-INF/native/`**). See **[`NATIVE_ARTIFACT_PACKAGING.md`](NATIVE_ARTIFACT_PACKAGING.md)** and **`scripts/deploy_rdp_jvm_sys_native_jars.sh`**.
+
 **GPG:** Upload the signing public key to a supported keyserver ([Central GPG requirements](https://central.sonatype.org/publish/requirements/gpg/)) so consumers can validate signatures.
 
 ---

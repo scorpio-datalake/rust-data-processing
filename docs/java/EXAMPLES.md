@@ -142,11 +142,11 @@ JSONObject root =
 
 ## Why these examples {#why-these-examples}
 
-The files under [`docs/java/examples/`](examples/) are **copy-paste tutorials** for JVM integrators. They are **not** compiled into the `rust-data-processing-jvm` JAR; you copy a class into your app module (which depends on that JAR) and run `main` with a built `rdp_jvm_sys` library.
+The files under [`docs/java/examples/`](examples/) are **copy-paste tutorials** for JVM integrators. They are **not** compiled into the `rust-data-processing-jvm` JAR; you copy a class into your app module (which depends on that JAR plus a native classifier, or a locally built `rdp_jvm_sys`).
 
 Each example shows how to:
 
-- Load **`RDP_JVM_SYS`** (or `-Drdp.jvm.sys.library`) and enable **`--enable-native-access=ALL-UNNAMED`**
+- Load the native library (**`rdp-jvm-sys`** classifier on the classpath by default, or **`RDP_JVM_SYS`** / **`-Drdp.jvm.sys.library`** to override) and enable **`--enable-native-access=ALL-UNNAMED`**
 - Resolve **`tests/fixtures/<bundle>/`** JSON (schemas, pipelines, payloads) instead of hard-coding SQL or schemas in Java
 - Call the right FFI entry point (`rdp_run_pipeline_json`, `rdp_ingest_*_path`, `rdp_parity_*`, …)
 - Map the flow to the **Python** tour on the same docs site ([`docs/python/README.md`](../python/README.md), [`PHASE2_EXAMPLES.md`](../python/PHASE2_EXAMPLES.md))
@@ -791,20 +791,53 @@ The crate also exposes **`rust_data_processing::ingestion::export_dataset_to_par
 ## Prerequisites
 
 - **JDK 21+** (Panama FFM). Some builds use preview features on newer JDKs; see the module `pom.xml`.
-- **Artifact:** `io.github.scorpio-datalake.rust-data-processing:rust-data-processing-jvm` (same version as [`bindings/java/VERSION`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/VERSION)).
-- **Native library:** build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/scorpio-datalake/rust-data-processing/tree/main/bindings/jvm-sys) (CI: `cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full`). Point Java at the absolute path:
-  - Environment variable **`RDP_JVM_SYS`**, or
-  - System property **`-Drdp.jvm.sys.library=…`**
 - **JVM flag:** `--enable-native-access=ALL-UNNAMED` (or a tighter module policy if you wire one).
 
-**Running an example `main`:**
+### Maven (recommended — no Rust install)
+
+Add **two** dependencies at the **same version** ([`bindings/java/VERSION`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/VERSION)): the Java API JAR and **one** native classifier for your OS/CPU. See **[`NATIVE_ARTIFACT_PACKAGING.md`](NATIVE_ARTIFACT_PACKAGING.md)** for the full classifier table.
+
+| Your machine | `rdp-jvm-sys` classifier |
+| --- | --- |
+| Linux x86_64 | `linux-x86_64` |
+| Linux ARM64 (aarch64) | `linux-aarch64` |
+| macOS Apple Silicon | `osx-aarch64` |
+| macOS Intel | `osx-x86_64` |
+| Windows x86_64 | `windows-x86_64` |
+
+```xml
+<dependency>
+  <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
+  <artifactId>rust-data-processing-jvm</artifactId>
+  <version>0.3.4</version>
+</dependency>
+<dependency>
+  <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
+  <artifactId>rdp-jvm-sys</artifactId>
+  <version>0.3.4</version>
+  <classifier>linux-x86_64</classifier><!-- pick row from table above -->
+</dependency>
+```
+
+`RdpNativeJson` loads the native library from **`META-INF/native/`** on the classpath automatically. You do **not** need `RDP_JVM_SYS` unless overriding the path.
+
+### Build from source (contributors / custom features)
+
+- **Rust + Cargo** required.
+- Build `rdp_jvm_sys` from [`bindings/jvm-sys/`](https://github.com/scorpio-datalake/rust-data-processing/tree/main/bindings/jvm-sys) (`cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full`).
+- Point Java at the absolute path: **`RDP_JVM_SYS`** or **`-Drdp.jvm.sys.library=…`**
+
+**Running an example `main` from a checkout:**
 
 ```bash
-# From repository root (Linux/macOS; adjust .so / .dll / .dylib)
+# Option A — Maven classifiers (no Rust)
+export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
+# … depend on rust-data-processing-jvm + rdp-jvm-sys:${classifier} …
+
+# Option B — local cargo build
 cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
 export RDP_JVM_SYS=$PWD/bindings/jvm-sys/target/release/librdp_jvm_sys.so
 export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
-# Compile/run from your module that depends on rust-data-processing-jvm, with docs/java/examples/MyExample.java on the classpath
 ```
 
 **JUnit (maintainers):** [`DocsExampleNativeIntegrationTest`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/docexamples/DocsExampleNativeIntegrationTest.java) exercises most catalog examples when `RDP_JVM_SYS` is set; [`FfiExportedSymbolsContractTest`](https://github.com/scorpio-datalake/rust-data-processing/blob/main/bindings/java/rust-data-processing-jvm/src/test/java/io/github/scorpio_datalake/rust_data_processing/FfiExportedSymbolsContractTest.java) covers manifest-wide symbol smoke separately.
@@ -841,7 +874,7 @@ import java.lang.foreign.SymbolLookup;
 import java.nio.file.Path;
 import org.json.JSONObject;
 
-Path lib = Path.of(System.getenv("RDP_JVM_SYS")); // or System.getProperty("rdp.jvm.sys.library")
+Path lib = RdpNativeJson.resolveNativeLibraryFromEnvOrProperty(); // classpath classifier, or RDP_JVM_SYS / -Drdp.jvm.sys.library
 Linker linker = Linker.nativeLinker();
 try (Arena arena = Arena.ofConfined()) {
   SymbolLookup lookup = SymbolLookup.libraryLookup(lib, arena);
@@ -924,6 +957,16 @@ For production-sized Polars outputs, prefer **Rust-side** materialization to **P
 ## Runnable walkthrough class
 
 **`io.github.scorpio_datalake.rust_data_processing.examples.ParityScenariosWalkthrough`** runs a curated list of exports (including types, bindings, mapping, transform, processing, SQL, validation, benchmark smoke) and prints short summaries — useful to **see** several `interchange` shapes in one JVM process.
+
+**Maven Central (classifier on classpath — no `RDP_JVM_SYS`):**
+
+```bash
+export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
+java -cp "rust-data-processing-jvm-examples-…jar:rust-data-processing-jvm-…jar:rdp-jvm-sys-…-linux-x86_64.jar" \
+  io.github.scorpio_datalake.rust_data_processing.examples.ParityScenariosWalkthrough
+```
+
+**From source (checkout build):**
 
 ```bash
 export RDP_JVM_SYS=/absolute/path/to/librdp_jvm_sys.so

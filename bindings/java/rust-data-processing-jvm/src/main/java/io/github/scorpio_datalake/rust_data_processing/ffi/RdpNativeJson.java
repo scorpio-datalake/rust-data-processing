@@ -1,5 +1,7 @@
 package io.github.scorpio_datalake.rust_data_processing.ffi;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.GroupLayout;
@@ -12,6 +14,10 @@ import java.lang.invoke.MethodHandle;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
+import java.util.Set;
 import org.json.JSONObject;
 
 /**
@@ -36,10 +42,10 @@ public final class RdpNativeJson {
   private RdpNativeJson() {}
 
   /**
-   * Resolves an existing native library path from {@code RDP_JVM_SYS} or system property {@code
-   * rdp.jvm.sys.library} (first match wins), then {@code bindings/jvm-sys/target/{release,debug}/}
-   * under {@code GITHUB_WORKSPACE} or by walking up from the working directory. Returns {@code
-   * null} if nothing is found.
+   * Resolves the native library path in order: {@code RDP_JVM_SYS}, {@code rdp.jvm.sys.library},
+   * {@code META-INF/native/} on the classpath (from {@code rdp-jvm-sys} classifier JAR), then a
+   * checkout build under {@code bindings/jvm-sys/target/}. Returns {@code null} if nothing is
+   * found.
    */
   public static Path resolveNativeLibraryFromEnvOrProperty() {
     String env = System.getenv("RDP_JVM_SYS");
@@ -56,7 +62,53 @@ public final class RdpNativeJson {
         return p;
       }
     }
+    Path fromClasspath = resolveNativeFromClasspath();
+    if (fromClasspath != null) {
+      return fromClasspath;
+    }
     return discoverBuiltNativeLibrary();
+  }
+
+  /**
+   * Extracts {@code META-INF/native/<basename>} from the classpath (e.g. {@code rdp-jvm-sys} Maven
+   * classifier JAR) into a temporary file for {@link SymbolLookup#libraryLookup}.
+   */
+  private static Path resolveNativeFromClasspath() {
+    String resource = "META-INF/native/" + nativeLibraryBasename();
+    ClassLoader cl = RdpNativeJson.class.getClassLoader();
+    try (InputStream in = cl.getResourceAsStream(resource)) {
+      if (in == null) {
+        return null;
+      }
+      String suffix =
+          resource.endsWith(".dll") ? ".dll" : resource.endsWith(".dylib") ? ".dylib" : ".so";
+      Path tmp = Files.createTempFile("rdp_jvm_sys", suffix);
+      tmp.toFile().deleteOnExit();
+      Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+      makeExecutableIfPosix(tmp);
+      return tmp.toAbsolutePath().normalize();
+    } catch (IOException e) {
+      return null;
+    }
+  }
+
+  private static void makeExecutableIfPosix(Path file) {
+    try {
+      Set<PosixFilePermission> perms =
+          EnumSet.of(
+              PosixFilePermission.OWNER_READ,
+              PosixFilePermission.OWNER_WRITE,
+              PosixFilePermission.OWNER_EXECUTE,
+              PosixFilePermission.GROUP_READ,
+              PosixFilePermission.GROUP_EXECUTE,
+              PosixFilePermission.OTHERS_READ,
+              PosixFilePermission.OTHERS_EXECUTE);
+      Files.setPosixFilePermissions(file, perms);
+    } catch (UnsupportedOperationException ignored) {
+      // Windows
+    } catch (IOException ignored) {
+      // Best-effort for temp extract
+    }
   }
 
   private static Path discoverBuiltNativeLibrary() {

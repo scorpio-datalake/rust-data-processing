@@ -50,7 +50,7 @@ cargo publish
 
 | Location | Bump / notes |
 | --- | --- |
-| **`bindings/java/VERSION`** | Single source — sync **`pom.xml`**, **`gradle.properties`** |
+| **`bindings/java/VERSION`** | Single source — sync **`pom.xml`**, **`gradle.properties`**, **`bindings/java/rdp-jvm-sys/pom.xml`** |
 | **`bindings/jvm-sys/Cargo.toml`** | Native crate semver (coordinate with FFI ABI **`rdp_ffi_abi_version`**) |
 | **`bindings/java/rust-data-processing-jvm/pom.xml`** | `<version>` after **`VERSION`** edit |
 
@@ -61,7 +61,7 @@ python scripts/check_java_version_consistency.py
 python scripts/check_jvm_ffi_manifest.py
 ```
 
-**Smoke build** (mirror CI):
+**Smoke build** (mirror CI — explicit native path on each runner):
 
 ```bash
 # Java formatting (same gate as Maven Central release `validate` / `mvn deploy`)
@@ -74,7 +74,15 @@ mvn -f bindings/java/rust-data-processing-jvm -q verify
 ( cd bindings/java/rust-data-processing-jvm && ./gradlew check publishToMavenLocal --no-daemon )
 ```
 
-Central publication: **[`docs/java/MAVEN_CENTRAL_PUBLISHING.md`](java/MAVEN_CENTRAL_PUBLISHING.md)** (namespace **`io.github.scorpio-datalake`**, tokens, GPG). CI publish: **[`.github/workflows/jvm_maven_central_release.yml`](../.github/workflows/jvm_maven_central_release.yml)** — runs when a **GitHub Release** is published and tag **`v{bindings/java/VERSION}`** matches a **non-SNAPSHOT** VERSION.
+**Native classifier smoke** (Linux x86_64 — validates classpath loading without **`RDP_JVM_SYS`**):
+
+```bash
+./scripts/test_native_classifier_local.sh
+```
+
+**Central publication (Java API JAR):** **[`docs/java/MAVEN_CENTRAL_PUBLISHING.md`](java/MAVEN_CENTRAL_PUBLISHING.md)** (namespace **`io.github.scorpio-datalake`**, tokens, GPG). CI: **[`.github/workflows/jvm_maven_central_release.yml`](../.github/workflows/jvm_maven_central_release.yml)** — runs when a **GitHub Release** is published and tag **`v{bindings/java/VERSION}`** matches a **non-SNAPSHOT** VERSION.
+
+**Central publication (native classifiers):** CI: **[`.github/workflows/jvm_native_maven_release.yml`](../.github/workflows/jvm_native_maven_release.yml)** — same **`v{VERSION}`** gate; builds five platform classifiers and deploys via **`scripts/deploy_rdp_jvm_sys_native_jars.sh`**. Consumer docs: **[`docs/java/NATIVE_ARTIFACT_PACKAGING.md`](java/NATIVE_ARTIFACT_PACKAGING.md)**.
 
 Workflow: **[`.github/workflows/jvm_bindings_ci.yml`](../.github/workflows/jvm_bindings_ci.yml)** (**Ubuntu / Windows / macOS** × JDK **21**).
 

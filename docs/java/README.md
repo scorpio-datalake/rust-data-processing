@@ -23,7 +23,7 @@
 
 | **[NATIVE_ARTIFACT_PACKAGING.md](NATIVE_ARTIFACT_PACKAGING.md)** | Classifier JARs / **`META-INF/native`** (**S1e**) |
 
-| **[gradle.md](gradle.md)** | Gradle quick path + **`maven-publish`** coords |
+| **[gradle.md](gradle.md)** | Gradle consumer deps (classifiers) + maintainer test path |
 
 | **[JEXTRACT.md](JEXTRACT.md)** | Regenerate Panama stubs from **`rdp_jvm_sys.h`** |
 
@@ -50,6 +50,8 @@
 | **`bindings/jvm-sys/`** | Rust **`cdylib`** (`--features jvm_ffi` aliases **`link-main`**), **`ffi_manifest.json`**, **`include/rdp_jvm_sys.h`** |
 
 | **`bindings/java/VERSION`** | Single SemVer line — **`pom.xml`** / **`gradle.properties`** must match (**CI enforced**) |
+
+| **`bindings/java/rdp-jvm-sys/`** | Maven metadata POM for native classifier JARs (`META-INF/native/…`) |
 
 | **`bindings/java/rust-data-processing-jvm/`** | **`pom.xml`**, Gradle **`maven-publish`**, tests (**`FfiExportedSymbolsContractTest`**, **`DocsExampleNativeIntegrationTest`**, **`JvmNativeContractScenarios`**, **`PytestMirrorAssertions`**, **`ParityMatrixDeferredExportTest`**, **`RdpJvmSysTestSupport`**) |
 

@@ -164,7 +164,7 @@ ds = rdp.ingest_from_path("path/to/data.csv", schema, {"format": "csv"})
 print("rows", ds.row_count())</code></pre>
 
       <h3>Java (parity JSON over Panama)</h3>
-      <pre><code>// After loading rdp_jvm_sys (RDP_JVM_SYS) — see java/examples.html
+      <pre><code>// After rdp_jvm_sys is on the classpath (rdp-jvm-sys classifier) — see java/examples.html
 JSONObject root = RdpNativeJson.invokeParityExport(
     linker, lookup, arena, "rdp_parity_watermark_mirror");
 PytestMirrorAssertions.validateMirrorExport(

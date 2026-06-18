@@ -14,6 +14,8 @@ JVM_DEPENDENT_POMS = (
     REPO / "bindings/java/rust-data-processing-jvm-examples/pom.xml",
     REPO / "bindings/java/rust-data-processing-jvm-spark/pom.xml",
 )
+RDP_JVM_SYS_POM = REPO / "bindings/java/rdp-jvm-sys/pom.xml"
+POM_VERSION_RE = re.compile(r"<version>([^<]+)</version>")
 JVM_DEP_RE = re.compile(
     r"<artifactId>rust-data-processing-jvm</artifactId>\s*<version>([^<]+)</version>",
     re.DOTALL,
@@ -33,12 +35,16 @@ def main() -> int:
     )
     gradle_ver = gradle_line.split("=", 1)[1].strip() if gradle_line else ""
     pom_ver = jvm_dependency_version(JVM_POM)
+    rdp_sys_pom = POM_VERSION_RE.search(RDP_JVM_SYS_POM.read_text(encoding="utf-8"))
+    rdp_sys_ver = rdp_sys_pom.group(1).strip() if rdp_sys_pom else ""
 
     bad = []
     if gradle_ver != ver:
         bad.append(f"gradle.properties version ({gradle_ver!r}) != VERSION ({ver!r})")
     if pom_ver != ver:
         bad.append(f"rust-data-processing-jvm/pom.xml <version> ({pom_ver!r}) != VERSION ({ver!r})")
+    if rdp_sys_ver != ver:
+        bad.append(f"rdp-jvm-sys/pom.xml <version> ({rdp_sys_ver!r}) != VERSION ({ver!r})")
     for pom in JVM_DEPENDENT_POMS:
         dep_ver = jvm_dependency_version(pom)
         if dep_ver != ver:

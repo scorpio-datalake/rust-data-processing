@@ -14,17 +14,32 @@ The file **`bindings/jvm-sys/ffi_manifest.json`** is the **source of truth** for
 
 ## 1. Maven dependency
 
-Use the same **`groupId`** / **`artifactId`** / **`version`** as the published module (or `0.1.0-SNAPSHOT` when building locally after `mvn install`):
+Use the same **`groupId`** / **`version`** as the published module (see **`bindings/java/VERSION`**). Add **two** artifacts: the Java API JAR and **one** native classifier for your OS/CPU.
 
 ```xml
-<dependency>
-  <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
-  <artifactId>rust-data-processing-jvm</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
-</dependency>
+<properties>
+  <rdp.jvm.version>0.3.4</rdp.jvm.version>
+  <rdp.jvm.native.classifier>linux-x86_64</rdp.jvm.native.classifier>
+</properties>
+
+<dependencies>
+  <dependency>
+    <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
+    <artifactId>rust-data-processing-jvm</artifactId>
+    <version>${rdp.jvm.version}</version>
+  </dependency>
+  <dependency>
+    <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
+    <artifactId>rdp-jvm-sys</artifactId>
+    <version>${rdp.jvm.version}</version>
+    <classifier>${rdp.jvm.native.classifier}</classifier>
+  </dependency>
+</dependencies>
 ```
 
-You still need the **native** library (`librdp_jvm_sys.so`, `rdp_jvm_sys.dll`, or `librdp_jvm_sys.dylib`) built from **`bindings/jvm-sys`** (see **`bindings/java/rust-data-processing-jvm/README.md`**). The JAR does **not** embed that binary.
+The main JAR does **not** embed the native binary. Classifier table: **[`NATIVE_ARTIFACT_PACKAGING.md`](NATIVE_ARTIFACT_PACKAGING.md)**. `RdpNativeJson` loads from **`META-INF/native/`** on the classpath — no **`RDP_JVM_SYS`** required.
+
+**From source:** build **`bindings/jvm-sys`** (see **`bindings/java/rust-data-processing-jvm/README.md`**) and set **`RDP_JVM_SYS`** or **`-Drdp.jvm.sys.library`** instead of the classifier dependency.
 
 ---
 
@@ -36,7 +51,9 @@ Panama **FFM** downcalls require native access:
 --enable-native-access=ALL-UNNAMED
 ```
 
-Set the library path (absolute) via environment variable:
+**Default (Maven Central):** add the matching **`rdp-jvm-sys`** classifier dependency (see **[`NATIVE_ARTIFACT_PACKAGING.md`](NATIVE_ARTIFACT_PACKAGING.md)**). `RdpNativeJson.resolveNativeLibraryFromEnvOrProperty()` loads from **`META-INF/native/`** on the classpath — no environment variable required.
+
+**Override (from source / debugging):** set an absolute path via environment variable:
 
 ```bash
 export RDP_JVM_SYS=/absolute/path/to/librdp_jvm_sys.so
@@ -48,7 +65,7 @@ or Java system property:
 -Drdp.jvm.sys.library=C:\absolute\path\to\rdp_jvm_sys.dll
 ```
 
-The examples module uses the same resolution as tests (`ExamplesNativeLibrary`).
+The examples module uses the same resolution as tests (`ExamplesNativeLibrary` → `RdpNativeJson`).
 
 ---
 
@@ -73,7 +90,7 @@ try (InputStream in = RdpNativeJson.class.getResourceAsStream(RdpNativeJson.FFI_
 }
 ```
 
-**Runnable repo example:** `LoadFfiManifestExample` in **`bindings/java/rust-data-processing-jvm-examples/`** (prints all symbols and probes ABI when `RDP_JVM_SYS` is set).
+**Runnable repo example:** `LoadFfiManifestExample` in **`bindings/java/rust-data-processing-jvm-examples/`** (prints all symbols and probes ABI when a native library is available on the classpath or via **`RDP_JVM_SYS`**).
 
 ---
 
@@ -92,7 +109,7 @@ import java.nio.file.Path;
 import org.json.JSONObject;
 
 Linker linker = Linker.nativeLinker();
-Path lib = Path.of(System.getenv("RDP_JVM_SYS"));
+Path lib = RdpNativeJson.resolveNativeLibraryFromEnvOrProperty();
 try (Arena arena = Arena.ofConfined()) {
   SymbolLookup lookup = SymbolLookup.libraryLookup(lib, arena);
   JSONObject root = RdpNativeJson.invokeParityExport(linker, lookup, arena, "rdp_parity_bindings_mirror");
@@ -118,7 +135,19 @@ Compare with **`abi_version_constant`** from the manifest; they must match for a
 
 ## 6. Classpath-only `java` / `java` from a fat layout
 
-From **`rust-data-processing-jvm-examples`** after `mvn -DskipTests package` (with the main module already `mvn install`’d):
+From **`rust-data-processing-jvm-examples`** after `mvn -DskipTests package` (with the main module already `mvn install`’d).
+
+**With a classifier JAR on the classpath (no `RDP_JVM_SYS`):**
+
+```bash
+export JAVA_TOOL_OPTIONS='--enable-native-access=ALL-UNNAMED'
+java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar:/path/to/rdp-jvm-sys-0.3.4-linux-x86_64.jar" \
+  io.github.scorpio_datalake.rust_data_processing.examples.LoadFfiManifestExample
+java -cp "target/rust-data-processing-jvm-examples-0.1.0-SNAPSHOT.jar:../rust-data-processing-jvm/target/rust-data-processing-jvm-0.1.0-SNAPSHOT.jar:/path/to/rdp-jvm-sys-0.3.4-linux-x86_64.jar" \
+  io.github.scorpio_datalake.rust_data_processing.examples.RunPytestMirrorExample rdp_parity_bindings_mirror
+```
+
+**From a checkout build (`RDP_JVM_SYS`):**
 
 ```bash
 export RDP_JVM_SYS=/path/to/librdp_jvm_sys.so
@@ -182,4 +211,4 @@ pwsh -File scripts/build_all.ps1
 # or: python scripts/python_scripts/build_all.py
 ```
 
-Requires `rdp_jvm_sys` built with **`--features full`** (Excel + linked core), `RDP_JVM_SYS` pointing at the release `cdylib`, and `--enable-native-access=ALL-UNNAMED`.
+Requires **`rdp_jvm_sys`** with **`--features full`** (Excel + linked core) — from a Maven **`rdp-jvm-sys`** classifier on the classpath, or a checkout build via **`RDP_JVM_SYS`** — and **`--enable-native-access=ALL-UNNAMED`**.

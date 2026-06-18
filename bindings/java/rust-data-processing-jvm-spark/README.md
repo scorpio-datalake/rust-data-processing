@@ -31,7 +31,7 @@ try (Arena arena = Arena.ofConfined()) {
 }
 ```
 
-Run the demo (requires `RDP_JVM_SYS`, JDK 21, `--enable-native-access=ALL-UNNAMED`):
+Run the demo (requires a native library — **`rdp-jvm-sys`** classifier on the classpath or **`RDP_JVM_SYS`** — JDK 21, `--enable-native-access=ALL-UNNAMED`):
 
 ```bash
 mvn -q -DskipTests package exec:java \

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
+  <artifactId>rdp-jvm-sys</artifactId>
+  <version>0.3.4</version>
+  <packaging>pom</packaging>
+  <name>rdp-jvm-sys (native classifiers)</name>
+  <description>Prebuilt rdp_jvm_sys shared libraries per OS/CPU for Panama FFM. Classifier JARs contain META-INF/native/ only — not a fat JAR.</description>
+  <url>https://github.com/scorpio-datalake/rust-data-processing</url>
+
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>scorpio-datalake</name>
+      <organization>scorpio-datalake</organization>
+      <organizationUrl>https://github.com/scorpio-datalake</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:git://github.com/scorpio-datalake/rust-data-processing.git</connection>
+    <developerConnection>scm:git:ssh://github.com:scorpio-datalake/rust-data-processing.git</developerConnection>
+    <url>https://github.com/scorpio-datalake/rust-data-processing</url>
+    <tag>v${project.version}</tag>
+  </scm>
+</project>
