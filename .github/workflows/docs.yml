@@ -101,6 +101,12 @@ jobs:
             -V lang=en \
             -H "${GITHUB_WORKSPACE}/docs/landing/java-examples-pandoc-header.html"
           test -f "${GITHUB_WORKSPACE}/site/java/examples.html"
+          # Runnable sources linked from EXAMPLES.md (e.g. examples/OrderedPaths.java).
+          cp -a "${GITHUB_WORKSPACE}/docs/java/examples" "${GITHUB_WORKSPACE}/site/java/"
+          test -f "${GITHUB_WORKSPACE}/site/java/examples/OrderedPaths.java"
+          python3 "${GITHUB_WORKSPACE}/scripts/python_scripts/java_examples_pages_links.py" \
+            "${GITHUB_WORKSPACE}/site/java/examples.html" \
+            --examples-dir "${GITHUB_WORKSPACE}/site/java/examples"
 
       - name: Assemble site
         run: |

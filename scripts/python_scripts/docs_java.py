@@ -8,6 +8,7 @@ import shutil
 import sys
 
 from common import REPO_ROOT, banner, require_tool, run
+from java_examples_pages_links import rewrite_file, write_examples_index
 
 
 def generate(*, skip_if_no_pandoc: bool = False) -> None:
@@ -45,7 +46,15 @@ def generate(*, skip_if_no_pandoc: bool = False) -> None:
         ],
         cwd=REPO_ROOT,
     )
+    examples_src = REPO_ROOT / "docs" / "java" / "examples"
+    examples_dst = java_site / "examples"
+    if examples_dst.exists():
+        shutil.rmtree(examples_dst)
+    shutil.copytree(examples_src, examples_dst)
+    rewrite_file(out_html)
+    write_examples_index(examples_dst)
     print(f"Open: {out_html}", flush=True)
+    print(f"Sources: {examples_dst}/", flush=True)
 
 
 def main(argv: list[str] | None = None) -> int:
