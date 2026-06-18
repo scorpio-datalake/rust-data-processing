@@ -14,6 +14,7 @@ except ImportError:
     DEPLOYED_REPO_PATHS = frozenset(
         {
             "docs/CONNECTORS.md",
+            "docs/CLOUD_AUTH.md",
             "docs/KAFKA_ELT.md",
             "docs/LAKE_TABLE_READ.md",
             "docs/REDUCE_AGG_SEMANTICS.md",
@@ -69,6 +70,21 @@ def rewrite_href(href: str, markdown_base: PurePosixPath) -> str:
         elif resolved == "docs/python/README.md" or path.endswith("/python/examples.html"):
             new_path = path
         elif resolved.endswith((".md", ".java", ".py", ".ndjson")):
+            new_path = f"{GITHUB_BLOB}/{resolved}"
+        else:
+            new_path = path
+    elif markdown_base == PurePosixPath("docs/rust"):
+        if resolved.startswith("docs/images/"):
+            new_path = path
+        elif resolved == "docs/python/README.md":
+            new_path = "../python/examples.html"
+        elif path.startswith("../python/examples.html"):
+            new_path = path
+        elif resolved == "docs/java/EXAMPLES.md":
+            new_path = "../java/examples.html"
+        elif path.startswith("../java/examples.html"):
+            new_path = path
+        elif resolved.endswith((".md", ".java", ".py", ".rs")):
             new_path = f"{GITHUB_BLOB}/{resolved}"
         else:
             new_path = path

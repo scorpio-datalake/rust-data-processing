@@ -9,6 +9,7 @@ End-user readable API documentation is produced as **Rust** via **rustdoc** (`ca
 | Rust (released crate) | docs.rs for the version published on crates.io | [docs.rs/rust-data-processing](https://docs.rs/rust-data-processing) |
 | Rust + Python (main branch) | Combined site from CI (requires Pages setup below) | `https://<owner>.github.io/<repo>/` — for this repo: [rust-data-processing GitHub Pages](https://scorpio-datalake.github.io/rust-data-processing/) |
 | Rust (main branch, rustdoc on Pages) | Crate API HTML | […/rust/rust_data_processing/index.html](https://scorpio-datalake.github.io/rust-data-processing/rust/rust_data_processing/index.html) |
+| Rust (main branch, Pandoc on Pages) | Examples cookbook | […/rust/examples.html](https://scorpio-datalake.github.io/rust-data-processing/rust/examples.html) (source: [`docs/rust/README.md`](rust/README.md)) |
 | Python (main branch, pdoc on Pages) | Top-level module | […/python/rust_data_processing.html](https://scorpio-datalake.github.io/rust-data-processing/python/rust_data_processing.html) |
 | Java (main branch, Pandoc on Pages) | Examples tour (JVM bindings) | […/java/examples.html](https://scorpio-datalake.github.io/rust-data-processing/java/examples.html) (source: [`docs/java/EXAMPLES.md`](java/EXAMPLES.md)) |
 | Back-compat | Bare `/rust_data_processing.html` at site root | Redirects to the Python module page above (same as […/rust_data_processing.html](https://scorpio-datalake.github.io/rust-data-processing/rust_data_processing.html)) |

@@ -111,6 +111,21 @@ jobs:
             "${GITHUB_WORKSPACE}/site/java/examples.html" \
             --examples-dir "${GITHUB_WORKSPACE}/site/java/examples"
 
+      - name: Rust examples page (Markdown → HTML)
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/site/rust"
+          pandoc "${GITHUB_WORKSPACE}/docs/rust/README.md" \
+            -f markdown+smart \
+            -o "${GITHUB_WORKSPACE}/site/rust/examples.html" \
+            --standalone \
+            --metadata title="Rust examples — rust-data-processing" \
+            -V lang=en \
+            -H "${GITHUB_WORKSPACE}/docs/landing/java-examples-pandoc-header.html"
+          test -f "${GITHUB_WORKSPACE}/site/rust/examples.html"
+          python3 "${GITHUB_WORKSPACE}/scripts/python_scripts/rust_examples_pages_links.py" \
+            "${GITHUB_WORKSPACE}/site/rust/examples.html"
+
       - name: Assemble site
         run: |
           set -euo pipefail

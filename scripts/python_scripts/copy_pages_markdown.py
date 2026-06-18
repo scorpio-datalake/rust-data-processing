@@ -12,6 +12,7 @@ from common import REPO_ROOT
 # Repo path → path under site/ (must match ../… links from java/ and python/ examples HTML).
 PAGES_MARKDOWN: dict[str, str] = {
     "docs/CONNECTORS.md": "CONNECTORS.md",
+    "docs/CLOUD_AUTH.md": "CLOUD_AUTH.md",
     "docs/KAFKA_ELT.md": "KAFKA_ELT.md",
     "docs/LAKE_TABLE_READ.md": "LAKE_TABLE_READ.md",
     "docs/REDUCE_AGG_SEMANTICS.md": "REDUCE_AGG_SEMANTICS.md",
