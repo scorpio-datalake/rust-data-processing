@@ -4,30 +4,48 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import sys
 
-from common import REPO_ROOT, banner, require_tool, run
+from common import REPO_ROOT, banner, run
 from java_examples_pages_links import rewrite_file, write_examples_index
+
+
+def find_pandoc() -> str | None:
+    pandoc = shutil.which("pandoc")
+    if pandoc is not None:
+        return pandoc
+    tools = REPO_ROOT / ".tools"
+    if not tools.is_dir():
+        return None
+    for candidate in sorted(tools.glob("pandoc-*/bin/pandoc"), reverse=True):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
 
 
 def generate(*, skip_if_no_pandoc: bool = False) -> None:
     java_site = REPO_ROOT / "_site" / "java"
     java_site.mkdir(parents=True, exist_ok=True)
 
-    pandoc = shutil.which("pandoc")
+    pandoc = find_pandoc()
     if pandoc is None:
         if skip_if_no_pandoc:
             print("pandoc not on PATH; skipping Java HTML docs", flush=True)
             return
-        raise SystemExit("pandoc not on PATH (https://pandoc.org)")
+        raise SystemExit(
+            "pandoc not found. Install system-wide (sudo apt install pandoc) or fetch a portable build:\n"
+            "  mkdir -p .tools && curl -fsSL -o .tools/pandoc.tgz "
+            "https://github.com/jgm/pandoc/releases/download/3.7/pandoc-3.7-linux-amd64.tar.gz\n"
+            "  tar xzf .tools/pandoc.tgz -C .tools"
+        )
 
     examples_md = REPO_ROOT / "docs" / "java" / "EXAMPLES.md"
     header = REPO_ROOT / "docs" / "landing" / "java-examples-pandoc-header.html"
     out_html = java_site / "examples.html"
 
     banner("Java docs: pandoc EXAMPLES.md → _site/java/examples.html")
-    require_tool("pandoc")
     run(
         [
             pandoc,
@@ -53,6 +71,9 @@ def generate(*, skip_if_no_pandoc: bool = False) -> None:
     shutil.copytree(examples_src, examples_dst)
     rewrite_file(out_html)
     write_examples_index(examples_dst)
+    from copy_pages_markdown import copy_pages_markdown
+
+    copy_pages_markdown(REPO_ROOT / "_site")
     print(f"Open: {out_html}", flush=True)
     print(f"Sources: {examples_dst}/", flush=True)
 

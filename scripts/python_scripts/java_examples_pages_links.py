@@ -3,60 +3,33 @@
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 from pathlib import Path, PurePosixPath
 
-GITHUB_BLOB = "https://github.com/scorpio-datalake/rust-data-processing/blob/main"
+from docs_pages_links import rewrite_html as rewrite_pages_html
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 MARKDOWN_BASE = PurePosixPath("docs/java")
-HREF_RE = re.compile(r'href="([^"]*)"')
+
+
+def default_html_path() -> Path:
+    for candidate in (REPO_ROOT / "_site" / "java" / "examples.html", REPO_ROOT / "site" / "java" / "examples.html"):
+        if candidate.is_file():
+            return candidate
+    return REPO_ROOT / "_site" / "java" / "examples.html"
 
 
 def resolve_repo_path(href_path: str) -> str:
     """Normalize an href path relative to docs/java/ to a repo-root posix path."""
-    parts: list[str] = []
-    for part in (MARKDOWN_BASE / href_path).parts:
-        if part == "..":
-            if parts:
-                parts.pop()
-        elif part != ".":
-            parts.append(part)
-    return "/".join(parts)
+    from docs_pages_links import resolve_repo_path as _resolve
+
+    return _resolve(href_path, MARKDOWN_BASE)
 
 
 def rewrite_href(href: str) -> str:
-    if not href or href.startswith(("#", "http://", "https://", "mailto:")):
-        return href
+    from docs_pages_links import rewrite_href as _rewrite
 
-    path, sep, fragment = href.partition("#")
-    if not path:
-        return href
-
-    resolved = resolve_repo_path(path)
-
-    if resolved.startswith("docs/java/examples/") and resolved.endswith(".java"):
-        new_path = f"examples/{PurePosixPath(resolved).name}"
-    elif path in ("examples", "examples/"):
-        new_path = "examples/"
-    elif resolved == "docs/python/README.md":
-        new_path = "../python/examples.html"
-    elif path.startswith("../python/examples.html"):
-        new_path = path
-    elif resolved.endswith((".md", ".java", ".py")):
-        new_path = f"{GITHUB_BLOB}/{resolved}"
-    else:
-        new_path = path
-
-    return f"{new_path}{sep}{fragment}" if sep else new_path
-
-
-def rewrite_html(html: str) -> str:
-    def repl(match: re.Match[str]) -> str:
-        old = match.group(1)
-        new = rewrite_href(old)
-        return f'href="{new}"' if new != old else match.group(0)
-
-    return HREF_RE.sub(repl, html)
+    return _rewrite(href, MARKDOWN_BASE)
 
 
 def write_examples_index(examples_dir: Path) -> None:
@@ -83,24 +56,55 @@ def write_examples_index(examples_dir: Path) -> None:
 
 def rewrite_file(html_path: Path) -> None:
     original = html_path.read_text(encoding="utf-8")
-    updated = rewrite_html(original)
+    updated = rewrite_pages_html(original, MARKDOWN_BASE)
     if updated != original:
         html_path.write_text(updated, encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("html_path", type=Path, help="site/java/examples.html")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "With no html_path, uses _site/java/examples.html (or site/java/examples.html if present). "
+            "Run docs_java.py first to generate the HTML."
+        ),
+    )
+    parser.add_argument(
+        "html_path",
+        nargs="?",
+        type=Path,
+        default=None,
+        help="examples.html to rewrite (default: _site/java/examples.html or site/java/examples.html)",
+    )
     parser.add_argument(
         "--examples-dir",
         type=Path,
         default=None,
-        help="Optional site/java/examples for index.html generation",
+        help="site/java/examples for index.html (default: <html_path>/../examples if it exists)",
+    )
+    parser.add_argument(
+        "--no-index",
+        action="store_true",
+        help="Skip writing examples/index.html",
     )
     args = parser.parse_args(argv)
-    rewrite_file(args.html_path)
-    if args.examples_dir is not None:
-        write_examples_index(args.examples_dir)
+
+    html_path = args.html_path or default_html_path()
+    if not html_path.is_file():
+        raise SystemExit(
+            f"{html_path} not found. Generate it first:\n"
+            "  python3 scripts/python_scripts/docs_java.py"
+        )
+
+    rewrite_file(html_path)
+    print(f"Rewrote links in {html_path}", flush=True)
+
+    if not args.no_index:
+        examples_dir = args.examples_dir or (html_path.parent / "examples")
+        if examples_dir.is_dir():
+            write_examples_index(examples_dir)
+            print(f"Wrote {examples_dir / 'index.html'}", flush=True)
+
     return 0
 
 

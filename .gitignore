@@ -3,6 +3,7 @@ target/
 # Alternate root `CARGO_TARGET_DIR` dirs (agent/tooling scratch builds), e.g. target-p2py, target-agent.
 /target-*/
 /_site
+.tools/
 
 # Root copy of the scope diagram; canonical tracked assets: docs/images/phase-*-scope-overview.png
 /Phase2.png

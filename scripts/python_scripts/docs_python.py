@@ -71,6 +71,13 @@ def generate() -> None:
     if not nested.is_file():
         raise SystemExit("pdoc did not emit rust_data_processing/examples.html")
     shutil.copy2(nested, flat)
+
+    from python_examples_pages_links import rewrite_file as rewrite_python_links
+    from copy_pages_markdown import copy_pages_markdown
+
+    rewrite_python_links(flat)
+    rewrite_python_links(nested)
+    copy_pages_markdown(REPO_ROOT / "_site")
     print(f"Open: {py_out / 'index.html'}", flush=True)
 
 

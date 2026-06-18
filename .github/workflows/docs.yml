@@ -86,6 +86,9 @@ jobs:
           # Stable URL (avoids deep path); same file as the pdoc module page.
           cp -f "${GITHUB_WORKSPACE}/site/python/rust_data_processing/examples.html" \
             "${GITHUB_WORKSPACE}/site/python/examples.html"
+          python3 "${GITHUB_WORKSPACE}/scripts/python_scripts/python_examples_pages_links.py" \
+            "${GITHUB_WORKSPACE}/site/python/examples.html" \
+            "${GITHUB_WORKSPACE}/site/python/rust_data_processing/examples.html"
 
       - name: Java examples page (Markdown → HTML)
         run: |
@@ -116,6 +119,8 @@ jobs:
           cp -f docs/landing/index.html site/index.html
           # Root /rust_data_processing.html was never part of the layout; pdoc lives under python/.
           cp -f docs/landing/rust_data_processing.html site/rust_data_processing.html
+          python3 "${GITHUB_WORKSPACE}/scripts/python_scripts/copy_pages_markdown.py" \
+            "${GITHUB_WORKSPACE}/site"
 
       # Only needed for the deploy job (skip on PRs to avoid unused Pages artifacts).
       - name: Upload Pages artifact
