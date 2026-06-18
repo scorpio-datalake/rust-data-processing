@@ -197,9 +197,16 @@ def set_jvm_version_files(repo: Path, new_ver: str) -> None:
         repo / "bindings/java/rust-data-processing-jvm/pom.xml",
         repo / "bindings/java/rust-data-processing-jvm-examples/pom.xml",
         repo / "bindings/java/rust-data-processing-jvm-spark/pom.xml",
+        repo / "bindings/java/rdp-jvm-sys/pom.xml",
     ]
     for pom in jvm_poms:
         pom_text = read_text(pom)
+        if pom == repo / "bindings/java/rdp-jvm-sys/pom.xml":
+            m = re.search(r"<version>([^<]+)</version>", pom_text)
+            if not m:
+                raise ValueError(f"{pom.relative_to(repo)}: no <version>")
+            write_text(pom, pom_text.replace(m.group(0), f"<version>{new_ver}</version>", 1))
+            continue
         if not JVM_POM_RE.search(pom_text):
             raise ValueError(f"{pom.relative_to(repo)}: no <version> for rust-data-processing-jvm")
         write_text(pom, JVM_POM_RE.sub(rf"\g<1>{new_ver}\g<2>", pom_text, count=1))

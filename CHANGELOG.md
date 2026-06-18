@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **JVM native classifiers (P3-E1-S1e):** Maven **`rdp-jvm-sys:{version}:{classifier}`** JARs per OS/CPU; **`RdpNativeJson`** loads from **`META-INF/native/`** on the classpath; CI workflow **`jvm_native_maven_release.yml`**; local smoke **`scripts/test_native_classifier_local.sh`**.
+
 ### Changed
 
 - **Planning:** Phase **3** JVM/Kafka tracking consolidated into **`Planning/PHASE3_EPICS.md`** only (parity rows + **P3-E1-S2d/S2e** secret stories). Removed **`docs/java/PARITY_MATRIX.md`** and superseded **`Planning/`** phase-plan markdown (`PHASE1_*`, **`Phase2_plan.md`**, **`PHASE2_EPICS.md`**, and related local notes) per single-tracker policy.
