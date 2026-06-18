@@ -71,9 +71,9 @@ def generate(*, skip_if_no_pandoc: bool = False) -> None:
     shutil.copytree(examples_src, examples_dst)
     rewrite_file(out_html)
     write_examples_index(examples_dst)
-    from copy_pages_markdown import copy_pages_markdown
+    from copy_pages_markdown import publish_pages_markdown
 
-    copy_pages_markdown(REPO_ROOT / "_site")
+    publish_pages_markdown(REPO_ROOT / "_site", pandoc=pandoc, html=True)
     print(f"Open: {out_html}", flush=True)
     print(f"Sources: {examples_dst}/", flush=True)
 

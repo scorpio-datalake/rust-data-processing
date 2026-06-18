@@ -135,7 +135,7 @@ jobs:
           # Root /rust_data_processing.html was never part of the layout; pdoc lives under python/.
           cp -f docs/landing/rust_data_processing.html site/rust_data_processing.html
           python3 "${GITHUB_WORKSPACE}/scripts/python_scripts/copy_pages_markdown.py" \
-            "${GITHUB_WORKSPACE}/site"
+            --html "${GITHUB_WORKSPACE}/site"
 
       # Only needed for the deploy job (skip on PRs to avoid unused Pages artifacts).
       - name: Upload Pages artifact

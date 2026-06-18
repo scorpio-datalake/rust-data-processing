@@ -8,7 +8,7 @@ import shutil
 import sys
 
 from common import REPO_ROOT, banner, run
-from copy_pages_markdown import copy_pages_markdown
+from copy_pages_markdown import publish_pages_markdown
 from docs_java import find_pandoc
 from rust_examples_pages_links import rewrite_file
 
@@ -51,7 +51,7 @@ def generate(*, skip_if_no_pandoc: bool = False) -> None:
         cwd=REPO_ROOT,
     )
     rewrite_file(out_html)
-    copy_pages_markdown(REPO_ROOT / "_site")
+    publish_pages_markdown(REPO_ROOT / "_site", pandoc=pandoc, html=True)
     print(f"Open: {out_html}", flush=True)
 
 

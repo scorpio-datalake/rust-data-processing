@@ -1,11 +1,12 @@
-"""Copy shared Markdown docs onto the GitHub Pages site tree."""
+"""Copy shared Markdown docs onto the GitHub Pages site tree (optional Pandoc HTML)."""
 
 from __future__ import annotations
 
 import argparse
 import shutil
+import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from common import REPO_ROOT
 
@@ -22,7 +23,25 @@ PAGES_MARKDOWN: dict[str, str] = {
     "docs/python/PHASE2_EXAMPLES.md": "python/PHASE2_EXAMPLES.md",
 }
 
+# docs/rust/README.md is rendered as site/rust/examples.html by docs.yml / docs_rust_readme.py.
+PAGES_HTML_SKIP = frozenset({"docs/rust/README.md"})
+
 DEPLOYED_REPO_PATHS = frozenset(PAGES_MARKDOWN.keys())
+
+DEFAULT_PANDOC_HEADER = REPO_ROOT / "docs" / "landing" / "java-examples-pandoc-header.html"
+
+
+def site_html_rel(site_md_rel: str) -> str:
+    if not site_md_rel.endswith(".md"):
+        raise ValueError(f"expected .md site path, got {site_md_rel!r}")
+    return f"{site_md_rel[:-3]}.html"
+
+
+def title_for_markdown(src: Path) -> str:
+    for line in src.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return src.stem.replace("_", " ")
 
 
 def copy_pages_markdown(site_dir: Path) -> None:
@@ -35,6 +54,79 @@ def copy_pages_markdown(site_dir: Path) -> None:
         shutil.copy2(src, dst)
 
 
+def render_pages_markdown_html(
+    site_dir: Path,
+    *,
+    pandoc: str,
+    header: Path = DEFAULT_PANDOC_HEADER,
+) -> list[Path]:
+    if not header.is_file():
+        raise SystemExit(f"Missing Pandoc header: {header}")
+
+    rendered: list[Path] = []
+    for repo_rel, site_rel in PAGES_MARKDOWN.items():
+        if repo_rel in PAGES_HTML_SKIP:
+            continue
+        src = REPO_ROOT / repo_rel
+        if not src.is_file():
+            raise SystemExit(f"Missing doc source for Pages HTML: {src}")
+        out_html = site_dir / site_html_rel(site_rel)
+        out_html.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(
+            [
+                pandoc,
+                str(src),
+                "-f",
+                "markdown+smart",
+                "-o",
+                str(out_html),
+                "--standalone",
+                "--metadata",
+                f"title={title_for_markdown(src)}",
+                "-V",
+                "lang=en",
+                "-H",
+                str(header),
+            ],
+            check=True,
+        )
+        rendered.append(out_html)
+    return rendered
+
+
+def rewrite_shared_pages_html(site_dir: Path) -> None:
+    from docs_pages_links import rewrite_html
+
+    for repo_rel, site_rel in PAGES_MARKDOWN.items():
+        if repo_rel in PAGES_HTML_SKIP:
+            continue
+        html_path = site_dir / site_html_rel(site_rel)
+        if not html_path.is_file():
+            continue
+        markdown_base = PurePosixPath(str(Path(repo_rel).parent))
+        original = html_path.read_text(encoding="utf-8")
+        updated = rewrite_html(original, markdown_base)
+        if updated != original:
+            html_path.write_text(updated, encoding="utf-8")
+
+
+def publish_pages_markdown(
+    site_dir: Path,
+    *,
+    pandoc: str | None = None,
+    header: Path = DEFAULT_PANDOC_HEADER,
+    html: bool = False,
+) -> None:
+    copy_pages_markdown(site_dir)
+    if not html:
+        return
+    pandoc_bin = pandoc or shutil.which("pandoc")
+    if not pandoc_bin:
+        raise SystemExit("pandoc not found (required for --html)")
+    render_pages_markdown_html(site_dir, pandoc=pandoc_bin, header=header)
+    rewrite_shared_pages_html(site_dir)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -44,9 +136,34 @@ def main(argv: list[str] | None = None) -> int:
         default=REPO_ROOT / "site",
         help="Pages site root (default: site/; local builds use _site/)",
     )
+    parser.add_argument(
+        "--html",
+        action="store_true",
+        help="Also render Pandoc HTML for shared docs (CONNECTORS.html, …)",
+    )
+    parser.add_argument("--pandoc", default=None, help="pandoc executable (default: PATH)")
+    parser.add_argument(
+        "--header",
+        type=Path,
+        default=DEFAULT_PANDOC_HEADER,
+        help="Pandoc header HTML (shared stylesheet)",
+    )
     args = parser.parse_args(argv)
-    copy_pages_markdown(args.site_dir.resolve())
-    print(f"Copied {len(PAGES_MARKDOWN)} markdown files into {args.site_dir}", flush=True)
+    site_dir = args.site_dir.resolve()
+    publish_pages_markdown(
+        site_dir,
+        pandoc=args.pandoc,
+        header=args.header.resolve(),
+        html=args.html,
+    )
+    if args.html:
+        count = len(PAGES_MARKDOWN) - len(PAGES_HTML_SKIP)
+        print(
+            f"Copied {len(PAGES_MARKDOWN)} markdown files and rendered {count} HTML pages into {site_dir}",
+            flush=True,
+        )
+    else:
+        print(f"Copied {len(PAGES_MARKDOWN)} markdown files into {site_dir}", flush=True)
     return 0
 
 

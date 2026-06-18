@@ -73,11 +73,12 @@ def generate() -> None:
     shutil.copy2(nested, flat)
 
     from python_examples_pages_links import rewrite_file as rewrite_python_links
-    from copy_pages_markdown import copy_pages_markdown
+    from copy_pages_markdown import publish_pages_markdown
 
     rewrite_python_links(flat)
     rewrite_python_links(nested)
-    copy_pages_markdown(REPO_ROOT / "_site")
+    pandoc = shutil.which("pandoc")
+    publish_pages_markdown(REPO_ROOT / "_site", pandoc=pandoc, html=bool(pandoc))
     print(f"Open: {py_out / 'index.html'}", flush=True)
 
 
