@@ -36,6 +36,7 @@ BUMP_PATHS = [
     "bindings/java/rust-data-processing-jvm/pom.xml",
     "bindings/java/rust-data-processing-jvm-examples/pom.xml",
     "bindings/java/rust-data-processing-jvm-spark/pom.xml",
+    "bindings/java/rdp-jvm-sys/pom.xml",
 ]
 
 JVM_POM_RE = re.compile(
