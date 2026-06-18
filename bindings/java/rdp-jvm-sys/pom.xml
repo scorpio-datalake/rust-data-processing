@@ -6,7 +6,7 @@
 
   <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
   <artifactId>rdp-jvm-sys</artifactId>
-  <version>0.3.4</version>
+  <version>0.3.5</version>
   <packaging>pom</packaging>
   <name>rdp-jvm-sys (native classifiers)</name>
   <description>Prebuilt rdp_jvm_sys shared libraries per OS/CPU for Panama FFM. Classifier JARs contain META-INF/native/ only — not a fat JAR.</description>
