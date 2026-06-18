@@ -72,6 +72,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install native build deps
         run: |
           sudo apt-get update -qq
@@ -83,7 +87,7 @@ jobs:
       - name: Package classifier JAR
         run: |
           python3 scripts/package_rdp_jvm_sys_native_jar.py linux-x86_64 \
-            bindings/jvm-sys/target/release/librdp_jvm_sys.so
+            target/release/librdp_jvm_sys.so
       - uses: actions/upload-artifact@v4
         with:
           name: rdp-jvm-sys-linux-x86_64
@@ -97,6 +101,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install native build deps
         run: |
           sudo apt-get update -qq
@@ -108,7 +116,7 @@ jobs:
       - name: Package classifier JAR
         run: |
           python3 scripts/package_rdp_jvm_sys_native_jar.py linux-aarch64 \
-            bindings/jvm-sys/target/release/librdp_jvm_sys.so
+            target/release/librdp_jvm_sys.so
       - uses: actions/upload-artifact@v4
         with:
           name: rdp-jvm-sys-linux-aarch64
@@ -122,6 +130,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Strawberry Perl (Windows — openssl-sys vendored build)
+        shell: pwsh
+        run: choco install strawberryperl -y --no-progress
       - name: cargo build (full)
         shell: bash
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
@@ -129,7 +144,7 @@ jobs:
         shell: bash
         run: |
           python3 scripts/package_rdp_jvm_sys_native_jar.py windows-x86_64 \
-            bindings/jvm-sys/target/release/rdp_jvm_sys.dll
+            target/release/rdp_jvm_sys.dll
       - uses: actions/upload-artifact@v4
         with:
           name: rdp-jvm-sys-windows-x86_64
@@ -143,12 +158,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: cargo build (full)
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
       - name: Package classifier JAR
         run: |
           python3 scripts/package_rdp_jvm_sys_native_jar.py osx-aarch64 \
-            bindings/jvm-sys/target/release/librdp_jvm_sys.dylib
+            target/release/librdp_jvm_sys.dylib
       - uses: actions/upload-artifact@v4
         with:
           name: rdp-jvm-sys-osx-aarch64
@@ -162,6 +181,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: cargo build (full, x86_64 cross-target)
         run: |
           rustup target add x86_64-apple-darwin
@@ -170,7 +193,7 @@ jobs:
       - name: Package classifier JAR
         run: |
           python3 scripts/package_rdp_jvm_sys_native_jar.py osx-x86_64 \
-            bindings/jvm-sys/target/x86_64-apple-darwin/release/librdp_jvm_sys.dylib
+            target/x86_64-apple-darwin/release/librdp_jvm_sys.dylib
       - uses: actions/upload-artifact@v4
         with:
           name: rdp-jvm-sys-osx-x86_64
