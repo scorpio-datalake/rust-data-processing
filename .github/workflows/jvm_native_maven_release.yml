@@ -134,17 +134,12 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Install Strawberry Perl (Windows — openssl-sys vendored build)
-        shell: pwsh
-        run: choco install strawberryperl -y --no-progress
+      # Match jvm_bindings_ci.yml: GitHub windows-latest builds `--features full` without
+      # Strawberry Perl. A choco perl install + bash shell was failing cargo (exit 101).
       - name: cargo build (full)
-        shell: bash
         run: cargo build --release --manifest-path bindings/jvm-sys/Cargo.toml --features full
       - name: Package classifier JAR
-        shell: bash
-        run: |
-          python3 scripts/package_rdp_jvm_sys_native_jar.py windows-x86_64 \
-            target/release/rdp_jvm_sys.dll
+        run: python3 scripts/package_rdp_jvm_sys_native_jar.py windows-x86_64 target/release/rdp_jvm_sys.dll
       - uses: actions/upload-artifact@v4
         with:
           name: rdp-jvm-sys-windows-x86_64
@@ -208,7 +203,14 @@ jobs:
       - build-windows-x86_64
       - build-macos-aarch64
       - build-macos-x86_64
-    if: needs.gate.outputs.skip != 'true'
+    # Publish when the four Linux/macOS jobs succeed. Windows is best-effort — a failure
+    # must not block Maven Central for the other classifiers (see jvm_bindings_ci parity).
+    if: |
+      needs.gate.outputs.skip != 'true' &&
+      needs.build-linux-x86_64.result == 'success' &&
+      needs.build-linux-aarch64.result == 'success' &&
+      needs.build-macos-aarch64.result == 'success' &&
+      needs.build-macos-x86_64.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -278,6 +280,9 @@ jobs:
           mkdir -p bindings/java/rdp-jvm-sys/target/native-jars
           find native-artifacts -name 'rdp-jvm-sys-*.jar' -exec cp -v {} bindings/java/rdp-jvm-sys/target/native-jars/ \;
           ls -la bindings/java/rdp-jvm-sys/target/native-jars/
+          if [[ "${{ needs.build-windows-x86_64.result }}" != "success" ]]; then
+            echo "::warning::windows-x86_64 classifier missing — deploy will publish other platforms only."
+          fi
 
       - name: Deploy classifier JARs
         env:
