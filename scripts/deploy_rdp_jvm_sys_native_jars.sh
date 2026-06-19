@@ -49,7 +49,7 @@ classifier_on_central() {
   local classifier="$1"
   local url="${CENTRAL_BASE}/${VERSION}/rdp-jvm-sys-${VERSION}-${classifier}.jar"
   local code
-  code="$(curl -fsSL -o /dev/null -w "%{http_code}" "${url}" || true)"
+  code="$(curl -sS -o /dev/null -w "%{http_code}" "${url}" 2>/dev/null || echo "000")"
   [[ "${code}" == "200" ]]
 }
 
@@ -81,6 +81,11 @@ done
 mvn_args+=(verify deploy)
 
 echo "Deploying ${#jars[@]} classifier(s) via central-publishing-maven-plugin..."
+if [[ "${SKIP_EXISTING}" == true ]]; then
+  # POM (and any classifiers already on Central) must not be re-bundled — Sonatype rejects
+  # "Component ... type=pom already exists" when adding missing classifiers to 0.3.5.
+  mvn_args+=("-DignorePublishedComponents=true")
+fi
 if [[ -n "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
   export MAVEN_GPG_PASSPHRASE
   mvn_args+=("-Dgpg.passphrase=${MAVEN_GPG_PASSPHRASE}")
