@@ -58,6 +58,7 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${DEPLOY_ONLY_INPUT}" == "true" ]]; then
             echo "deploy_only=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy-only run (reusing artifacts from run ${{ github.event.inputs.artifacts_run_id }})"
           else
             echo "deploy_only=false" >> "$GITHUB_OUTPUT"
           fi
@@ -220,8 +221,11 @@ jobs:
       - build-windows-x86_64
       - build-macos-aarch64
       - build-macos-x86_64
-    # deploy_only: skip ~30 min of builds and reuse artifacts from a prior run.
+    # always() required: when deploy_only skips build jobs, GitHub otherwise auto-skips
+    # this job even if the if expression below would be true.
     if: |
+      always() &&
+      needs.gate.result == 'success' &&
       needs.gate.outputs.skip != 'true' && (
         needs.gate.outputs.deploy_only == 'true' ||
         (
