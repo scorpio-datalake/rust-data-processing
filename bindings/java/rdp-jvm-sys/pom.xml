@@ -41,11 +41,31 @@
   </scm>
 
   <profiles>
-    <!-- Staged by scripts/deploy_rdp_jvm_sys_native_jars.sh → mvn central-publishing:publish -->
+    <!-- CI: mvn -Pcentral-release deploy (after build-helper attach-artifact for classifiers) -->
     <profile>
       <id>central-release</id>
       <build>
         <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.8</version>
+            <configuration>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
           <plugin>
             <groupId>org.sonatype.central</groupId>
             <artifactId>central-publishing-maven-plugin</artifactId>

@@ -1,21 +1,17 @@
 #!/usr/bin/env bash
 # Deploy all rdp-jvm-sys-{version}-{classifier}.jar files to Maven Central (Sonatype Portal).
 #
-# Uses central-publishing-maven-plugin (same as rust-data-processing-jvm), NOT
-# gpg:sign-and-deploy-file — the Portal publisher URL is not a Maven repo endpoint.
+# Attaches each prebuilt classifier to the pom-packaged module, then `mvn deploy` via
+# central-publishing-maven-plugin (same flow as rust-data-processing-jvm).
 set -euo pipefail
 
 VERSION="${1:?version}"
 JAR_DIR="${2:?jar directory}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODULE="${REPO_ROOT}/bindings/java/rdp-jvm-sys"
-POM="${MODULE}/pom.xml"
-STAGING="${MODULE}/target/central-staging"
-GROUP_PATH="io/github/scorpio-datalake/rust-data-processing/rdp-jvm-sys/${VERSION}"
-OUT="${STAGING}/${GROUP_PATH}"
 
-if [[ ! -f "${POM}" ]]; then
-  echo "Missing POM: ${POM}" >&2
+if [[ ! -f "${MODULE}/pom.xml" ]]; then
+  echo "Missing POM: ${MODULE}/pom.xml" >&2
   exit 1
 fi
 
@@ -26,32 +22,29 @@ if [[ ${#jars[@]} -eq 0 ]]; then
   exit 1
 fi
 
-rm -rf "${STAGING}"
-mkdir -p "${OUT}"
+cd "${MODULE}"
 
-cp "${POM}" "${OUT}/rdp-jvm-sys-${VERSION}.pom"
+# One deploy bundles pom + all classifiers. build-helper attach-artifact is per goal.
+mvn_args=(mvn -B -Pcentral-release)
 for jar in "${jars[@]}"; do
   base="$(basename "${jar}" .jar)"
   classifier="${base#rdp-jvm-sys-${VERSION}-}"
-  echo "Staging rdp-jvm-sys:${VERSION}:${classifier}"
-  cp "${jar}" "${OUT}/rdp-jvm-sys-${VERSION}-${classifier}.jar"
+  echo "Attach rdp-jvm-sys:${VERSION}:${classifier}"
+  mvn_args+=(
+    org.codehaus.mojo:build-helper-maven-plugin:3.6.0:attach-artifact
+    "-Dfile=${jar}"
+    "-Dclassifier=${classifier}"
+    -Dtype=jar
+  )
 done
+mvn_args+=(deploy)
 
-if [[ -z "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
-  echo "MAVEN_GPG_PASSPHRASE is required for signing." >&2
-  exit 1
+echo "Deploying ${#jars[@]} classifier(s) via central-publishing-maven-plugin..."
+if [[ -n "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
+  export MAVEN_GPG_PASSPHRASE
+  mvn_args+=("-Dgpg.passphrase=${MAVEN_GPG_PASSPHRASE}")
 fi
 
-export GPG_TTY=""
-for f in "${OUT}/rdp-jvm-sys-${VERSION}.pom" "${OUT}/rdp-jvm-sys-${VERSION}-"*.jar; do
-  gpg --batch --yes --pinentry-mode loopback \
-    --passphrase "${MAVEN_GPG_PASSPHRASE}" \
-    --detach-sign --armor "${f}"
-done
-
-echo "Publishing bundle via central-publishing-maven-plugin (${#jars[@]} classifier(s))..."
-cd "${MODULE}"
-mvn -B -Pcentral-release \
-  org.sonatype.central:central-publishing-maven-plugin:0.10.0:publish
+"${mvn_args[@]}"
 
 echo "Deployed ${#jars[@]} native classifier JAR(s) to Maven Central."
