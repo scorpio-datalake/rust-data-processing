@@ -41,7 +41,8 @@
   </scm>
 
   <profiles>
-    <!-- Attach prebuilt classifier JARs when -Drdp.native.jar.<classifier>=/path is set (CI deploy script). -->
+    <!-- Attach prebuilt classifier JARs when -Drdp.native.jar.<classifier>=/path is set (CI deploy script).
+         Each profile must use a unique build-helper execution id; duplicate ids merge and only one classifier attaches. -->
     <profile>
       <id>native-jar-linux-x86_64</id>
       <activation>
@@ -55,7 +56,7 @@
             <version>3.6.0</version>
             <executions>
               <execution>
-                <id>attach-native-jar</id>
+                <id>attach-native-jar-linux-x86_64</id>
                 <phase>package</phase>
                 <goals><goal>attach-artifact</goal></goals>
                 <configuration>
@@ -86,7 +87,7 @@
             <version>3.6.0</version>
             <executions>
               <execution>
-                <id>attach-native-jar</id>
+                <id>attach-native-jar-linux-aarch64</id>
                 <phase>package</phase>
                 <goals><goal>attach-artifact</goal></goals>
                 <configuration>
@@ -117,7 +118,7 @@
             <version>3.6.0</version>
             <executions>
               <execution>
-                <id>attach-native-jar</id>
+                <id>attach-native-jar-osx-aarch64</id>
                 <phase>package</phase>
                 <goals><goal>attach-artifact</goal></goals>
                 <configuration>
@@ -148,7 +149,7 @@
             <version>3.6.0</version>
             <executions>
               <execution>
-                <id>attach-native-jar</id>
+                <id>attach-native-jar-osx-x86_64</id>
                 <phase>package</phase>
                 <goals><goal>attach-artifact</goal></goals>
                 <configuration>
@@ -179,7 +180,7 @@
             <version>3.6.0</version>
             <executions>
               <execution>
-                <id>attach-native-jar</id>
+                <id>attach-native-jar-windows-x86_64</id>
                 <phase>package</phase>
                 <goals><goal>attach-artifact</goal></goals>
                 <configuration>

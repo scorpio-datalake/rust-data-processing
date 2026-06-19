@@ -17,7 +17,7 @@ on:
         type: boolean
         default: false
       artifacts_run_id:
-        description: Workflow run ID with classifier artifacts (required when deploy_only)
+        description: Workflow run ID with rdp-jvm-sys-* artifacts (required when deploy_only)
         required: false
         type: string
 
@@ -238,6 +238,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Validate deploy_only inputs
+        if: needs.gate.outputs.deploy_only == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${{ github.event.inputs.artifacts_run_id }}" ]]; then
+            echo "::error::deploy_only requires artifacts_run_id (e.g. 27799654053)."
+            exit 1
+          fi
+
       - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v5
@@ -290,22 +300,17 @@ jobs:
           gpg_private_key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Download classifier JARs from prior workflow run
+      - name: Download native classifier JARs (prior workflow run)
         if: needs.gate.outputs.deploy_only == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACTS_RUN_ID: ${{ github.event.inputs.artifacts_run_id }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${ARTIFACTS_RUN_ID}" ]]; then
-            echo "::error::Set artifacts_run_id when deploy_only=true (e.g. 27799654053)."
-            exit 1
-          fi
-          gh run download "${ARTIFACTS_RUN_ID}" -R "${GITHUB_REPOSITORY}" -D native-artifacts
-          find native-artifacts -name '*.jar' | head -20
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.inputs.artifacts_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: native-artifacts
+          pattern: rdp-jvm-sys-*
+          merge-multiple: true
 
-      - name: Download all native classifier JARs
+      - name: Download native classifier JARs (this workflow run)
         if: needs.gate.outputs.deploy_only != 'true'
         uses: actions/download-artifact@v4
         with:
@@ -331,5 +336,6 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x scripts/deploy_rdp_jvm_sys_native_jars.sh
-          scripts/deploy_rdp_jvm_sys_native_jars.sh "${{ needs.gate.outputs.version }}" \
+          scripts/deploy_rdp_jvm_sys_native_jars.sh --skip-existing \
+            "${{ needs.gate.outputs.version }}" \
             bindings/java/rdp-jvm-sys/target/native-jars
