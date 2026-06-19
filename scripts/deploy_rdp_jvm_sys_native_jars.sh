@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Deploy all rdp-jvm-sys-{version}-{classifier}.jar files to Maven Central (Sonatype Portal).
 #
-# Attaches each prebuilt classifier to the pom-packaged module, then `mvn deploy` via
-# central-publishing-maven-plugin (same flow as rust-data-processing-jvm).
+# Sets -Drdp.native.jar.<classifier> for each JAR; pom profiles attach them at package
+# phase, then central-publishing-maven-plugin deploys the bundle (same as JVM API JAR).
 set -euo pipefail
 
 VERSION="${1:?version}"
@@ -24,18 +24,13 @@ fi
 
 cd "${MODULE}"
 
-# One deploy bundles pom + all classifiers. build-helper attach-artifact is per goal.
 mvn_args=(mvn -B -Pcentral-release)
 for jar in "${jars[@]}"; do
   base="$(basename "${jar}" .jar)"
   classifier="${base#rdp-jvm-sys-${VERSION}-}"
-  echo "Attach rdp-jvm-sys:${VERSION}:${classifier}"
-  mvn_args+=(
-    org.codehaus.mojo:build-helper-maven-plugin:3.6.0:attach-artifact
-    "-Dfile=${jar}"
-    "-Dclassifier=${classifier}"
-    -Dtype=jar
-  )
+  jar_abs="$(cd "$(dirname "${jar}")" && pwd)/$(basename "${jar}")"
+  echo "Attach rdp-jvm-sys:${VERSION}:${classifier} (${jar_abs})"
+  mvn_args+=("-Drdp.native.jar.${classifier}=${jar_abs}")
 done
 mvn_args+=(deploy)
 
