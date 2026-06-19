@@ -39,4 +39,27 @@
     <url>https://github.com/scorpio-datalake/rust-data-processing</url>
     <tag>v${project.version}</tag>
   </scm>
+
+  <profiles>
+    <!-- Staged by scripts/deploy_rdp_jvm_sys_native_jars.sh → mvn central-publishing:publish -->
+    <profile>
+      <id>central-release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.10.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <deploymentName>rdp-jvm-sys-${project.version}</deploymentName>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
