@@ -15,6 +15,15 @@ if [[ ! -f "${MODULE}/pom.xml" ]]; then
   exit 1
 fi
 
+if [[ "${JAR_DIR}" != /* ]]; then
+  JAR_DIR="${REPO_ROOT}/${JAR_DIR}"
+fi
+if [[ ! -d "${JAR_DIR}" ]]; then
+  echo "JAR directory not found: ${JAR_DIR}" >&2
+  exit 1
+fi
+JAR_DIR="$(cd "${JAR_DIR}" && pwd)"
+
 shopt -s nullglob
 jars=("${JAR_DIR}/rdp-jvm-sys-${VERSION}-"*.jar)
 if [[ ${#jars[@]} -eq 0 ]]; then
@@ -28,9 +37,8 @@ mvn_args=(mvn -B -Pcentral-release)
 for jar in "${jars[@]}"; do
   base="$(basename "${jar}" .jar)"
   classifier="${base#rdp-jvm-sys-${VERSION}-}"
-  jar_abs="$(cd "$(dirname "${jar}")" && pwd)/$(basename "${jar}")"
-  echo "Attach rdp-jvm-sys:${VERSION}:${classifier} (${jar_abs})"
-  mvn_args+=("-Drdp.native.jar.${classifier}=${jar_abs}")
+  echo "Attach rdp-jvm-sys:${VERSION}:${classifier} (${jar})"
+  mvn_args+=("-Drdp.native.jar.${classifier}=${jar}")
 done
 mvn_args+=(deploy)
 
