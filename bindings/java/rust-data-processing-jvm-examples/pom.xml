@@ -24,7 +24,7 @@
     <dependency>
       <groupId>io.github.scorpio-datalake.rust-data-processing</groupId>
       <artifactId>rust-data-processing-jvm</artifactId>
-      <version>0.3.5</version>
+      <version>0.3.6</version>
     </dependency>
     <dependency>
       <groupId>org.json</groupId>

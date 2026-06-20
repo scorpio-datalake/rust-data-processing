@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Phase 2 (batch):** `ReduceOp::Median` / `Agg::Median`; UTF-8 privacy `TransformStep`s (`Utf8Truncate`, `Utf8Sha256Hex`, `Utf8RedactMiddle`); validation `Check::Utf8LenCharsBetween`; modules **`export`** (JSONL + deterministic train/test indices), **`privacy`** (UTF-8 diff summaries), **`reports`** (byte-safe truncation); Arrow **`record_batches_to_dataset`** + `LargeUtf8` support; Python bindings `export_dataset_jsonl`, `privacy_summarize_utf8_changes_json`, `reports_truncate_utf8_bytes`.
 - **Docs & examples:** lake read ADR + user guide, SFT format guide, outreach shortlist, ML reduce gap audit, P2-E6 policy + P2-E7 deferral notes, vector export recipe, `examples/{dbt,airflow,tabular_nn,llm_prep}/`, `notebooks/` index + starter notebooks.
 
+## [0.3.6] - 2026-06-20
+
+### Fixed
+
+- **JVM native classifiers on Maven Central:** Republish **`rdp-jvm-sys:0.3.6:{classifier}`** for all five platforms in one release. **`0.3.5`** was only partially published (POM + `windows-x86_64`); Sonatype does not allow adding missing classifiers to an existing GAV. Deploy script now fails fast on partial redeploys and documents the version-bump path.
+
+### Changed
+
+- **`scripts/deploy_rdp_jvm_sys_native_jars.sh`:** Unique per-platform Maven attach profiles; clearer errors when Central already has the POM.
+
 ## [0.3.5] - 2026-06-18
 
 ### Changed
@@ -151,6 +161,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `profiling`, `validation`, `outliers`, `transform` (TransformSpec), `cdc` boundary types.
 - Optional `db_connectorx` for DB → Arrow → `DataSet` ingestion.
 
+[0.3.6]: https://github.com/scorpio-datalake/rust-data-processing/releases/tag/v0.3.6
 [0.3.5]: https://github.com/scorpio-datalake/rust-data-processing/releases/tag/v0.3.5
 [0.3.4]: https://github.com/scorpio-datalake/rust-data-processing/releases/tag/v0.3.4
 [0.3.3]: https://github.com/scorpio-datalake/rust-data-processing/releases/tag/v0.3.3

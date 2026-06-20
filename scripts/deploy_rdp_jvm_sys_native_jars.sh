@@ -2,7 +2,8 @@
 # Deploy all rdp-jvm-sys-{version}-{classifier}.jar files to Maven Central (Sonatype Portal).
 #
 # Fresh release: mvn -Pcentral-release with -Drdp.native.jar.<classifier> properties.
-# Redeploy (POM already on Central): Portal bundle with pom.xml + missing classifier JARs.
+# Partial redeploy (POM already on Central, classifiers missing) is not supported by the
+# Portal API — publish a new VERSION instead (see partial_release_on_central error below).
 #
 # Usage:
 #   deploy_rdp_jvm_sys_native_jars.sh [--skip-existing] VERSION JAR_DIR
@@ -22,9 +23,6 @@ JAR_DIR="${2:?jar directory}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MODULE="${REPO_ROOT}/bindings/java/rdp-jvm-sys"
 CENTRAL_BASE="https://repo1.maven.org/maven2/io/github/scorpio-datalake/rust-data-processing/rdp-jvm-sys"
-MAVEN_PATH="io/github/scorpio-datalake/rust-data-processing/rdp-jvm-sys"
-PORTAL_UPLOAD="https://central.sonatype.com/api/v1/publisher/upload"
-PORTAL_STATUS="https://central.sonatype.com/api/v1/publisher/status"
 
 CLASSIFIER_ORDER=(
   linux-x86_64
@@ -61,22 +59,6 @@ pom_on_central() {
   [[ "$(http_code "${CENTRAL_BASE}/${VERSION}/rdp-jvm-sys-${VERSION}.pom")" == "200" ]]
 }
 
-stage_signed_artifact() {
-  local src="$1"
-  local dest_dir="$2"
-  local base dest
-  base="$(basename "${src}")"
-  dest="${dest_dir}/${base}"
-  if [[ "${src}" != "${dest}" ]]; then
-    cp "${src}" "${dest}"
-  fi
-  gpg --batch --pinentry-mode loopback --passphrase "${MAVEN_GPG_PASSPHRASE}" \
-    --armor --detach-sign --output "${dest}.asc" "${dest}"
-  (cd "${dest_dir}" && md5sum "${base}" | awk '{print $1}' > "${base}.md5")
-  (cd "${dest_dir}" && sha1sum "${base}" | awk '{print $1}' > "${base}.sha1")
-  echo "Staged ${base}"
-}
-
 jars=()
 for classifier in "${CLASSIFIER_ORDER[@]}"; do
   jar="${JAR_DIR}/rdp-jvm-sys-${VERSION}-${classifier}.jar"
@@ -91,6 +73,29 @@ done
 if [[ ${#jars[@]} -eq 0 ]]; then
   echo "No classifier JARs to deploy."
   exit 0
+fi
+
+if [[ "${SKIP_EXISTING}" == true ]] && pom_on_central; then
+  cat >&2 <<EOF
+::error::rdp-jvm-sys:${VERSION} is partially published on Maven Central.
+
+Sonatype rejected supplemental classifier uploads:
+  - Portal bundle without pom.xml → "Bundle has content that does NOT have a .pom file"
+  - Portal bundle with pom.xml    → "type=pom already exists"
+  - Maven ignorePublishedComponents → stages zero files (entire GAV treated as published)
+
+Maven Central releases are immutable once the POM is live
+(https://central.sonatype.org/faq/can-i-change-a-component/).
+
+Fix options:
+  1. Bump bindings/java/VERSION (e.g. 0.3.6), publish a fresh GitHub Release, and run
+     jvm_native_maven_release.yml so all classifiers deploy together.
+  2. Open a Sonatype Central support ticket for deployment c1072cc7-5eb1-4a09-9af8-667e4a315475.
+  3. Local workaround: export RDP_JVM_SYS=/path/to/librdp_jvm_sys.so
+
+Do not re-run deploy_only for ${VERSION}; it cannot succeed via the Portal API.
+EOF
+  exit 1
 fi
 
 deploy_classifiers_via_maven() {
@@ -120,71 +125,6 @@ deploy_classifiers_via_maven() {
   fi
 }
 
-deploy_classifiers_via_portal() {
-  if [[ -z "${MAVEN_CENTRAL_USERNAME:-}" || -z "${MAVEN_CENTRAL_PASSWORD:-}" ]]; then
-    echo "MAVEN_CENTRAL_USERNAME and MAVEN_CENTRAL_PASSWORD required for Portal redeploy." >&2
-    exit 1
-  fi
-  if [[ -z "${MAVEN_GPG_PASSPHRASE:-}" ]]; then
-    echo "MAVEN_GPG_PASSPHRASE required for Portal redeploy." >&2
-    exit 1
-  fi
-
-  local staging_root="${MODULE}/target/classifier-central-staging"
-  local staging_dir="${staging_root}/${MAVEN_PATH}/${VERSION}"
-  local bundle="${MODULE}/target/classifier-central-bundle.zip"
-  local pom_name="rdp-jvm-sys-${VERSION}.pom"
-  rm -rf "${staging_root}"
-  mkdir -p "${staging_dir}"
-
-  echo "POM already on Central — uploading Portal bundle (pom.xml + ${#jars[@]} classifier JAR(s))."
-  cp "${MODULE}/pom.xml" "${staging_dir}/${pom_name}"
-  stage_signed_artifact "${staging_dir}/${pom_name}" "${staging_dir}"
-  for jar in "${jars[@]}"; do
-    stage_signed_artifact "${jar}" "${staging_dir}"
-  done
-
-  rm -f "${bundle}"
-  (cd "${staging_root}" && zip -rq "${bundle}" "${MAVEN_PATH}")
-
-  local bearer deployment_id state
-  bearer="$(printf '%s:%s' "${MAVEN_CENTRAL_USERNAME}" "${MAVEN_CENTRAL_PASSWORD}" | base64 | tr -d '\n')"
-  deployment_id="$(
-    curl -fsS --request POST \
-      --header "Authorization: Bearer ${bearer}" \
-      --form "bundle=@${bundle}" \
-      "${PORTAL_UPLOAD}?name=rdp-jvm-sys-${VERSION}-classifiers&publishingType=AUTOMATIC"
-  )"
-  echo "Uploaded bundle; deploymentId=${deployment_id}"
-
-  for _ in $(seq 1 360); do
-    state="$(
-      curl -fsS --request POST \
-        --header "Authorization: Bearer ${bearer}" \
-        "${PORTAL_STATUS}?id=${deployment_id}" \
-        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("deploymentState",""))'
-    )"
-    echo "Deployment state: ${state}"
-    case "${state}" in
-      PUBLISHED) return 0 ;;
-      FAILED)
-        curl -fsS --request POST \
-          --header "Authorization: Bearer ${bearer}" \
-          "${PORTAL_STATUS}?id=${deployment_id}" >&2 || true
-        echo "::error::Classifier deployment ${deployment_id} failed." >&2
-        exit 1
-        ;;
-    esac
-    sleep 5
-  done
-  echo "::error::Timed out waiting for deployment ${deployment_id} to publish." >&2
-  exit 1
-}
-
-if [[ "${SKIP_EXISTING}" == true ]] && pom_on_central; then
-  deploy_classifiers_via_portal
-else
-  deploy_classifiers_via_maven
-fi
+deploy_classifiers_via_maven
 
 echo "Deployed ${#jars[@]} native classifier JAR(s) to Maven Central."
