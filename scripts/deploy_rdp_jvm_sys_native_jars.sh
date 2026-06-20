@@ -64,11 +64,14 @@ pom_on_central() {
 stage_signed_artifact() {
   local src="$1"
   local dest_dir="$2"
-  local base
+  local base dest
   base="$(basename "${src}")"
-  cp "${src}" "${dest_dir}/${base}"
+  dest="${dest_dir}/${base}"
+  if [[ "${src}" != "${dest}" ]]; then
+    cp "${src}" "${dest}"
+  fi
   gpg --batch --pinentry-mode loopback --passphrase "${MAVEN_GPG_PASSPHRASE}" \
-    --armor --detach-sign --output "${dest_dir}/${base}.asc" "${dest_dir}/${base}"
+    --armor --detach-sign --output "${dest}.asc" "${dest}"
   (cd "${dest_dir}" && md5sum "${base}" | awk '{print $1}' > "${base}.md5")
   (cd "${dest_dir}" && sha1sum "${base}" | awk '{print $1}' > "${base}.sha1")
   echo "Staged ${base}"
