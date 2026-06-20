@@ -42,6 +42,7 @@ Planning/
 bindings/java/**/build/
 bindings/java/**/.gradle/
 .m2/
+.m2-local/
 bindings/java/**/target/
 bindings/java/**/build/
 scripts/git_scripts/
