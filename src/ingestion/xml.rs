@@ -8,6 +8,7 @@ use std::io::{BufReader, Write};
 use std::path::Path;
 
 use quick_xml::Writer;
+use quick_xml::escape::unescape;
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 
 use crate::error::{IngestionError, IngestionResult};
@@ -138,8 +139,10 @@ pub fn ingest_xml_from_path(path: impl AsRef<Path>, schema: &Schema) -> Ingestio
             }
             Ok(Event::Text(e)) => {
                 if let Some(ref field) = active_field {
-                    let text = e
-                        .unescape()
+                    let decoded = e
+                        .xml10_content()
+                        .map_err(|err| xml_err(format!("xml text: {err}")))?;
+                    let text = unescape(&decoded)
                         .map_err(|err| xml_err(format!("xml text: {err}")))?;
                     field_values
                         .entry(field.clone())

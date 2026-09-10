@@ -10,6 +10,9 @@
 #
 # Postgres stack minimums (root `Cargo.toml` direct deps + lockfile): `postgres-protocol` >=0.6.12,
 # `tokio-postgres` >=0.7.18 (each capped below next minor) for RUSTSEC-2026-0178/0179/0180.
+# `crossbeam-epoch` >=0.9.20 (capped below 0.10) for RUSTSEC-2026-0204 (Polars / rayon deque).
+# `h2` >=0.4.16 for RUSTSEC-2026-0258; `quinn-proto` >=0.11.15 for RUSTSEC-2026-0185;
+# `rust_decimal` >=1.43 for RUSTSEC-2026-0235 (drops rkyv 0.7). Direct `quick-xml` is 0.41.
 
 [advisories]
 ignore = [
@@ -33,6 +36,14 @@ ignore = [
   # --- Default build: Polars / parquet / object_store stack ---
   "RUSTSEC-2025-0141", # bincode unmaintained (polars-utils)
   "RUSTSEC-2024-0436", # paste unmaintained (parquet; also oracle when ConnectorX enabled)
+
+  # Direct `quick-xml` is >=0.41. Remaining copies: calamine 0.33 → 0.38 (fix is calamine
+  # 0.36, MSRV 1.88) and object_store 0.13 → 0.39 (Polars pins object_store ^0.13).
+  "RUSTSEC-2026-0194",
+  "RUSTSEC-2026-0195",
+
+  # `suppaftp` CRLF command injection: patched only in >=10.0.2, which requires MSRV 1.88.
+  "RUSTSEC-2026-0271",
 
   # `rand`: informational unsound under narrow custom-logger conditions; reached via Polars and
   # ConnectorX paths. Upstream rand patch levels are gated on ecosystem upgrades.

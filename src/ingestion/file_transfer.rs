@@ -271,6 +271,28 @@ fn download_ftp(
     Ok(())
 }
 
+/// `suppaftp` < 10.0.2 does not reject CR/LF in control-channel arguments (RUSTSEC-2026-0271).
+fn reject_ftp_control_crlf(
+    user: &str,
+    password: &str,
+    dir: &str,
+    file_name: &str,
+) -> IngestionResult<()> {
+    for (label, value) in [
+        ("user", user),
+        ("password", password),
+        ("path", dir),
+        ("file name", file_name),
+    ] {
+        if value.contains('\r') || value.contains('\n') {
+            return Err(IngestionError::SchemaMismatch {
+                message: format!("ftp {label} must not contain CR or LF"),
+            });
+        }
+    }
+    Ok(())
+}
+
 fn download_ftp_plain(
     addr: &str,
     user: &str,
@@ -280,6 +302,8 @@ fn download_ftp_plain(
 ) -> IngestionResult<Vec<u8>> {
     use suppaftp::FtpStream;
     use suppaftp::types::FileType;
+
+    reject_ftp_control_crlf(user, password, dir, file_name)?;
 
     let mut ftp = FtpStream::connect(addr).map_err(|e| IngestionError::Engine {
         message: format!("ftp connect `{addr}`"),
@@ -319,6 +343,8 @@ fn download_ftp_tls(
     dir: &str,
     file_name: &str,
 ) -> IngestionResult<Vec<u8>> {
+    reject_ftp_control_crlf(user, password, dir, file_name)?;
+
     use std::sync::Arc;
 
     use suppaftp::rustls::ClientConfig;
