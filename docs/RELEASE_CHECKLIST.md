@@ -154,7 +154,7 @@ uv run maturin build --release -o dist --find-interpreter --sdist
 ## 5) After publish
 
 1. **GitHub Releases** — create a release for tag **`vX.Y.Z`**; paste **`CHANGELOG`** notes.
-2. **docs.rs** — updates automatically for the published Rust version. If a version shows **“failed to build”**, open **Builds** on docs.rs: **OOM** is common for Polars-heavy crates; this repo sets **`[package.metadata.docs.rs] cargo-args = ["-j", "1"]`** in the root **`Cargo.toml`**. Publish a **patch** (e.g. `0.1.6`) after that change so docs.rs rebuilds. For **compiler errors**, fix the reported issue and republish.
+2. **docs.rs** — updates automatically for the published Rust version. If a version shows **“failed to build”**, open **Builds** on docs.rs. Do **not** set `cargo-args = ["-j", "1"]`: docs.rs already passes `-j`, and a second `--jobs` makes Cargo exit immediately (`--jobs` cannot be used multiple times; this failed **0.3.6**). Publish a **patch** after a metadata or rustdoc fix so docs.rs rebuilds. For **compiler errors**, fix the reported issue and republish.
 3. **PyPI** — verify the new version appears and `pip install rust-data-processing==X.Y.Z` works.
 
 ## Reference

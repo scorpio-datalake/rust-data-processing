@@ -38,8 +38,11 @@ deep = [
     "pyarrow>=15",
 ]
 # HTML API docs (`pdoc` in docs.yml / build_docs).
+# markdown2 2.5.4 (and pdoc 15's vendored copy) emits a second, broken
+# table-of-contents entry for headings that contain inline code.
 docs = [
-    "pdoc>=14,<16",
+    "pdoc>=16,<17",
+    "markdown2>=2.5.5",
 ]
 
 [tool.ruff]

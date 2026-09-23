@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **docs.rs:** Remove `[package.metadata.docs.rs] cargo-args = ["-j", "1"]`. docs.rs already passes `-j`, and Cargo rejects a second `--jobs` (`0.3.6` build #3633397 failed in 11s with `--jobs cannot be used multiple times`). A new crates.io release is required; rebuilding 0.3.6 uses the published metadata and fails the same way.
+
 ### Added
 
 - **JVM native classifiers (P3-E1-S1e):** Maven **`rdp-jvm-sys:{version}:{classifier}`** JARs per OS/CPU; **`RdpNativeJson`** loads from **`META-INF/native/`** on the classpath; CI workflow **`jvm_native_maven_release.yml`**; local smoke **`scripts/test_native_classifier_local.sh`**.
